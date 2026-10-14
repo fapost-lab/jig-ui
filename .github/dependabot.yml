@@ -8,3 +8,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # Types follow the minimum supported Node major (engines: >=24); a newer major would let
+      # code use APIs that Node 24 lacks. Raise it together with engines.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]

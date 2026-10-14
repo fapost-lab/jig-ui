@@ -14,7 +14,7 @@ Goal: every merge reaches the maintainer's machine. Done when a merge to the def
 publishes a prerelease that `npx @fapost/jig-ui@next` starts, and a `v*` tag publishes a stable
 version. Nothing here reads Jig, so it waits for no Jig contract.
 
-- [ ] package and release pipeline — the `@fapost/jig-ui` package with a CLI that checks Node 24+ and serves a placeholder page on 127.0.0.1; CI runs typecheck, tests and the build on Linux, macOS and Windows; a merge to the default branch publishes `<version>-next.<n>` under the `next` tag, a `v*` tag publishes `latest`, both through npm trusted publishing with provenance
+- [ ] `release-pipeline` — package and release pipeline — the `@fapost/jig-ui` package with a CLI that checks Node 24+ and serves a placeholder page on 127.0.0.1; CI runs typecheck, tests and the build on Linux, macOS and Windows; a merge to the default branch publishes `<version>-next.<n>` under the `next` tag, a `v*` tag publishes `latest`, both through npm trusted publishing with provenance
 
 ## Phase 1 — Read-only UI
 

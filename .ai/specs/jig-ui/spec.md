@@ -125,7 +125,14 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
 - Jig UI reads and writes Jig only through the contracts of Jig's `contract-extensions` spec,
   and development does not start before those contracts are in a Jig release (maintainer,
   2026-10-14). The wait is per phase: Phase 1 here starts once Phase 1 of `contract-extensions`
-  (machine-readable Jig) is released, Phase 2 here once its Phase 2 (queue and requests) is. Rejected: parsing Jig's `state` files behind an adapter until the contracts land
+  (machine-readable Jig) is released, Phase 2 here once its Phase 2 (queue and requests) is.
+  Work that reads nothing of Jig — the package and its release pipeline — does not wait
+  (maintainer, 2026-10-14): every merge should reach the maintainer's machine from the start.
+- Every merge to the default branch publishes a prerelease under npm's `next` tag, started with
+  `npx @fapost/jig-ui@next`; a `v*` tag publishes a stable version under `latest`. Publishing
+  runs only in CI, through npm trusted publishing (no token in secrets) with provenance
+  (maintainer, 2026-10-14). Rejected: publishing on tags only — a person is needed for every
+  version the maintainer wants to try. Rejected: parsing Jig's `state` files behind an adapter until the contracts land
   — it ties the UI to a format Jig never promised, and the adapter would be thrown away.
 - Each phase is released on its own from the default branch; there is no epic branch
   (maintainer, 2026-10-14). Phase 1 alone — a read-only board — is worth a release.

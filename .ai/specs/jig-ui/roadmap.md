@@ -5,8 +5,16 @@ every project, orders and prioritises them, and files new tasks — and Jig work
 when that page is not installed.
 
 External dependency: Jig's spec `contract-extensions` (fapost-lab/jig, `.ai/specs/contract-extensions/`).
-No task of Phase 1 here starts before its Phase 1 (machine-readable Jig) is in a Jig release; no
+Phase 0 reads nothing of Jig and does not wait. No task of Phase 1 here starts before its Phase 1 (machine-readable Jig) is in a Jig release; no
 task of Phase 2 here starts before its Phase 2 (queue and requests) is.
+
+## Phase 0 — Package and release
+
+Goal: every merge reaches the maintainer's machine. Done when a merge to the default branch
+publishes a prerelease that `npx @fapost/jig-ui@next` starts, and a `v*` tag publishes a stable
+version. Nothing here reads Jig, so it waits for no Jig contract.
+
+- [ ] package and release pipeline — the `@fapost/jig-ui` package with a CLI that checks Node 24+ and serves a placeholder page on 127.0.0.1; CI runs typecheck, tests and the build on Linux, macOS and Windows; a merge to the default branch publishes `<version>-next.<n>` under the `next` tag, a `v*` tag publishes `latest`, both through npm trusted publishing with provenance
 
 ## Phase 1 — Read-only UI
 
@@ -16,7 +24,7 @@ agent, and the page follows without a reload; stopping the UI changes nothing in
 
 Every item updates the pages in `docs/` it changes.
 
-- [ ] walking skeleton — `npx @fapost/jig-ui` checks Node 24+, starts one instance on 127.0.0.1 with a per-start token, opens the browser on an empty page, and a second start opens the running one once it answers; CI runs Vitest and the build, and a tag publishes the package to npm
+- [ ] walking skeleton — `npx @fapost/jig-ui` starts one instance on 127.0.0.1 with a per-start token and the `Host`/`Origin` guard, opens the browser on the Vue page, and a second start opens the running one once it answers (after: package and release pipeline — it extends that package and ships through it)
 - [ ] project registry and connect — connect by path, a clone's main checkout only (a worktree path is refused and named), slug rules, disconnect; a project below Jig's minimum version is shown as such, not read (after: walking skeleton — the registry lives in its config directory and its page)
 - [ ] live updates — watcher with a periodic rescan per connected project, the whole `.ai/`, debounced into "project changed" over SSE; the page re-fetches and keeps the last good read when one fails; the cost is measured with several agents in several projects (after: project registry — it watches what is connected)
 - [ ] workspace dashboard — every connected project with its counts and what needs the person, from Jig's attention items (after: project registry — it lists connected projects)
@@ -44,12 +52,13 @@ instead of being overwritten.
 
 ## Waves
 
-1. walking skeleton
-2. project registry and connect
-3. live updates; workspace dashboard; project board
-4. task details; specs and epics
-5. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
-6. conflict display
+1. package and release pipeline
+2. walking skeleton
+3. project registry and connect
+4. live updates; workspace dashboard; project board
+5. task details; specs and epics
+6. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
+7. conflict display
 
 <!--
 Rules (jig-idea §8):

@@ -5,8 +5,8 @@ every project, orders and prioritises them, and files new tasks — and Jig work
 when that page is not installed.
 
 External dependency: Jig's spec `contract-extensions` (fapost-lab/jig, `.ai/specs/contract-extensions/`).
-Its Phase 1 (machine-readable Jig) comes before Phase 1 here goes past a prototype; its Phase 2
-(queue and requests) comes before Phase 2 here.
+No task of Phase 1 here starts before its Phase 1 (machine-readable Jig) is in a Jig release; no
+task of Phase 2 here starts before its Phase 2 (queue and requests) is.
 
 ## Phase 1 — Read-only UI
 

@@ -94,16 +94,26 @@ Findings from checking the concept against Jig 0.26.0:
   documented requirement, not something Jig UI bundles (maintainer, 2026-10-14). Rejected for
   now: a single self-contained binary for people without a development environment — it stays
   the Phase 3 fog item on installation.
-- Jig UI has an installer, and the installer checks the Node.js requirement before it installs
-  anything (maintainer, 2026-10-14).
+- Installing and starting Jig UI is one command, `npx @fapost/jig-ui`; what matters is that
+  installation is very simple, not that a separate installer exists (maintainer, 2026-10-14).
+  The package is scoped because `jig-ui` on npm belongs to an unrelated project; the `@fapost`
+  scope is the maintainer's, and `@jig` is held by someone else (checked 2026-10-14). Rejected: a
+  git-clone installer like Jig's own, which builds on the user's machine and adds a script to
+  maintain on two platforms; it comes back only if `npx` proves not simple enough.
+- Jig UI reads and writes Jig only through the contracts of Jig's `contract-extensions` spec,
+  and development does not start before those contracts are in a Jig release (maintainer,
+  2026-10-14). The wait is per phase: Phase 1 here starts once Phase 1 of `contract-extensions`
+  (machine-readable Jig) is released, Phase 2 here once its Phase 2 (queue and requests) is. Rejected: parsing Jig's `state` files behind an adapter until the contracts land
+  — it ties the UI to a format Jig never promised, and the adapter would be thrown away.
+- Stack: Vue 3 + Vite + TypeScript in the browser, Hono on Node.js with Server-Sent Events for
+  live updates, one process serving both the API and the built page (maintainer, 2026-10-14).
+  Details and rejected options are in `stack.md`.
 - Public documentation lives in `docs/` of this repository and is published with Mintlify
   (maintainer, 2026-10-14). The requirements page states the Node.js requirement the installer
   checks.
 
 ## Open questions
 
-- Stack: Node.js + Vue and SSE are hypotheses; the prototype decides. Condition: one command to
-  start, no native dependencies.
 - How `jig init` registers a project in an installed UI without making the UI a dependency of
   Jig — needs a small hook on Jig's side, not designed yet.
 

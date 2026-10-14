@@ -90,13 +90,20 @@ Findings from checking the concept against Jig 0.26.0:
 - The UI never runs agents; it reads and writes through Jig's commands (from research.md: running
   agents from the UI is aif-handoff's largest cost).
 - The repository is `fapost-lab/jig-ui` (maintainer, 2026-10-14).
+- The first version is for a developer with a terminal. Node.js installed on the machine is a
+  documented requirement, not something Jig UI bundles (maintainer, 2026-10-14). Rejected for
+  now: a single self-contained binary for people without a development environment — it stays
+  the Phase 3 fog item on installation.
+- Jig UI has an installer, and the installer checks the Node.js requirement before it installs
+  anything (maintainer, 2026-10-14).
+- Public documentation lives in `docs/` of this repository and is published with Mintlify
+  (maintainer, 2026-10-14). The requirements page states the Node.js requirement the installer
+  checks.
 
 ## Open questions
 
 - Stack: Node.js + Vue and SSE are hypotheses; the prototype decides. Condition: one command to
   start, no native dependencies.
-- Who is the user: a developer with a terminal, or a non-developer on Windows? Decides the
-  install story.
 - How `jig init` registers a project in an installed UI without making the UI a dependency of
   Jig — needs a small hook on Jig's side, not designed yet.
 

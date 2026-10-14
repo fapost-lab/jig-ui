@@ -25,7 +25,8 @@ maintainer on 2026-10-14).
   its interface settings.
 - Jig UI reads and changes projects only through the machine-readable contracts of Jig's
   `contract-extensions` spec, and runs no agents. A phase of Jig UI starts only once the Jig
-  contracts it needs are in a Jig release.
+  contracts it needs are in a Jig release. Work that reads nothing of Jig — the package and its
+  release pipeline — does not wait (maintainer, 2026-10-14).
 
 ## Alternatives
 

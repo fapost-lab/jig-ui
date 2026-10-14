@@ -31,3 +31,7 @@ nbproject/
 *~
 .DS_Store
 Thumbs.db
+
+# Build and dependencies
+node_modules/
+dist/

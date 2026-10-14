@@ -27,7 +27,15 @@ are added as sections of this file.
   minimum Jig version it reads. (spec `jig-ui`, stack.md. Checked by `jig verify`.)
 - `jig` is spawned with `execFile` and no shell; on Windows through Git's bash.
   (adr-20261014-stack-vue-hono-sse-on-node. Checked in review.)
-- No native dependencies; the published package carries the page already built.
-  (adr-20261014-stack-vue-hono-sse-on-node. Checked in review of `package.json` and by CI.)
+- The published package has no native runtime dependencies and carries the page already built;
+  development tools (the TypeScript compiler, Vitest's bundler) may be native.
+  (adr-20261014-stack-vue-hono-sse-on-node. Checked in review of `package.json` `dependencies`.)
+- The package is published only by `.github/workflows/release.yml`, through npm trusted
+  publishing: never with a token, never from a machine, except the one-time bootstrap in
+  `RELEASING.md`. The job holding `id-token: write` installs no dependencies; publishing waits for
+  the CI matrix on Linux, macOS and Windows; a tag publishes only a commit on `main`.
+  (spec `jig-ui`, Phase 0. Checked in review of `.github/workflows/`.)
+- Every action in `.github/workflows/` is pinned to a full commit SHA with its version in a
+  comment; Dependabot proposes updates. (spec `jig-ui`, Phase 0. Checked in review.)
 - Work that changes what a user sees or does updates the pages in `docs/` it affects.
   (spec `jig-ui`, roadmap. Checked in review.)

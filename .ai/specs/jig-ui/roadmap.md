@@ -40,10 +40,11 @@ instead of being overwritten.
 
 ## Waves
 
-1. Prototype and stack choice.
-2. Registry; file watching.
-3. Board; task details.
-4. Phase 2, once Jig's queue exists.
+1. prototype and stack choice
+2. project registry and connect; file watching with a periodic rescan
+3. workspace dashboard and project board; task details
+4. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
+5. conflict display
 
 <!--
 Rules (jig-idea §8):

@@ -14,4 +14,79 @@ Informal synonyms: <words people say instead>.
 Use in: source code, schema, API, documentation.
 ```
 
-<!-- Add terms below. Delete this comment when the first real term is added. -->
+
+## Connected project
+
+A Jig project registered in Jig UI by the path of its main checkout, and named by an id
+everywhere else.
+
+Informal synonyms: repo, clone, workspace (wrong: workspace is all connected projects).
+Use in: source code, API, documentation.
+
+## Main checkout
+
+A clone's primary working tree, which lists every task of the clone; a worktree is never
+connected.
+
+Informal synonyms: root, main repo.
+Use in: source code, documentation.
+
+## Registry
+
+Jig UI's list of connected projects, kept in the user's config directory; the only data Jig UI
+owns besides interface settings.
+
+Informal synonyms: project list, database (wrong: there is none).
+Use in: source code, documentation.
+
+## Workspace
+
+All connected projects together, as the workspace dashboard shows them.
+
+Informal synonyms: overview, all projects.
+Use in: source code, API, documentation.
+
+## Board
+
+One connected project's tasks laid out in columns derived from Jig's state.
+
+Informal synonyms: kanban.
+Use in: source code, API, documentation.
+
+## Column
+
+A board lane computed from a task's Jig state; never stored.
+
+Informal synonyms: status (wrong: status is one of Jig's fields the column is computed from).
+Use in: source code, documentation.
+
+## Request
+
+A sticky ask from the page — pause, resume — that Jig holds until it is honoured or cancelled;
+the card shows it with its age.
+
+Informal synonyms: pending move.
+Use in: source code, API, documentation.
+
+## Revision
+
+The version of a project's state a read came from; carried by the change signal and sent back
+with every write, so a stale write is refused.
+
+Informal synonyms: version, etag, hash.
+Use in: source code, API.
+
+## ProjectSource
+
+The port through which the server reads and changes a connected project; the local adapter is
+built from JigClient and Watcher.
+
+Informal synonyms: provider, backend.
+Use in: source code.
+
+## JigClient
+
+The module that runs `jig` and validates its JSON; the only code that knows Jig's shapes.
+
+Informal synonyms: Jig adapter, CLI wrapper.
+Use in: source code.

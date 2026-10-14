@@ -22,7 +22,7 @@
 # file but you (ADR-0024), so a key added by a newer Jig is one this file will
 # go on saying nothing about, and `jig doctor` names those.
 
-profiles: [generic]
+profiles: [generic, node]
 adapters: [claude, codex]
 
 git.base_branch: main                 # merge target for ancestry checks

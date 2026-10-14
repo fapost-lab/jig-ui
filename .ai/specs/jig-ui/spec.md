@@ -140,6 +140,8 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
 
 ## Open questions
 
+The first three are raised in Jig's `contract-extensions` spec (fapost-lab/jig#242).
+
 - For Jig's `contract-extensions`: does reading Jig's JSON stay offline, with pull request and CI
   state refreshed by housekeeping, so a rescan never calls the network? Decides the rescan
   interval and whether the board can show remote state live.

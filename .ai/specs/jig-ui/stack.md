@@ -10,6 +10,10 @@ native dependencies, Node.js already on the machine.
   that waits for Jig's contracts is likely to ship.
 - **Distribution:** an npm package, `@fapost/jig-ui`, started with `npx @fapost/jig-ui`.
   The package ships the page already built; nothing compiles on the user's machine.
+- **Publishing:** only from GitHub Actions, through npm trusted publishing with provenance. A
+  merge to the default branch publishes `<version>-next.<n>` under the `next` tag; a `v*` tag
+  matching `package.json` publishes under `latest`. The very first version is published by hand,
+  because a trusted publisher is configured on a package that already exists.
 - **Server:** Hono on `@hono/node-server`. One process serves the JSON API, the live-update
   stream and the built page.
 - **Live updates:** Server-Sent Events (Hono `streamSSE`). Writes are ordinary HTTP requests, so

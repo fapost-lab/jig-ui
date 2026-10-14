@@ -9,9 +9,11 @@ showing it, so the edges are what deserve a seam.
 
 ```
 server/
-  jig/        JigClient port: run jig, parse and validate its JSON
+  source/     ProjectSource port: the only way the rest reads or changes a project
+              (one adapter today: local, built from jig/ and watch/)
+  jig/        JigClient: run jig, parse and validate its JSON
               (real adapter, and a fake over fixtures for tests)
-  watch/      Watcher port: fs.watch + rescan -> "project changed"
+  watch/      Watcher: fs.watch + rescan -> "project changed"
   registry/   connect and disconnect projects, the config directory, one instance
   board/      workspace overview and per-project boards, read from JigClient
   task/       task details, read from JigClient
@@ -27,7 +29,29 @@ web/
   data.
 - **Watcher** emits that a project changed and nothing more; what changed is read through
   JigClient.
-- Dependencies point inward to `jig/` and `watch/`; `http/` is the only module that knows Hono.
+- **ProjectSource** is what `board/`, `task/` and `live/` depend on: read a project, list its
+  tasks and specs, subscribe to its changes, send a command. The local adapter composes JigClient
+  and Watcher; nothing outside `source/` knows that a project is a directory.
+- Dependencies point inward to `source/`; `http/` is the only module that knows Hono.
+
+## Room for a hosted or self-hosted Jig UI
+
+Jig UI may later run in the cloud or on a team's own server (maintainer, 2026-10-14). Nothing of
+that is built in Phase 1, but four seams keep it open:
+
+1. **ProjectSource is a port.** A later remote adapter is a connector on the machine that holds
+   the projects, pushing snapshots and taking commands; the server side does not change.
+2. **Projects are named by id, never by path.** The API and the page speak project ids; a path is
+   a property of the local source. `web/` knows nothing of the file system or of localhost.
+3. **Access is a replaceable guard in `http/`.** Today the per-start token; later accounts. The
+   bind address is configurable and defaults to 127.0.0.1; the server refuses a non-local address
+   while the guard is the local token.
+4. **Writes are commands carrying the revision they were based on**, as Jig's contract does, so
+   they can later travel as a queue of commands to a connector.
+
+Rejected: splitting a local connector from a view server already in Phase 1 — the cloud comes
+closer, but the first version stops being one process started by one command. Rejected: leaving
+it all for later — cheap now, and a rewrite of every module that took a path for granted.
 
 ## Live updates
 

@@ -10,15 +10,19 @@ task of Phase 2 here starts before its Phase 2 (queue and requests) is.
 
 ## Phase 1 — Read-only UI
 
-Goal: the page exists and tells the truth. Done when a person connects two projects, sees both on
-a workspace page and on a board per project, edits a task through an agent, and the page follows
-without a reload; stopping the UI changes nothing in either project.
+Goal: the page exists and tells the truth. Done when a person runs `npx @fapost/jig-ui`, connects
+two projects, sees both on the workspace page and on a board per project, edits a task through an
+agent, and the page follows without a reload; stopping the UI changes nothing in either project.
 
-- [ ] prototype and stack choice — one local command, no native dependencies; checks Node + Vue and SSE against a real clone before the choice is recorded
-- [ ] project registry and connect — manual connect, path and slug rules, a clone's main checkout only (after: prototype — the registry is its first part)
-- [ ] workspace dashboard and project board — columns derived from Jig status, no stored board column (after: registry — boards are per connected project)
-- [ ] task details — status, stage, gate, artifacts, dependencies, attention (after: board — opened from a card)
-- [ ] file watching with a periodic rescan — the whole `.ai/workspace`, not a few files (after: prototype — the watcher is part of the backend it picks)
+Every item updates the pages in `docs/` it changes.
+
+- [ ] walking skeleton — `npx @fapost/jig-ui` checks Node 24+, starts one instance on 127.0.0.1 with a per-start token, opens the browser on an empty page, and a second start opens the running one once it answers; CI runs Vitest and the build, and a tag publishes the package to npm
+- [ ] project registry and connect — connect by path, a clone's main checkout only (a worktree path is refused and named), slug rules, disconnect; a project below Jig's minimum version is shown as such, not read (after: walking skeleton — the registry lives in its config directory and its page)
+- [ ] live updates — watcher with a periodic rescan per connected project, the whole `.ai/`, debounced into "project changed" over SSE; the page re-fetches and keeps the last good read when one fails; the cost is measured with several agents in several projects (after: project registry — it watches what is connected)
+- [ ] workspace dashboard — every connected project with its counts and what needs the person, from Jig's attention items (after: project registry — it lists connected projects)
+- [ ] project board — columns derived from Jig's task state, never stored; light cards (after: project registry — one board per connected project)
+- [ ] task details — status, stage, gate, artifacts, pull request, dependencies, attention, opened from a card (after: project board — a card opens it)
+- [ ] specs and epics — each spec with its phases, progress and epic branch beside the board, from Jig's spec list (after: project board — shown on the project's page)
 - [ ] fog: registration by `jig init` — needs a hook on Jig's side that keeps the UI optional
 
 ## Phase 2 — Planning from the UI
@@ -27,24 +31,25 @@ Goal: the page changes things, only through Jig. Done when a drag, a priority ch
 task all land through Jig commands, and a concurrent change by an agent shows as a conflict
 instead of being overwritten.
 
-- [ ] reorder and prioritise by drag (after: board; Jig queue — writes go through Jig's queue command with the revision)
-- [ ] pause and resume as a request — a drop on the paused column writes a sticky request through Jig; the card shows "requested" with its age and a cancel until Jig's state changes (after: Jig legal actions and requests — they say when a pause is offered)
-- [ ] file a minimal backlog task from the page (after: board — through `jig task new` with a short description)
-- [ ] conflict display (after: reorder — the refusal of a stale revision is what it shows)
+- [ ] reorder and prioritise by drag (after: project board; Jig queue — writes go through Jig's queue command with the revision)
+- [ ] pause and resume as a request — a drop on the paused column writes a sticky request through Jig; the card shows "requested" with its age and a cancel until Jig's state changes (after: project board; Jig legal actions and requests — they say when a pause is offered)
+- [ ] file a minimal backlog task from the page (after: project board — through `jig task new` with a short description)
+- [ ] conflict display (after: reorder and prioritise by drag — the refusal of a stale revision is what it shows)
 
 ## Phase 3 — Further
 
-- [ ] fog: remote access and a hosted view — first form is a read-only snapshot with a revision; authentication and file access rules are not stated
+- [ ] fog: hosted and self-hosted Jig UI — a connector on the machine with the projects behind the ProjectSource port; first form is a read-only snapshot with a revision; accounts and file access rules are not stated
 - [ ] fog: installation for people without a development environment, Windows first
 - [ ] fog: epic and spec planning from the page
 
 ## Waves
 
-1. prototype and stack choice
-2. project registry and connect; file watching with a periodic rescan
-3. workspace dashboard and project board; task details
-4. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
-5. conflict display
+1. walking skeleton
+2. project registry and connect
+3. live updates; workspace dashboard; project board
+4. task details; specs and epics
+5. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
+6. conflict display
 
 <!--
 Rules (jig-idea §8):

@@ -10,6 +10,16 @@ task and epic of every connected project, and later lets a person order, priorit
 them. It is for developers with a terminal and Node.js. Jig works exactly as before without it
 (adr-20261014-jig-ui-is-an-optional-layer-over-jig).
 
+## Built
+
+- `server/cli.ts` — the `jig-ui` command. It imports nothing but the Node version check, so an
+  old Node prints the requirement instead of a stack trace, then loads `server/main.ts`.
+- `server/http/` — the Hono app: a placeholder page behind the local-only `Host`/`Origin` guard,
+  served on 127.0.0.1. No API and no token yet (the walking skeleton adds them).
+- **Release flow.** A merge to `main` runs the CI matrix, builds `dist/` in a job without
+  credentials, and publishes `<version>-next.<run>` under npm's `next` tag; a `v*` tag on a
+  commit of `main` publishes `latest`. Details in `RELEASING.md`.
+
 ## Intended — not built yet
 
 Everything below is decided (spec `jig-ui`) and not built. The task that builds a part moves it
@@ -46,6 +56,8 @@ One npm package with a server and a page
 1. **Start.** `npx @fapost/jig-ui` checks Node 24+, finds a running instance through the config
    directory (and checks it answers) or starts one on 127.0.0.1 with a fresh token, and opens the
    browser on a link carrying the token (adr-20261014-local-server-access-guard).
+   The Node check and the local-only guard of this flow are built; the token and the single
+   instance are not.
 2. **Read and follow.** The page fetches light lists and heavy detail on demand. A file change
    under a project's `.ai/`, debounced, makes ProjectSource re-read through Jig; `live/` sends
    "project X changed, revision R" and the page re-fetches what it shows.

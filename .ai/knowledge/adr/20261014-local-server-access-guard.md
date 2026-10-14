@@ -7,6 +7,7 @@ domains: []
 paths:
   - "server/http/**"
   - "server/registry/**"
+  - server/main.ts
 summary: 127.0.0.1 with Host/Origin checks, a per-start token, one instance, registry in the user's config dir
 ---
 # The local server is reachable only from the user's browser on this machine

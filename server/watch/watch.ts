@@ -1,4 +1,4 @@
-import { type FSWatcher, watch } from 'node:fs';
+import { existsSync, type FSWatcher, watch } from 'node:fs';
 
 export interface Watch {
   /** False once the system watcher failed to start or failed later; the owner may start another. */
@@ -40,6 +40,8 @@ export function watchTree(dir: string, { ignore, onChange, quietMs = 1_000, maxW
     watcher = undefined;
   };
 
+  // Linux's recursive watch does not throw for a missing directory, macOS's does: ask first.
+  if (!existsSync(dir)) return { open: false, close };
   try {
     watcher = watch(dir, { recursive: true }, (_event, file) => {
       // Some systems name no file; that is still a change.

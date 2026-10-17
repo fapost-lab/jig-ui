@@ -75,9 +75,47 @@ export function describe(project: Project): string {
   if (project.state === 'incompatible') {
     return `Jig ${project.jigVersion} answers in a form this Jig UI does not read. Update Jig UI: npx @fapost/jig-ui@latest.`;
   }
-  if (project.state === 'unreadable') return `Jig could not be read (${project.code}). It is tried again on the next load.`;
+  if (project.state === 'unreadable') return `Jig could not be read (${project.code}). It is tried again on the next change.`;
   return project.reason === 'missing' ? 'The project directory is not there any more.' : 'There is no Jig in the project any more.';
 }
 
 /** A link only for a web address: the url comes from the project's files. */
 export const link = (url: string | null): string | undefined => (url?.startsWith('https://') ? url : undefined);
+
+/** Told a project's id when it changed, or nothing when anything may have: the stream came back after a gap. */
+type Listener = (project?: string) => void;
+const listeners = new Set<Listener>();
+let events: EventSource | undefined;
+
+/** Follows the server's change signals; one stream for the whole page. Returns the unsubscribe. */
+export function onChange(listener: Listener): () => void {
+  if (listeners.size === 0) document.addEventListener('visibilitychange', follow); // added once: same function
+  listeners.add(listener);
+  follow();
+  return () => listeners.delete(listener);
+}
+
+/**
+ * Opens the stream while the tab is visible and closes it while hidden: a browser gives one site
+ * six connections over HTTP/1.1, and a stream per open tab would use them up.
+ */
+function follow(): void {
+  if (document.hidden) {
+    events?.close();
+    events = undefined;
+    return;
+  }
+  if (events) return;
+  events = new EventSource('/api/events');
+  // Signals sent while no stream was open are lost — before the first open too, when the tab
+  // loaded hidden: everything is fetched again on every open.
+  events.addEventListener('open', () => {
+    for (const listener of listeners) listener();
+  });
+  events.addEventListener('changed', (event) => {
+    const { project } = JSON.parse((event as MessageEvent<string>).data) as { project: string };
+    for (const listener of listeners) listener(project);
+  });
+  // The browser retries on its own; asking the server says whether it ended or the session did.
+  events.addEventListener('error', () => void api('/api/instance'));
+}

@@ -2,7 +2,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { jigVersion, JigRefusal, JigShapeError, MIN_JIG_VERSION, readStatus, readTasks, supports } from './client.js';
+import { jigVersion, JigRefusal, JigShapeError, MIN_JIG_VERSION, readStatus, readTasks, supports, writtenByReads } from './client.js';
 
 const root = mkdtempSync(join(tmpdir(), 'jig-ui-jig-'));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -161,5 +161,17 @@ describe('a refused read', () => {
   it('is a shape error for another schema', async () => {
     const out = '{"schema":2,"revision":1,"generated_at":"x","data":{"tasks":[]}}';
     await expect(readTasks(answering(`case-${cases++}`, out))).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+describe('writtenByReads', () => {
+  it("passes over Jig's records of its own reads, never the revision or the tasks", () => {
+    expect(writtenByReads('runtime')).toBe(true);
+    expect(writtenByReads('runtime/checkout')).toBe(true);
+    expect(writtenByReads('runtime/working/live-updates')).toBe(true);
+    expect(writtenByReads('runtime/revision')).toBe(false);
+    expect(writtenByReads('runtime/revision/1792229491')).toBe(false);
+    expect(writtenByReads('workspace/tasks/a/state')).toBe(false);
+    expect(writtenByReads('runtimes')).toBe(false);
   });
 });

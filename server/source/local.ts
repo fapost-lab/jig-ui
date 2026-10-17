@@ -1,8 +1,20 @@
 import { existsSync } from 'node:fs';
-import { JigRefusal, JigShapeError, jigVersion, MIN_JIG_VERSION, readStatus, readTasks, supports, type TaskSummary } from '../jig/client.js';
+import {
+  JigRefusal,
+  JigShapeError,
+  jigVersion,
+  MIN_JIG_VERSION,
+  readStatus,
+  readTasks,
+  supports,
+  type TaskSummary,
+  watchDir,
+  writtenByReads,
+} from '../jig/client.js';
 import { addProject, type Project, readProjects, removeProject } from '../registry/projects.js';
+import { type Watch, watchTree } from '../watch/watch.js';
 import { mainCheckout } from './checkout.js';
-import type { ProjectSource, ProjectTasks, ProjectView, Refusal, TaskCounts } from './project-source.js';
+import type { Change, ProjectSource, ProjectTasks, ProjectView, Refusal, TaskCounts } from './project-source.js';
 
 /** Jig's version in the checkout: `null` when Jig is there but names no version Jig UI can read. */
 async function version(root: string): Promise<string | null | undefined> {
@@ -38,6 +50,9 @@ function count(tasks: TaskSummary[]): TaskCounts {
 
 type NotReady = Exclude<ProjectView, { state: 'ready' }>;
 
+/** One read of a project: what the workspace and the board show, and the revision it came from. */
+type Read = { view: ProjectView; tasks: ProjectTasks; revision: number | null };
+
 /**
  * Runs `read` on a connected project whose Jig Jig UI reads; a project gone, below the minimum, or
  * refusing the read comes back as its state instead.
@@ -56,27 +71,26 @@ async function reading<T>({ id, path }: Project, read: (root: string, jigVersion
   }
 }
 
-function view(project: Project): Promise<ProjectView> {
-  return reading(project, async (root, jigVersion) => {
-    const [status, { tasks }] = await Promise.all([readStatus(root), readTasks(root)]);
-    return {
+async function readProject(project: Project): Promise<Read> {
+  const read = await reading(project, async (root, jigVersion) => {
+    const [status, list] = await Promise.all([readStatus(root), readTasks(root)]);
+    return { status, list, jigVersion };
+  });
+  if (!('list' in read)) return { view: read, tasks: read, revision: null };
+  const { status, list, jigVersion } = read;
+  return {
+    view: {
       id: project.id,
-      state: 'ready' as const,
+      state: 'ready',
       jigVersion,
-      counts: count(tasks),
+      counts: count(list.tasks),
       attention: status.attention,
       housekeepingStale: status.housekeepingStale,
-    };
-  });
-}
-
-function tasksOf(project: Project): Promise<ProjectTasks> {
-  return reading(project, async (root) => {
-    const { tasks, hidden } = await readTasks(root);
-    return {
-      state: 'ready' as const,
+    },
+    tasks: {
+      state: 'ready',
       // Jig's live list holds active and ready tasks only.
-      tasks: tasks.flatMap((t) =>
+      tasks: list.tasks.flatMap((t) =>
         t.status === 'active' || t.status === 'ready'
           ? [
               {
@@ -93,29 +107,171 @@ function tasksOf(project: Project): Promise<ProjectTasks> {
             ]
           : [],
       ),
-      finished: hidden,
-    };
-  });
+      finished: list.hidden,
+    },
+    revision: list.revision,
+  };
 }
 
-/** The local adapter: the registry in the config directory, and Jig run in each main checkout. */
-export function localSource(configDir: string): ProjectSource {
+/** A read that may have caught Jig mid-write: worth one more try before it is believed. */
+const torn = (read: Read): boolean => read.view.state === 'unreadable' || read.view.state === 'incompatible';
+
+/** What the adapter knows of one connected project. */
+interface Entry {
+  project: Project;
+  /** What the project shows now. */
+  shown?: Read;
+  /** `shown` was kept over one torn read; the next torn read is believed. */
+  held: boolean;
+  watch?: Watch;
+  /** The read under way; a change meanwhile sets `dirty` for one more after it. */
+  reading?: Promise<void>;
+  dirty: boolean;
+}
+
+export interface LocalOptions {
+  /** How often every followed project is read again, for changes the system watcher dropped. */
+  rescanMs?: number;
+  quietMs?: number;
+  maxWaitMs?: number;
+}
+
+/**
+ * The local adapter: the registry in the config directory, Jig run in each main checkout, and a
+ * Watcher on each project's `.ai/` while someone listens. Then reads are served from what the
+ * watch last read, and a change is signalled only when a new read differs from it.
+ */
+export function localSource(configDir: string, { rescanMs = 60_000, quietMs, maxWaitMs }: LocalOptions = {}): ProjectSource {
+  const entries = new Map<string, Entry>();
+  const listeners = new Set<(change: Change) => void>();
+  let rescan: NodeJS.Timeout | undefined;
+  const following = (): boolean => rescan !== undefined;
+
+  const entryOf = (project: Project): Entry => {
+    let entry = entries.get(project.id);
+    if (!entry) entries.set(project.id, (entry = { project, held: false, dirty: false }));
+    return entry;
+  };
+
+  /** Keeps what was shown over one torn read; otherwise the read is what the project shows. */
+  function settle(entry: Entry, read: Read): void {
+    if (torn(read) && entry.shown && !torn(entry.shown) && !entry.held) {
+      entry.held = true;
+      return;
+    }
+    entry.held = false;
+    entry.shown = read;
+  }
+
+  /** Reads the project again — one read at a time — and signals when what it shows changed. */
+  function refresh(entry: Entry): Promise<void> {
+    if (entry.reading) {
+      entry.dirty = true;
+      return entry.reading;
+    }
+    entry.reading = (async () => {
+      do {
+        entry.dirty = false;
+        const before = JSON.stringify(entry.shown);
+        settle(entry, await readProject(entry.project));
+        if (following() && entries.get(entry.project.id) === entry && JSON.stringify(entry.shown) !== before) {
+          signal({ id: entry.project.id, revision: entry.shown?.revision ?? null });
+        }
+      } while (entry.dirty);
+    })().finally(() => (entry.reading = undefined));
+    return entry.reading;
+  }
+
+  function signal(change: Change): void {
+    for (const listener of listeners) listener(change);
+  }
+
+  /** What the project shows: from the watch while following, read through Jig otherwise. */
+  async function shown(project: Project): Promise<Read> {
+    const entry = entryOf(project);
+    if (!(following() && entry.shown)) await (entry.reading ?? refresh(entry));
+    return entry.shown as Read;
+  }
+
+  function follow(entry: Entry): void {
+    if (entry.watch?.open) return;
+    entry.watch = watchTree(watchDir(entry.project.path), {
+      ignore: writtenByReads,
+      onChange: () => void refresh(entry),
+      quietMs,
+      maxWaitMs,
+    });
+  }
+
+  /**
+   * Follows every registered project and reads it again; forgets one no longer registered, such as
+   * one a read in flight brought back after its disconnect.
+   */
+  async function sweep(): Promise<void> {
+    // An unreadable registry is the page's to show, through its own read.
+    const projects = await readProjects(configDir).catch(() => undefined);
+    if (!projects || !following()) return;
+    const ids = new Set(projects.map((p) => p.id));
+    for (const [id, entry] of entries) {
+      if (ids.has(id)) continue;
+      entry.watch?.close();
+      entries.delete(id);
+    }
+    for (const project of projects) {
+      const entry = entryOf(project);
+      follow(entry); // a watcher that failed, or a directory that came back
+      void refresh(entry);
+    }
+  }
+
+  function start(): void {
+    rescan = setInterval(() => void sweep(), rescanMs);
+    rescan.unref();
+    void sweep();
+  }
+
+  /** Stops following; what was read while following may be old by the next subscribe, so it goes. */
+  function stop(): void {
+    clearInterval(rescan);
+    rescan = undefined;
+    for (const entry of entries.values()) {
+      entry.watch?.close();
+      entry.watch = undefined;
+      entry.shown = undefined;
+      entry.held = false;
+    }
+  }
+
   return {
     async workspace() {
-      return Promise.all((await readProjects(configDir)).map(view));
+      return Promise.all((await readProjects(configDir)).map(async (p) => (await shown(p)).view));
     },
     async connect(path) {
       const found = await connectable(path);
       if ('code' in found) return found;
       const { project, created } = await addProject(configDir, found.root);
-      return { project: await view(project), created };
+      const entry = entryOf(project);
+      if (following()) follow(entry);
+      await refresh(entry);
+      return { project: (entry.shown as Read).view, created };
     },
     async tasks(id) {
       const project = (await readProjects(configDir)).find((p) => p.id === id);
-      return project && tasksOf(project);
+      return project && (await shown(project)).tasks;
     },
-    disconnect(id) {
-      return removeProject(configDir, id);
+    async disconnect(id) {
+      if (!(await removeProject(configDir, id))) return false;
+      entries.get(id)?.watch?.close();
+      entries.delete(id);
+      if (following()) signal({ id, revision: null });
+      return true;
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      if (!following()) start();
+      return () => {
+        if (listeners.delete(listener) && listeners.size === 0) stop();
+      };
     },
   };
 }

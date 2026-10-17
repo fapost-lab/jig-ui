@@ -37,15 +37,15 @@ Each connected project, in the order you connected them. For a readable project:
   `jig housekeeping`; when its last run is old or the forge did not answer, a waiting pull request
   may be missing until you run it.
 
-The page reads the projects when it opens; reload it to see changes. A project whose state is
-not readable shows why:
+The page follows the projects while it is open — see [Staying current](#staying-current). A
+project whose state is not readable shows why:
 
 | Shown | Meaning |
 | --- | --- |
 | `Jig 0.29.0` | The project is connected and readable. |
 | Answers in a form this Jig UI does not read | The project's Jig is newer than this Jig UI understands. Update Jig UI: `npx @fapost/jig-ui@latest`. |
-| Jig could not be read | Jig refused the read — for example while an agent is writing to the project. The code in brackets is Jig's; the next load tries again. |
-| Jig UI needs 0.29.0 or later | The project's Jig is older than Jig UI reads. Run `jig upgrade` in the project; it is shown as readable on the next load, without connecting it again. |
+| Jig could not be read | Jig refused the read — for example while an agent is writing to the project. The code in brackets is Jig's; the next change in the project tries again. |
+| Jig UI needs 0.29.0 or later | The project's Jig is older than Jig UI reads. Run `jig upgrade` in the project; it is shown as readable once the upgrade lands, without connecting it again. |
 | The project directory is not there any more | The folder was moved or deleted. Disconnect it, then connect its new path. |
 | There is no Jig in the project any more | Jig was removed from the project. |
 
@@ -65,6 +65,19 @@ rule that fits wins:
 
 A card shows the task's id, class and goal, and what it waits for. Finished tasks are only
 counted under the board. The order inside a column is Jig's (by id) for now.
+
+## Staying current
+
+While the page is open, Jig UI watches each connected project's `.ai/` folder. When an agent or
+a person changes a task — through Jig, by editing a file, or with git (a pull, a checkout) — the
+workspace and the board show it within about two seconds, without a reload. Every minute each
+project is also read again, for a change the system did not report.
+
+A read that fails while an agent is in the middle of writing does not blank the page: the last
+good read stays until the next one. A project that keeps failing shows why, as in the table above.
+
+Watching stops when the last page closes; nothing is written in the project. If the page says its
+session has ended, Jig UI was restarted: run `npx @fapost/jig-ui` again to reopen it.
 
 ## Disconnect a project
 

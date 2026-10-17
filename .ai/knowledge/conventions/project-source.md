@@ -7,7 +7,6 @@ paths:
   - "server/source/**"
   - "server/board/**"
   - "server/task/**"
-  - "server/live/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
 reviewed_at: 2026-10-17
 ---
@@ -28,14 +27,21 @@ Why:      a later remote adapter (a connector on the projects' machine) must fit
           same port; anything a caller learns about directories or processes breaks that.
 ```
 
-Callers (`board/`, `task/`, `live/`) depend on the port, never on `jig/` or `watch/` directly.
+Callers (`board/`, `task/`, and `http/` for the change stream) depend on the port, never on `jig/` or `watch/` directly.
 
 The port is `ProjectSource` in `server/source/project-source.ts` — the workspace, a project's
-live tasks (`tasks(id)`, for the board), connect and disconnect; its local adapter
+live tasks (`tasks(id)`, for the board), connect, disconnect, and `subscribe` to changes; its local adapter
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
 only the path a person types to connect. A read that fails becomes a state of the project, not an
 error of the workspace: `unreadable` with Jig's failure code and never its message (it may name a
-path), `incompatible` when Jig answered in a shape JigClient does not read.
+path), `incompatible` when Jig answered in a shape JigClient does not read. Either one right after a good
+read is held back once — the last good read stays — and believed the second time.
+
+`subscribe(listener)` returns the unsubscribe. The local adapter follows projects only while
+someone listens: a Watcher per project (convention-watcher) and a rescan every minute; each change
+re-reads the project, and the listener hears `{ id, revision }` only when the read differs from
+the last one — connect and disconnect included. Meanwhile `workspace()` and `tasks(id)` answer
+from that last read (feature-live-updates).
 
 ## Example
 

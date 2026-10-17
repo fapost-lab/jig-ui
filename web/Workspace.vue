@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { api, describe, type Failure, link, type Project } from './api';
+import { onMounted, onUnmounted, ref } from 'vue';
+import { api, describe, type Failure, link, onChange, type Project } from './api';
 
 const projects = ref<Project[]>();
 const path = ref('');
 const refusal = ref<string>();
 const busy = ref(false);
 
+let latest = 0;
+
 async function load(): Promise<void> {
+  const mine = ++latest;
   const res = await api('/api/workspace');
-  if (res) projects.value = ((await res.json()) as { projects: Project[] }).projects;
+  const read = res && ((await res.json()) as { projects: Project[] }).projects;
+  // A newer load may have started meanwhile: an older answer must not overwrite it.
+  if (read && mine === latest) projects.value = read;
 }
 
 async function connect(): Promise<void> {
@@ -35,6 +40,7 @@ async function disconnect(id: string): Promise<void> {
 }
 
 onMounted(load);
+onUnmounted(onChange(() => void load()));
 </script>
 
 <template>

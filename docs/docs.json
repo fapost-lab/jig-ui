@@ -9,7 +9,7 @@
     "groups": [
       {
         "group": "Get started",
-        "pages": ["index", "requirements", "installation"]
+        "pages": ["index", "requirements", "installation", "projects"]
       }
     ]
   }

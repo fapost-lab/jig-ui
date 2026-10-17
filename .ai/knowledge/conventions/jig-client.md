@@ -6,10 +6,9 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
+reviewed_at: 2026-10-17
 ---
 # JigClient — the only module that knows Jig
-
-Not built yet: the paths match nothing until the first task writes them.
 
 ## Practice
 
@@ -26,6 +25,11 @@ MUST NOT: read or write Jig's files directly (`state`, roadmaps, the queue file)
 Why:      a change of Jig's contract must be a change here and in its contract tests only, and
           Jig's files are not a contract Jig promised.
 ```
+
+The minimum Jig the package reads is `MIN_JIG_VERSION` in `server/jig/client.ts` — 0.29.0, the
+first Jig that prints JSON. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
+found from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`), never a
+`bash` on PATH, which may be WSL's.
 
 ## Example
 

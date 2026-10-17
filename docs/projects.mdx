@@ -1,0 +1,47 @@
+---
+title: "Connecting projects"
+description: "Add a Jig project to Jig UI and remove it again."
+---
+
+Jig UI shows the projects you connect. Connecting reads nothing yet but the project's Jig version;
+the workspace and the boards come next.
+
+## Connect a project
+
+Paste the path of the project's **main checkout** — the folder you cloned — into the field on the
+page and choose **Connect**. A path inside the project works too; Jig UI connects the project's
+root. `~/` stands for your home folder.
+
+The project needs [Jig 0.29.0 or later](/requirements). Each project gets a short id from its
+folder name (`My Project` becomes `my-project`, a second `api` becomes `api-2`); the page names
+it by that id.
+
+A path is refused when it is:
+
+- **not inside a git repository**, or does not exist;
+- **a worktree.** A task started in a worktree keeps its records in the main checkout, which lists
+  every task of the clone. Connect the main checkout instead;
+- **a repository without Jig.** Run `jig init` in it first.
+
+Connecting a project that is already connected changes nothing.
+
+## What the page shows
+
+| Shown | Meaning |
+| --- | --- |
+| `Jig 0.29.0` | The project is connected and readable. |
+| Jig UI needs 0.29.0 or later | The project's Jig is older than Jig UI reads. Run `jig upgrade` in the project; it is shown as readable on the next load, without connecting it again. |
+| The project directory is not there any more | The folder was moved or deleted. Disconnect it, then connect its new path. |
+| There is no Jig in the project any more | Jig was removed from the project. |
+
+## Disconnect a project
+
+**Disconnect** removes the project from Jig UI. Nothing in the project changes: Jig UI never
+writes a file in a project.
+
+## Where the list is kept
+
+The list of connected projects is `projects.json` in Jig UI's config folder —
+`~/.config/jig-ui/` (or `$XDG_CONFIG_HOME/jig-ui/`) on Linux and macOS, `%APPDATA%\jig-ui\` on
+Windows. It survives a reinstall. If the file is damaged, Jig UI says so and leaves it as it is,
+so you can fix or remove it.

@@ -17,8 +17,9 @@ are added as sections of this file.
   (adr-20261014-board-columns-are-derived-from-jig-state. Checked in review.)
 - Only `server/jig/` runs `jig` or knows the shape of its output.
   (convention-jig-client. Checked in review: nothing outside `server/jig/` spawns `jig` or names
-  Jig's fields; the only other `child_process` use is `server/open-browser.ts` starting the
-  system browser opener.)
+  Jig's fields; the only other `child_process` uses are `server/open-browser.ts` starting the
+  system browser opener, `git rev-parse` in `server/source/` telling a main checkout from a
+  worktree, and `git --exec-path` in `server/jig/` finding Git's bash on Windows.)
 - The API and the page name projects by id; no path reaches `web/`.
   (adr-20261014-project-source-port-keeps-hosting-open. Checked by tests on the API responses.)
 - The server binds 127.0.0.1 unless a guard other than the local token is in place, refuses a

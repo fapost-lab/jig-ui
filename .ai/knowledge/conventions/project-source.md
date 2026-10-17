@@ -9,10 +9,9 @@ paths:
   - "server/task/**"
   - "server/live/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
+reviewed_at: 2026-10-17
 ---
 # ProjectSource — how the server reaches a project
-
-Not built yet: the paths match nothing until the first task writes them.
 
 ## Practice
 
@@ -30,6 +29,14 @@ Why:      a later remote adapter (a connector on the projects' machine) must fit
 ```
 
 Callers (`board/`, `task/`, `live/`) depend on the port, never on `jig/` or `watch/` directly.
+
+**Built so far, not yet the port.** `server/source/local.ts` has two functions: `connectable(path)`
+(the main checkout a typed path names, or a refusal) and `projectState(project)` (Jig's version
+against the minimum). The port as a type arrives with the first real read — the workspace
+dashboard (maintainer, task `project-registry`, 2026-10-17). Until then the connect flow is the
+one place a path crosses the edge: `http/` takes it from the request, `connectable` hands the
+checkout root back, and `http/` gives it to `registry/`; `projectState` takes a registry row with
+its path. Responses carry ids only. When the port lands, the registry's paths move behind it.
 
 ## Example
 

@@ -13,7 +13,24 @@ With the [requirements](/requirements) in place, one command installs and starts
 npx @fapost/jig-ui
 ```
 
-The package starts a placeholder page for now: it checks Node.js, serves a page on `127.0.0.1` and prints the address.
+It checks Node.js, starts a server on `127.0.0.1:4870` and opens Jig UI in your browser. The
+page shows the version for now; connecting projects comes next.
+
+The link it opens and prints carries a token made fresh at every start, so only your browser can
+use Jig UI. A bookmark of the page stops working after a restart: run the command again to reopen
+it.
+
+## Starting it again
+
+Jig UI runs once per machine. Running `npx @fapost/jig-ui` while it is already running opens the
+running one in the browser and exits.
+
+## Options
+
+| Option | What it does |
+| --- | --- |
+| `--port <n>` | Listen on another port than 4870. |
+| `--no-open` | Print the link instead of opening the browser, for example over SSH. |
 
 ## Development channel
 

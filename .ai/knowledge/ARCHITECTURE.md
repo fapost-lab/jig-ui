@@ -14,8 +14,22 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
 
 - `server/cli.ts` — the `jig-ui` command. It imports nothing but the Node version check, so an
   old Node prints the requirement instead of a stack trace, then loads `server/main.ts`.
-- `server/http/` — the Hono app: a placeholder page behind the local-only `Host`/`Origin` guard,
-  served on 127.0.0.1. No API and no token yet (the walking skeleton adds them).
+- `server/http/` — the Hono app on 127.0.0.1: the access guard in `access.ts` (local-only
+  `Host`/`Origin`, then the per-start token swapped for a cookie; convention-access-guard) before
+  every route, `GET /api/instance`, and the built page from `dist/web`.
+- `server/registry/` — the config directory and the single instance: `instance.json` (port,
+  token) written atomically, probed by a second start, removed with `open.html` on stop. No
+  project registry yet.
+- `server/open-browser.ts` — opens the browser through `open.html` in the config directory, so
+  the token is never a process argument (adr-20261017-browser-opens-through-a-redirect-file).
+- `web/` — the Vue 3 page, a placeholder that reads `/api/instance`; Vite builds it into
+  `dist/web` and the package ships it built. One TypeScript checks both sides
+  (adr-20261017-one-typescript-for-server-and-web).
+- **Start flow.** `npx @fapost/jig-ui` checks Node 24+, finds a running instance through the
+  config directory and checks it answers with its token — then opens it and exits — or starts one
+  on 127.0.0.1 with a fresh token and opens the browser on a link carrying it
+  (adr-20261014-local-server-access-guard). Two starts at once: the one that loses the port opens
+  the winner.
 - **Release flow.** A merge to `main` runs the CI matrix, builds `dist/` in a job without
   credentials, and publishes `<version>-next.<run>` under npm's `next` tag; a `v*` tag on a
   commit of `main` publishes `latest`. Details in `RELEASING.md`.
@@ -53,15 +67,12 @@ One npm package with a server and a page
 
 ### Runtime flows
 
-1. **Start.** `npx @fapost/jig-ui` checks Node 24+, finds a running instance through the config
-   directory (and checks it answers) or starts one on 127.0.0.1 with a fresh token, and opens the
-   browser on a link carrying the token (adr-20261014-local-server-access-guard).
-   The Node check and the local-only guard of this flow are built; the token and the single
-   instance are not.
-2. **Read and follow.** The page fetches light lists and heavy detail on demand. A file change
+The start flow is built (see Built above). Still to build:
+
+1. **Read and follow.** The page fetches light lists and heavy detail on demand. A file change
    under a project's `.ai/`, debounced, makes ProjectSource re-read through Jig; `live/` sends
    "project X changed, revision R" and the page re-fetches what it shows.
-3. **Change** (Phase 2). The page sends a command with the revision it saw; ProjectSource runs the
+2. **Change** (Phase 2). The page sends a command with the revision it saw; ProjectSource runs the
    matching Jig command; a stale revision comes back as Jig's refusal and is shown as a conflict.
 
 ### System-wide constraints and invariants

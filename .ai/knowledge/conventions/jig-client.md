@@ -33,9 +33,11 @@ found from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/ba
 
 ## Example
 
-A task-list read runs Jig's JSON task listing, validates the envelope and each row, and returns
-typed tasks; a response that fails validation re-checks the project's Jig version and is
-reported as "this project's Jig is not supported", never shown half-parsed.
+A task-list read runs Jig's JSON task listing, validates the envelope and each row — the status
+among Jig's own words — and returns typed tasks. Jig's refusal throws `JigRefusal` with its code
+(an unknown code is `failed`); an envelope of another shape throws `JigShapeError`, which the
+project shows as `incompatible` ("update Jig UI"), never half-parsed. Each read has a contract
+test over a fixture in `server/jig/fixtures/`.
 
 ## Rationale
 

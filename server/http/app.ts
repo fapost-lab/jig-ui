@@ -4,8 +4,7 @@ import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { type Context, Hono } from 'hono';
-import { addProject, readProjects, RegistryUnreadable, removeProject } from '../registry/projects.js';
-import { connectable, projectState } from '../source/local.js';
+import { type ProjectSource, RegistryUnreadable } from '../source/project-source.js';
 import { localOnly, tokenAccess } from './access.js';
 
 /**
@@ -26,8 +25,8 @@ export interface AppOptions {
   port: number;
   /** This start's token; the browser swaps it for a cookie that every API call must carry. */
   token: string;
-  /** Jig UI's config directory, where the registry lives. */
-  configDir: string;
+  /** Where the connected projects are read and changed. */
+  source: ProjectSource;
   version?: string;
   /** Directory of the built page. */
   webRoot?: string;
@@ -43,7 +42,7 @@ function absolute(path: unknown): string | undefined {
   return isAbsolute(expanded) ? expanded : undefined;
 }
 
-export function createApp({ port, token, configDir, version = readPackageVersion(), webRoot = DEFAULT_WEB_ROOT }: AppOptions): Hono {
+export function createApp({ port, token, source, version = readPackageVersion(), webRoot = DEFAULT_WEB_ROOT }: AppOptions): Hono {
   const app = new Hono();
   app.use(localOnly(port));
   app.use(tokenAccess({ port, token }));
@@ -55,27 +54,24 @@ export function createApp({ port, token, configDir, version = readPackageVersion
 
   app.get('/api/instance', (c) => c.json({ version }));
 
-  app.get('/api/projects', async (c) => {
-    const projects = await readProjects(configDir);
-    return c.json({ projects: await Promise.all(projects.map(projectState)) });
-  });
+  app.get('/api/workspace', async (c) => c.json({ projects: await source.workspace() }));
 
   app.post('/api/projects', async (c) => {
     const body: unknown = await c.req.json().catch(() => undefined);
     const path = absolute((body as { path?: unknown } | undefined)?.path);
     if (path === undefined) return refuse(c, 422, 'usage', 'Give the absolute path of a project.');
-    const found = await connectable(path);
-    if ('code' in found) return refuse(c, 422, found.code, found.message);
-    const { project, created } = await addProject(configDir, found.root);
-    return c.json({ project: await projectState(project) }, created ? 201 : 200);
+    const result = await source.connect(path);
+    if ('code' in result) return refuse(c, 422, result.code, result.message);
+    return c.json({ project: result.project }, result.created ? 201 : 200);
   });
 
   app.delete('/api/projects/:id', async (c) => {
-    if (!(await removeProject(configDir, c.req.param('id')))) {
+    if (!(await source.disconnect(c.req.param('id')))) {
       return refuse(c, 404, 'not-connected', 'No connected project has this id.');
     }
     return c.body(null, 204);
   });
+
   app.all('/api/*', (c) => c.json({ error: 'not found' }, 404));
 
   if (existsSync(join(webRoot, 'index.html'))) {

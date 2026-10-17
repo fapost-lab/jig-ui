@@ -7,6 +7,7 @@ import { createApp, readPackageVersion } from './http/app.js';
 import { openBrowser } from './open-browser.js';
 import { configDir } from './registry/config-dir.js';
 import { type InstanceInfo, probeInstance, readInstance, removeInstance, writeInstance } from './registry/instance.js';
+import { localSource } from './source/local.js';
 
 const HOST = '127.0.0.1';
 
@@ -72,7 +73,7 @@ export async function main(): Promise<void> {
 
   const version = readPackageVersion();
   const token = randomBytes(32).toString('base64url');
-  const server = serve({ fetch: createApp({ port, token, configDir: dir, version }).fetch, hostname: HOST, port }, () => {
+  const server = serve({ fetch: createApp({ port, token, source: localSource(dir), version }).fetch, hostname: HOST, port }, () => {
     void (async () => {
       await writeInstance(dir, { port, token, pid: process.pid, version });
       console.log(`Jig UI ${version} is running at http://${HOST}:${port}/`);

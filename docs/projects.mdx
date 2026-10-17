@@ -3,8 +3,8 @@ title: "Connecting projects"
 description: "Add a Jig project to Jig UI and remove it again."
 ---
 
-Jig UI shows the projects you connect. Connecting reads nothing yet but the project's Jig version;
-the workspace and the boards come next.
+Jig UI shows the projects you connect on one page: each with its tasks counted and what waits for
+you in it. Boards per project come next.
 
 ## Connect a project
 
@@ -27,9 +27,24 @@ Connecting a project that is already connected changes nothing.
 
 ## What the page shows
 
+Each connected project, in the order you connected them. For a readable project:
+
+- **Its live tasks counted** — `active`, `paused` and `ready` (finished tasks are not counted).
+- **What needs you** — the same items `jig status` lists under "Needs you", most urgent first: a
+  design waiting at its gate, a stopped autopilot run, a pull request waiting for review, a task to
+  close. Each says what happened and what to do; a pull request comes with a link to it.
+- **A note when pull request facts may be out of date.** Jig reads pull requests only during
+  `jig housekeeping`; when its last run is old or the forge did not answer, a waiting pull request
+  may be missing until you run it.
+
+The page reads the projects when it opens; reload it to see changes. A project whose state is
+not readable shows why:
+
 | Shown | Meaning |
 | --- | --- |
 | `Jig 0.29.0` | The project is connected and readable. |
+| Answers in a form this Jig UI does not read | The project's Jig is newer than this Jig UI understands. Update Jig UI: `npx @fapost/jig-ui@latest`. |
+| Jig could not be read | Jig refused the read — for example while an agent is writing to the project. The code in brackets is Jig's; the next load tries again. |
 | Jig UI needs 0.29.0 or later | The project's Jig is older than Jig UI reads. Run `jig upgrade` in the project; it is shown as readable on the next load, without connecting it again. |
 | The project directory is not there any more | The folder was moved or deleted. Disconnect it, then connect its new path. |
 | There is no Jig in the project any more | Jig was removed from the project. |

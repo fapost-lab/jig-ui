@@ -21,19 +21,21 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   token) written atomically, probed by a second start, removed with `open.html` on stop; and the
   registry, `projects.json`, of connected projects by id and main-checkout path
   (adr-20261017-registry-of-connected-projects). It knows neither git nor Jig.
-- `server/jig/` — JigClient, so far reading one thing: the project's Jig version against
-  `MIN_JIG_VERSION` (convention-jig-client).
-- `server/source/` — the local source's first functions: whether a path is a clone's main
-  checkout (git), and a connected project's state — `ready`, `unsupported` (Jig below the
-  minimum, not read further) or `unavailable`. Not yet the ProjectSource port
-  (convention-project-source).
-- `server/http/` also serves `/api/projects` — list, connect by path, disconnect by id; responses
-  name projects by id only. Directions so far: `http/` → `registry/`, `source/`; `source/` →
-  `jig/`, and `registry/` for the row type only.
+- `server/jig/` — JigClient: the project's Jig version against `MIN_JIG_VERSION`, and the JSON
+  reads `jig status` (what needs the person) and `jig task list`, validated against fixtures of
+  Jig 0.29.0 in `server/jig/fixtures/` (convention-jig-client).
+- `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, connect,
+  disconnect) and its local adapter (`local.ts`), which holds the registry and runs Jig. A
+  project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
+  read), `incompatible` (a newer Jig's shape), `unreadable` (Jig refused; its code only) or
+  `unavailable` (convention-project-source).
+- `server/http/` also serves `GET /api/workspace` and connect / disconnect under `/api/projects`,
+  through the port only; responses name projects by id. Directions: `http/` → `source/`;
+  `source/` → `jig/`, `registry/`.
 - `server/open-browser.ts` — opens the browser through `open.html` in the config directory, so
   the token is never a process argument (adr-20261017-browser-opens-through-a-redirect-file).
-- `web/` — the Vue 3 page: the connected projects with their state, a connect form and
-  disconnect; Vite builds it into `dist/web` and the package ships it built. One TypeScript checks both sides
+- `web/` — the Vue 3 page, the workspace: a card per connected project with its task counts and
+  what needs the person, a connect form and disconnect; Vite builds it into `dist/web` and the package ships it built. One TypeScript checks both sides
   (adr-20261017-one-typescript-for-server-and-web).
 - **Start flow.** `npx @fapost/jig-ui` checks Node 24+, finds a running instance through the
   config directory and checks it answers with its token — then opens it and exits — or starts one
@@ -54,13 +56,10 @@ out of this heading.
 One npm package with a server and a page
 (adr-20261014-project-source-port-keeps-hosting-open):
 
-- `server/source/` — ProjectSource, the port through which everything else reaches a project;
-  one local adapter composed of JigClient and Watcher (convention-project-source).
-- `server/jig/` — JigClient, the only code that knows Jig's commands and JSON shapes
-  (convention-jig-client).
+- `server/source/` — the local adapter grows a Watcher beside JigClient.
 - `server/watch/` — Watcher: recursive `fs.watch` on each project's `.ai/` plus a periodic
   rescan, emitting "project changed" and nothing more.
-- `server/board/`, `server/task/` — the workspace overview, the per-project board and task
+- `server/board/`, `server/task/` — the per-project board and task
   details, read through ProjectSource.
 - `server/live/` — the SSE stream.
 - `server/http/` — the Hono app, the access guard and the built page; the only module that knows

@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
+import { localSource } from '../source/local.js';
 import { createApp, readPackageVersion } from './app.js';
 
 const PORT = 4870;
@@ -14,7 +15,7 @@ const webRoot = mkdtempSync(join(tmpdir(), 'jig-ui-web-'));
 writeFileSync(join(webRoot, 'index.html'), '<!doctype html><div id="app"></div>');
 afterAll(() => rmSync(webRoot, { recursive: true, force: true }));
 
-const app = createApp({ port: PORT, token: TOKEN, configDir: join(webRoot, 'config'), webRoot });
+const app = createApp({ port: PORT, token: TOKEN, source: localSource(join(webRoot, 'config')), webRoot });
 const get = (path: string, headers: Record<string, string>) => app.request(path, { headers });
 
 describe('createApp', () => {
@@ -25,7 +26,7 @@ describe('createApp', () => {
   });
 
   it('answers 503 when the page is not built', async () => {
-    const bare = createApp({ port: PORT, token: TOKEN, configDir: join(webRoot, 'config'), webRoot: join(webRoot, 'missing') });
+    const bare = createApp({ port: PORT, token: TOKEN, source: localSource(join(webRoot, 'config')), webRoot: join(webRoot, 'missing') });
     expect((await bare.request('/', { headers: { host: HOST } })).status).toBe(503);
   });
 
@@ -103,20 +104,38 @@ describe('access guard', () => {
   });
 });
 
-/** A git clone whose `.ai/scripts/jig` answers `jig <version>`; no Jig at all without a version. */
-function project(name: string, version?: string): string {
+/**
+ * A git clone whose `.ai/scripts/jig` answers `jig <version>` and an empty project to every JSON
+ * read, refusing with a message that names a path; no Jig at all without a version.
+ */
+function project(name: string, version?: string, refuse = false): string {
   const dir = join(realpathSync.native(webRoot), name);
   mkdirSync(dir, { recursive: true });
   execFileSync('git', ['init', '-q'], { cwd: dir });
   if (version) {
+    const data = '"data":{"attention":[],"housekeeping":null,"tasks":[]}';
+    const error = `"error":{"code":"failed","message":"cannot read ${dir.replace(/\\/g, '/')}"}`;
     mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
-    writeFileSync(join(dir, '.ai', 'scripts', 'jig'), `#!/usr/bin/env bash\necho "jig ${version}"\n`);
+    writeFileSync(
+      join(dir, '.ai', 'scripts', 'jig'),
+      `#!/usr/bin/env bash
+[ "$1" = --version ] && { echo "jig ${version}"; exit 0; }
+echo '{"schema":1,"revision":1,"generated_at":"x",${refuse ? error : data}}'
+exit ${refuse ? 1 : 0}
+`,
+    );
   }
   return dir;
 }
 
-describe('/api/projects', () => {
-  const projects = createApp({ port: PORT, token: TOKEN, configDir: join(webRoot, 'projects-config'), webRoot });
+/** Fails when `text` carries the temporary root, raw or as JSON escapes it (a Windows path's backslashes). */
+function expectNoPath(text: string): void {
+  const root = realpathSync.native(webRoot);
+  for (const form of [root, JSON.stringify(root).slice(1, -1), root.replace(/\\/g, '/')]) expect(text).not.toContain(form);
+}
+
+describe('/api/projects and /api/workspace', () => {
+  const projects = createApp({ port: PORT, token: TOKEN, source: localSource(join(webRoot, 'projects-config')), webRoot });
   const call = (method: string, path: string, body?: unknown) =>
     projects.request(path, {
       method,
@@ -125,29 +144,32 @@ describe('/api/projects', () => {
     });
   const ready = project('ready', '0.29.0');
   const old = project('old', '0.26.0');
+  const broken = project('broken', '0.29.0', true);
+  const empty = { counts: { active: 0, paused: 0, ready: 0 }, attention: [], housekeepingStale: false };
 
   it('connects, lists and disconnects a project, by id only', async () => {
     const first = await call('POST', '/api/projects', { path: ready });
     expect(first.status).toBe(201);
-    expect(await first.json()).toEqual({ project: { id: 'ready', state: 'ready', jigVersion: '0.29.0' } });
+    expect(await first.json()).toEqual({ project: { id: 'ready', state: 'ready', jigVersion: '0.29.0', ...empty } });
     expect((await call('POST', '/api/projects', { path: join(ready, '.ai') })).status).toBe(200);
 
-    const old201 = await call('POST', '/api/projects', { path: old });
-    expect(old201.status).toBe(201);
-    const list = await call('GET', '/api/projects');
+    expect((await call('POST', '/api/projects', { path: old })).status).toBe(201);
+    expectNoPath(await (await call('POST', '/api/projects', { path: broken })).text());
+    const list = await call('GET', '/api/workspace');
     const text = await list.text();
     expect(JSON.parse(text)).toEqual({
       projects: [
-        { id: 'ready', state: 'ready', jigVersion: '0.29.0' },
+        { id: 'ready', state: 'ready', jigVersion: '0.29.0', ...empty },
         { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' },
+        { id: 'broken', state: 'unreadable', code: 'failed' },
       ],
     });
-    expect(text).not.toContain(realpathSync.native(webRoot));
+    expectNoPath(text);
     expect(text).not.toContain('"path"');
 
     expect((await call('DELETE', '/api/projects/old')).status).toBe(204);
     expect((await call('DELETE', '/api/projects/old')).status).toBe(404);
-    expect(((await (await call('GET', '/api/projects')).json()) as { projects: unknown[] }).projects).toHaveLength(1);
+    expect(((await (await call('GET', '/api/workspace')).json()) as { projects: unknown[] }).projects).toHaveLength(2);
   });
 
   it.each([
@@ -168,11 +190,11 @@ describe('/api/projects', () => {
     expect(res.status).toBe(422);
     const text = await res.text();
     expect(JSON.parse(text).error.code).toBe(code);
-    expect(text).not.toContain(realpathSync.native(webRoot));
+    expectNoPath(text);
   });
 
   it('refuses every call without the token', async () => {
-    expect((await projects.request('/api/projects', { headers: { host: HOST } })).status).toBe(401);
+    expect((await projects.request('/api/workspace', { headers: { host: HOST } })).status).toBe(401);
     expect((await projects.request('/api/projects', { method: 'POST', headers: { host: HOST } })).status).toBe(401);
   });
 
@@ -180,8 +202,8 @@ describe('/api/projects', () => {
     const dir = join(webRoot, 'broken-config');
     mkdirSync(dir);
     writeFileSync(join(dir, 'projects.json'), '{');
-    const broken = createApp({ port: PORT, token: TOKEN, configDir: dir, webRoot });
-    const res = await broken.request('/api/projects', { headers: { host: HOST, cookie: COOKIE } });
+    const unreadable = createApp({ port: PORT, token: TOKEN, source: localSource(dir), webRoot });
+    const res = await unreadable.request('/api/workspace', { headers: { host: HOST, cookie: COOKIE } });
     expect(res.status).toBe(500);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe('registry-unreadable');
   });

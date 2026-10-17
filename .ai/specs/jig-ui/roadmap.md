@@ -28,7 +28,7 @@ Every item updates the pages in `docs/` it changes.
 - [x] `project-registry` — project registry and connect — connect by path, a clone's main checkout only (a worktree path is refused and named), slug rules, disconnect; a project below Jig's minimum version is shown as such, not read (after: walking skeleton — the registry lives in its config directory and its page)
 - [ ] live updates — watcher with a periodic rescan per connected project, the whole `.ai/`, debounced into "project changed" over SSE; the page re-fetches and keeps the last good read when one fails; the cost is measured with several agents in several projects (after: project registry — it watches what is connected)
 - [x] `workspace-dashboard` — workspace dashboard — every connected project with its counts and what needs the person, from Jig's attention items (after: project registry — it lists connected projects)
-- [ ] project board — columns derived from Jig's task state, never stored; light cards (after: project registry — one board per connected project)
+- [x] `project-board` — project board — columns derived from Jig's task state, never stored; light cards (after: project registry — one board per connected project)
 - [ ] task details — status, stage, gate, artifacts, pull request, dependencies, attention, opened from a card (after: project board — a card opens it)
 - [ ] specs and epics — each spec with its phases, progress and epic branch beside the board, from Jig's spec list (after: project board — shown on the project's page)
 - [ ] fog: registration by `jig init` — needs a hook on Jig's side that keeps the UI optional

@@ -18,6 +18,22 @@ export type ProjectView =
   | { id: string; state: 'unavailable'; reason: 'missing' | 'no-jig' }
   | { id: string; state: 'unreadable'; code: string };
 
+/** A live task as a board shows it; where it stands is Jig's, the column the board's. */
+export interface Task {
+  id: string;
+  class: string | null;
+  status: 'active' | 'ready';
+  goal: string | null;
+  paused: boolean;
+  started: boolean;
+  gate: string | null;
+  autopilot: string | null;
+  pullRequest: { url: string; state: string | null; ci: string | null } | null;
+}
+
+/** A project's live tasks and how many finished ones are left out, or why it cannot be read. */
+export type ProjectTasks = { state: 'ready'; tasks: Task[]; finished: number } | Exclude<ProjectView, { state: 'ready' }>;
+
 export type Refusal = { code: 'not-a-repository' | 'worktree' | 'no-jig'; message: string };
 
 /**
@@ -29,6 +45,8 @@ export interface ProjectSource {
   workspace(): Promise<ProjectView[]>;
   /** Connects the project a path names; one already connected keeps its id. */
   connect(path: string): Promise<{ project: ProjectView; created: boolean } | Refusal>;
+  /** A connected project's live tasks; `undefined` when no project has that id. */
+  tasks(id: string): Promise<ProjectTasks | undefined>;
   /** False when no project has that id. Nothing in the project is touched. */
   disconnect(id: string): Promise<boolean>;
 }

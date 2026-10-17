@@ -108,12 +108,12 @@ describe('access guard', () => {
  * A git clone whose `.ai/scripts/jig` answers `jig <version>` and an empty project to every JSON
  * read, refusing with a message that names a path; no Jig at all without a version.
  */
-function project(name: string, version?: string, refuse = false): string {
+function project(name: string, version?: string, refuse = false, tasks: unknown[] = []): string {
   const dir = join(realpathSync.native(webRoot), name);
   mkdirSync(dir, { recursive: true });
   execFileSync('git', ['init', '-q'], { cwd: dir });
   if (version) {
-    const data = '"data":{"attention":[],"housekeeping":null,"tasks":[]}';
+    const data = `"data":{"attention":[],"housekeeping":null,"tasks":${JSON.stringify(tasks)},"hidden":0}`;
     const error = `"error":{"code":"failed","message":"cannot read ${dir.replace(/\\/g, '/')}"}`;
     mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
     writeFileSync(
@@ -170,6 +170,48 @@ describe('/api/projects and /api/workspace', () => {
     expect((await call('DELETE', '/api/projects/old')).status).toBe(204);
     expect((await call('DELETE', '/api/projects/old')).status).toBe(404);
     expect(((await (await call('GET', '/api/workspace')).json()) as { projects: unknown[] }).projects).toHaveLength(2);
+  });
+
+  it("serves a project's board, its state when it is not readable, and 404 for an unknown id", async () => {
+    const board = await call('GET', '/api/projects/ready/board');
+    const text = await board.text();
+    expect(JSON.parse(text)).toEqual({
+      board: {
+        id: 'ready',
+        state: 'ready',
+        finished: 0,
+        columns: ['backlog', 'in-progress', 'needs-you', 'paused', 'ready'].map((id) => expect.objectContaining({ id, cards: [] })),
+      },
+    });
+    expectNoPath(text);
+    const unreadable = await (await call('GET', '/api/projects/broken/board')).text();
+    expect(JSON.parse(unreadable)).toEqual({ board: { id: 'broken', state: 'unreadable', code: 'failed' } });
+    expectNoPath(unreadable);
+    expect((await call('GET', '/api/projects/nobody/board')).status).toBe(404);
+  });
+
+  it('puts the cards of a project in their columns and carries no worktree path', async () => {
+    const tree = join(realpathSync.native(webRoot), 'tree-of-busy').replace(/\\/g, '/');
+    const row = (id: string, more: Record<string, unknown>) => ({
+      id, class: 'T2', status: 'active', goal: null, paused: false, branch: `task/${id}`,
+      worktree: null, gate: null, autopilot: null, pull_request: null, ...more,
+    });
+    const busy = project('busy', '0.29.0', false, [
+      row('a', { branch: null }),
+      row('b', { worktree: { path: tree, uncommitted: 1 }, gate: { state: 'waiting', by: null } }),
+      row('c', { status: 'ready' }),
+    ]);
+    await call('POST', '/api/projects', { path: busy });
+    const text = await (await call('GET', '/api/projects/busy/board')).text();
+    const { board } = JSON.parse(text) as { board: { columns: { id: string; cards: { id: string }[] }[] } };
+    expect(Object.fromEntries(board.columns.map((c) => [c.id, c.cards.map((t) => t.id)]))).toEqual({
+      backlog: ['a'],
+      'in-progress': [],
+      'needs-you': ['b'],
+      paused: [],
+      ready: ['c'],
+    });
+    expectNoPath(text);
   });
 
   it.each([

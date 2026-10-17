@@ -135,25 +135,59 @@ export async function readStatus(
   };
 }
 
-/** A task, as far as the workspace counts it; the statuses are Jig's (schemas/state.md). */
+/** A task as `jig task list --json` reports it, as far as the workspace and the board read it; the statuses are Jig's (schemas/state.md). */
 export interface TaskSummary {
   id: string;
+  class: string | null;
   status: 'active' | 'ready' | 'consolidated' | 'abandoned';
+  goal: string | null;
   paused: boolean;
+  /** `null` while the task has not been started. */
+  branch: string | null;
+  gate: { state: string } | null;
+  autopilot: { state: string } | null;
+  pullRequest: { url: string; state: string | null; ci: string | null } | null;
 }
 
 const STATUSES = new Set(['active', 'ready', 'consolidated', 'abandoned']);
-const isTaskSummary = (v: unknown): v is TaskSummary =>
-  isObject(v) && isString(v.id) && isString(v.status) && STATUSES.has(v.status) && typeof v.paused === 'boolean';
+const isNullableState = (v: unknown): v is { state: string } | null => v === null || (isObject(v) && isString(v.state));
+const isPullRequest = (v: unknown): v is { url: string; state: string | null; ci: string | null } | null =>
+  v === null || (isObject(v) && isString(v.url) && isNullableString(v.state) && isNullableString(v.ci));
+/** A row of Jig's task list, the fields Jig UI reads, in Jig's own names. */
+type TaskRow = Omit<TaskSummary, 'pullRequest'> & { pull_request: TaskSummary['pullRequest'] };
 
-/** The project's live tasks (`jig task list --json`, finished ones left out). */
+const isTaskRow = (v: unknown): v is TaskRow =>
+  isObject(v) &&
+  isString(v.id) &&
+  isNullableString(v.class) &&
+  isString(v.status) &&
+  STATUSES.has(v.status) &&
+  isNullableString(v.goal) &&
+  typeof v.paused === 'boolean' &&
+  isNullableString(v.branch) &&
+  isNullableState(v.gate) &&
+  isNullableState(v.autopilot) &&
+  isPullRequest(v.pull_request);
+
+/** The project's live tasks (`jig task list --json`) and how many finished ones it left out. */
 export async function readTasks(
   root: string,
   platform: NodeJS.Platform = process.platform,
-): Promise<{ revision: number; tasks: TaskSummary[] }> {
+): Promise<{ revision: number; tasks: TaskSummary[]; hidden: number }> {
   const { revision, data } = await readJson(root, ['task', 'list'], platform);
-  if (!Array.isArray(data.tasks) || !data.tasks.every(isTaskSummary)) throw new JigShapeError();
-  return { revision, tasks: data.tasks.map(({ id, status, paused }) => ({ id, status, paused })) };
+  if (!Array.isArray(data.tasks) || !data.tasks.every(isTaskRow) || typeof data.hidden !== 'number') throw new JigShapeError();
+  const tasks = data.tasks.map(({ id, class: cls, status, goal, paused, branch, gate, autopilot, pull_request: pr }) => ({
+    id,
+    class: cls,
+    status,
+    goal,
+    paused,
+    branch,
+    gate: gate && { state: gate.state },
+    autopilot: autopilot && { state: autopilot.state },
+    pullRequest: pr && { url: pr.url, state: pr.state, ci: pr.ci },
+  }));
+  return { revision, tasks, hidden: data.hidden };
 }
 
 /** True when `version` is at least the minimum Jig UI reads. */

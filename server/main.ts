@@ -72,7 +72,7 @@ export async function main(): Promise<void> {
 
   const version = readPackageVersion();
   const token = randomBytes(32).toString('base64url');
-  const server = serve({ fetch: createApp({ port, token, version }).fetch, hostname: HOST, port }, () => {
+  const server = serve({ fetch: createApp({ port, token, configDir: dir, version }).fetch, hostname: HOST, port }, () => {
     void (async () => {
       await writeInstance(dir, { port, token, pid: process.pid, version });
       console.log(`Jig UI ${version} is running at http://${HOST}:${port}/`);

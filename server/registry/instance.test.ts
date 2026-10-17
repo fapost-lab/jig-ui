@@ -78,7 +78,7 @@ describe('probeInstance', () => {
       const s = serve({ fetch: (req) => app().fetch(req), hostname: '127.0.0.1', port: 0 }, () => resolve(s));
     });
     const port = (server.address() as { port: number }).port;
-    const app = () => createApp({ port, token, version: '0.1.0' });
+    const app = () => createApp({ port, token, configDir: root, version: '0.1.0' });
     try {
       expect(await probeInstance({ ...info, port, token })).toBe(true);
       expect(await probeInstance({ ...info, port, token: 'stale' })).toBe(false);

@@ -18,12 +18,22 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   `Host`/`Origin`, then the per-start token swapped for a cookie; convention-access-guard) before
   every route, `GET /api/instance`, and the built page from `dist/web`.
 - `server/registry/` — the config directory and the single instance: `instance.json` (port,
-  token) written atomically, probed by a second start, removed with `open.html` on stop. No
-  project registry yet.
+  token) written atomically, probed by a second start, removed with `open.html` on stop; and the
+  registry, `projects.json`, of connected projects by id and main-checkout path
+  (adr-20261017-registry-of-connected-projects). It knows neither git nor Jig.
+- `server/jig/` — JigClient, so far reading one thing: the project's Jig version against
+  `MIN_JIG_VERSION` (convention-jig-client).
+- `server/source/` — the local source's first functions: whether a path is a clone's main
+  checkout (git), and a connected project's state — `ready`, `unsupported` (Jig below the
+  minimum, not read further) or `unavailable`. Not yet the ProjectSource port
+  (convention-project-source).
+- `server/http/` also serves `/api/projects` — list, connect by path, disconnect by id; responses
+  name projects by id only. Directions so far: `http/` → `registry/`, `source/`; `source/` →
+  `jig/`, and `registry/` for the row type only.
 - `server/open-browser.ts` — opens the browser through `open.html` in the config directory, so
   the token is never a process argument (adr-20261017-browser-opens-through-a-redirect-file).
-- `web/` — the Vue 3 page, a placeholder that reads `/api/instance`; Vite builds it into
-  `dist/web` and the package ships it built. One TypeScript checks both sides
+- `web/` — the Vue 3 page: the connected projects with their state, a connect form and
+  disconnect; Vite builds it into `dist/web` and the package ships it built. One TypeScript checks both sides
   (adr-20261017-one-typescript-for-server-and-web).
 - **Start flow.** `npx @fapost/jig-ui` checks Node 24+, finds a running instance through the
   config directory and checks it answers with its token — then opens it and exits — or starts one
@@ -50,7 +60,6 @@ One npm package with a server and a page
   (convention-jig-client).
 - `server/watch/` — Watcher: recursive `fs.watch` on each project's `.ai/` plus a periodic
   rescan, emitting "project changed" and nothing more.
-- `server/registry/` — connected projects, the config directory, the single instance.
 - `server/board/`, `server/task/` — the workspace overview, the per-project board and task
   details, read through ProjectSource.
 - `server/live/` — the SSE stream.

@@ -14,7 +14,7 @@ import {
 import { addProject, type Project, readProjects, removeProject } from '../registry/projects.js';
 import { type Watch, watchTree } from '../watch/watch.js';
 import { mainCheckout } from './checkout.js';
-import type { Change, ProjectSource, ProjectTasks, ProjectView, Refusal, TaskCounts } from './project-source.js';
+import type { Attention, Change, ProjectSource, ProjectTasks, ProjectView, Refusal, Task, TaskCounts, TaskDetails } from './project-source.js';
 
 /** Jig's version in the checkout: `null` when Jig is there but names no version Jig UI can read. */
 async function version(root: string): Promise<string | null | undefined> {
@@ -50,8 +50,45 @@ function count(tasks: TaskSummary[]): TaskCounts {
 
 type NotReady = Exclude<ProjectView, { state: 'ready' }>;
 
-/** One read of a project: what the workspace and the board show, and the revision it came from. */
-type Read = { view: ProjectView; tasks: ProjectTasks; revision: number | null };
+/** One read of a project: what the workspace, the board and each task's details show, and the revision it came from. */
+type Read = { view: ProjectView; tasks: ProjectTasks; details: TaskDetails[]; revision: number | null };
+
+/** A live task as a board's card shows it. */
+const card = (t: TaskSummary & { status: Task['status'] }): Task => ({
+  id: t.id,
+  class: t.class,
+  status: t.status,
+  goal: t.goal,
+  paused: t.paused,
+  started: t.branch !== null,
+  gate: t.gate?.state ?? null,
+  autopilot: t.autopilot?.state ?? null,
+  pullRequest: t.pullRequest,
+});
+
+/** A live task in full; where its worktree is was never read, and an action Jig refuses is left out. */
+const details = (t: TaskSummary & { status: Task['status'] }, attention: Attention[]): TaskDetails => ({
+  ...card(t),
+  issue: t.issue,
+  branch: t.branch,
+  baseBranch: t.baseBranch,
+  createdAt: t.createdAt,
+  updatedAt: t.updatedAt,
+  knowledgeConsolidated: t.knowledgeConsolidated,
+  worktree: t.worktree,
+  gateBy: t.gate?.by ?? null,
+  run: t.autopilot && {
+    mode: t.autopilot.mode,
+    stage: t.autopilot.stage,
+    stageAt: t.autopilot.stageAt,
+    stopReason: t.autopilot.stopReason,
+    stopAt: t.autopilot.stopAt,
+    phase: t.autopilot.phase,
+  },
+  housekeepingFlags: t.housekeepingFlags,
+  actions: t.actions.filter((a) => a.offered).map(({ id, command }) => ({ id, command })),
+  attention: attention.filter((a) => a.tasks.includes(t.id)),
+});
 
 /**
  * Runs `read` on a connected project whose Jig Jig UI reads; a project gone, below the minimum, or
@@ -76,8 +113,10 @@ async function readProject(project: Project): Promise<Read> {
     const [status, list] = await Promise.all([readStatus(root), readTasks(root)]);
     return { status, list, jigVersion };
   });
-  if (!('list' in read)) return { view: read, tasks: read, revision: null };
+  if (!('list' in read)) return { view: read, tasks: read, details: [], revision: null };
   const { status, list, jigVersion } = read;
+  // Jig's live list holds active and ready tasks only.
+  const live = list.tasks.filter((t): t is TaskSummary & { status: Task['status'] } => t.status === 'active' || t.status === 'ready');
   return {
     view: {
       id: project.id,
@@ -87,28 +126,8 @@ async function readProject(project: Project): Promise<Read> {
       attention: status.attention,
       housekeepingStale: status.housekeepingStale,
     },
-    tasks: {
-      state: 'ready',
-      // Jig's live list holds active and ready tasks only.
-      tasks: list.tasks.flatMap((t) =>
-        t.status === 'active' || t.status === 'ready'
-          ? [
-              {
-                id: t.id,
-                class: t.class,
-                status: t.status,
-                goal: t.goal,
-                paused: t.paused,
-                started: t.branch !== null,
-                gate: t.gate?.state ?? null,
-                autopilot: t.autopilot?.state ?? null,
-                pullRequest: t.pullRequest,
-              },
-            ]
-          : [],
-      ),
-      finished: list.hidden,
-    },
+    tasks: { state: 'ready', tasks: live.map(card), finished: list.hidden },
+    details: live.map((t) => details(t, status.attention)),
     revision: list.revision,
   };
 }
@@ -258,6 +277,13 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     async tasks(id) {
       const project = (await readProjects(configDir)).find((p) => p.id === id);
       return project && (await shown(project)).tasks;
+    },
+    async task(id, taskId) {
+      const project = (await readProjects(configDir)).find((p) => p.id === id);
+      if (!project) return undefined;
+      const read = await shown(project);
+      if (read.tasks.state !== 'ready') return read.tasks;
+      return { state: 'ready', task: read.details.find((t) => t.id === taskId) ?? null };
     },
     async disconnect(id) {
       if (!(await removeProject(configDir, id))) return false;

@@ -90,3 +90,11 @@ The module that runs `jig` and validates its JSON; the only code that knows Jig'
 
 Informal synonyms: Jig adapter, CLI wrapper.
 Use in: source code.
+
+## Action
+
+Something a person may do next with a task, as Jig decides it from the task's state, with the Jig
+command that takes it; Jig UI shows the ones Jig offers and runs none of them yet.
+
+Informal synonyms: legal move, button.
+Use in: source code, API, documentation.

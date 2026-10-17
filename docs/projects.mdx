@@ -4,7 +4,7 @@ description: "Add a Jig project to Jig UI and remove it again."
 ---
 
 Jig UI shows the projects you connect on one page: each with its tasks counted and what waits for
-you in it, and a board of its tasks one click away.
+you in it, a board of its tasks one click away, and each task's details from its card.
 
 ## Connect a project
 
@@ -65,6 +65,27 @@ rule that fits wins:
 
 A card shows the task's id, class and goal, and what it waits for. Finished tasks are only
 counted under the board. The order inside a column is Jig's (by id) for now.
+
+## Task details
+
+The task id on a card opens the task's details:
+
+- **Where it stands** — its column, status, class, branch and the branch it lands on, how many
+  files are uncommitted in its worktree, whether its knowledge decision is recorded, and when it
+  was filed and last changed.
+- **Its design gate** (T3 and T4) — waiting for approval, changed after approval, or approved.
+- **Its autopilot run** — the stage it entered last and, when it stopped, the question it stopped
+  on.
+- **Its pull request** — open, merged or closed, its CI, and a link, as Jig's last
+  `jig housekeeping` heard it.
+- **What needs you** about it, and the housekeeping flags that still stand for it.
+- **What Jig offers now** — each step Jig would accept on the task as it is (approve the design,
+  answer the autopilot, pause, ship, close…) with the command to run in the project. Jig UI runs
+  none of them; the page follows the change once you do.
+
+Two things are not shown yet: which of the task's documents exist (Jig does not report them in a
+form Jig UI reads) and dependencies between tasks (they come with Jig's task queue). A finished
+task has no details page; its link says so.
 
 ## Staying current
 

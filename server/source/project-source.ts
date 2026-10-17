@@ -28,11 +28,41 @@ export interface Task {
   started: boolean;
   gate: string | null;
   autopilot: string | null;
-  pullRequest: { url: string; state: string | null; ci: string | null } | null;
+  pullRequest: { url: string; state: string | null; ci: string | null; fetchedAt: string | null } | null;
+}
+
+/** One live task in full, as its details show it; never where its worktree is. */
+export interface TaskDetails extends Task {
+  issue: string | null;
+  branch: string | null;
+  baseBranch: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  knowledgeConsolidated: boolean;
+  /** How many files differ in the worktree the task's branch is checked out in. */
+  worktree: { uncommitted: number } | null;
+  gateBy: string | null;
+  /** The autopilot run beyond its state: the stage it entered last, the question it stopped on. */
+  run: {
+    mode: string | null;
+    stage: string | null;
+    stageAt: string | null;
+    stopReason: string | null;
+    stopAt: string | null;
+    phase: string | null;
+  } | null;
+  housekeepingFlags: string[];
+  /** What Jig offers to do next, with its command. Refused ones are left out: Jig's reasons may name a path. */
+  actions: { id: string; command: string }[];
+  /** What needs the person about this task, from Jig's attention items. */
+  attention: Attention[];
 }
 
 /** A project's live tasks and how many finished ones are left out, or why it cannot be read. */
 export type ProjectTasks = { state: 'ready'; tasks: Task[]; finished: number } | Exclude<ProjectView, { state: 'ready' }>;
+
+/** One live task of a project, `null` when the project has no live task of that id; or why the project cannot be read. */
+export type ProjectTask = { state: 'ready'; task: TaskDetails | null } | Exclude<ProjectView, { state: 'ready' }>;
 
 export type Refusal = { code: 'not-a-repository' | 'worktree' | 'no-jig'; message: string };
 
@@ -50,6 +80,8 @@ export interface ProjectSource {
   connect(path: string): Promise<{ project: ProjectView; created: boolean } | Refusal>;
   /** A connected project's live tasks; `undefined` when no project has that id. */
   tasks(id: string): Promise<ProjectTasks | undefined>;
+  /** One live task of a connected project; `undefined` when no project has that id. */
+  task(id: string, taskId: string): Promise<ProjectTask | undefined>;
   /** False when no project has that id. Nothing in the project is touched. */
   disconnect(id: string): Promise<boolean>;
   /**

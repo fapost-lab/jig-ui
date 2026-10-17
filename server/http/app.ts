@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { type Context, Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { columns } from '../board/columns.js';
+import { columns, placeOf } from '../board/columns.js';
 import { type ProjectSource, RegistryUnreadable } from '../source/project-source.js';
 import { localOnly, tokenAccess } from './access.js';
 
@@ -67,6 +67,14 @@ export function createApp({ port, token, source, version = readPackageVersion(),
     if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
     if (read.state !== 'ready') return c.json({ board: read });
     return c.json({ board: { id, state: 'ready', columns: columns(read.tasks), finished: read.finished } });
+  });
+
+  app.get('/api/projects/:id/tasks/:task', async (c) => {
+    const read = await source.task(c.req.param('id'), c.req.param('task'));
+    if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+    if (read.state !== 'ready') return c.json({ task: read });
+    if (read.task === null) return refuse(c, 404, 'not-found', 'This project has no live task with this id.');
+    return c.json({ task: { state: 'ready', ...read.task, column: placeOf(read.task) } });
   });
 
   app.post('/api/projects', async (c) => {

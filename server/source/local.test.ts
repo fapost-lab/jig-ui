@@ -16,12 +16,20 @@ const task = (id: string, status: string, paused = false, more: Record<string, u
   id,
   class: 'T2',
   status,
+  issue: null,
   goal: `Goal of ${id}`,
+  knowledge_consolidated: false,
   paused,
+  created_at: '2026-10-17',
+  updated_at: '2026-10-17',
   branch: `task/${id}`,
+  base_branch: 'main',
+  worktree: null,
   gate: null,
   autopilot: null,
   pull_request: null,
+  housekeeping_flags: [],
+  actions: [],
   ...more,
 });
 const attention = {
@@ -66,7 +74,22 @@ describe('localSource', () => {
 
   const busy = project('busy', '0.29.0', {
     status: { attention: [attention], housekeeping: { ran_at: 'x', forge: 'github', stale: true } },
-    tasks: { tasks: [task('a', 'active'), task('b', 'active'), task('c', 'active', true), task('d', 'ready')], hidden: 2, housekeeping: null },
+    tasks: {
+      tasks: [
+        task('a', 'active'),
+        task('b', 'active', false, {
+          worktree: { path: '/secret/tree-of-b', uncommitted: 3 },
+          actions: [
+            { id: 'pause', command: 'jig task pause b', offered: true, reason: null },
+            { id: 'start', command: 'jig task start b', offered: false, reason: 'checked out in /secret/tree-of-b' },
+          ],
+        }),
+        task('c', 'active', true),
+        task('d', 'ready'),
+      ],
+      hidden: 2,
+      housekeeping: null,
+    },
   });
   const old = project('old', '0.26.0');
   const broken = project('broken', '0.29.0', {
@@ -115,7 +138,7 @@ describe('localSource', () => {
         tasks: {
           tasks: [
             task('f', 'active', false, { branch: null }),
-            task('g', 'active', false, { gate: { state: 'waiting', by: null }, autopilot: { state: 'stopped', mode: 'attended' } }),
+            task('g', 'active', false, { gate: { state: 'waiting', by: null }, autopilot: { state: 'stopped', mode: 'attended', repairs: 0, stage: 'implement', stage_at: 'x', stop_reason: 'which?', stop_at: 'x', phase: null } }),
             task('h', 'ready', false, { pull_request: { url: 'https://x/pull/1', state: 'merged', ci: null, fetched_at: 'x' } }),
           ],
           hidden: 0,
@@ -139,11 +162,30 @@ describe('localSource', () => {
       tasks: [
         expect.objectContaining({ id: 'f', started: false, gate: null, autopilot: null }),
         expect.objectContaining({ id: 'g', started: true, gate: 'waiting', autopilot: 'stopped' }),
-        expect.objectContaining({ id: 'h', pullRequest: { url: 'https://x/pull/1', state: 'merged', ci: null } }),
+        expect.objectContaining({ id: 'h', pullRequest: { url: 'https://x/pull/1', state: 'merged', ci: null, fetchedAt: 'x' } }),
       ],
     });
     expect(await source.tasks('old')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' });
     expect(await source.tasks('nobody')).toBeUndefined();
+  });
+
+  it("reads one live task in full, with what needs the person about it and only what Jig offers", async () => {
+    const read = await source.task('busy', 'b');
+    expect(read).toEqual({
+      state: 'ready',
+      task: expect.objectContaining({
+        id: 'b',
+        baseBranch: 'main',
+        worktree: { uncommitted: 3 },
+        actions: [{ id: 'pause', command: 'jig task pause b' }],
+        attention: [attention],
+      }),
+    });
+    expect(JSON.stringify(read)).not.toContain('/secret/');
+    expect(await source.task('busy', 'a')).toMatchObject({ task: { id: 'a', attention: [], actions: [] } });
+    expect(await source.task('busy', 'gone-task')).toEqual({ state: 'ready', task: null });
+    expect(await source.task('old', 'a')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' });
+    expect(await source.task('nobody', 'a')).toBeUndefined();
   });
 
   it('disconnects by id', async () => {

@@ -148,39 +148,129 @@ export async function readStatus(
   };
 }
 
-/** A task as `jig task list --json` reports it, as far as the workspace and the board read it; the statuses are Jig's (schemas/state.md). */
+/** What a person may do next with a task, as Jig decides it from the task's state. */
+export interface TaskAction {
+  id: string;
+  /** The Jig command that takes it; a word in `<…>` is a value the person supplies. */
+  command: string;
+  offered: boolean;
+  /** Jig's refusal, word for word, when not offered; it may name a path. */
+  reason: string | null;
+}
+
+/** A task as `jig task list --json` reports it, as far as Jig UI reads it; the statuses are Jig's (schemas/state.md). */
 export interface TaskSummary {
   id: string;
   class: string | null;
   status: 'active' | 'ready' | 'consolidated' | 'abandoned';
+  issue: string | null;
   goal: string | null;
+  knowledgeConsolidated: boolean;
   paused: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
   /** `null` while the task has not been started. */
   branch: string | null;
-  gate: { state: string } | null;
-  autopilot: { state: string } | null;
-  pullRequest: { url: string; state: string | null; ci: string | null } | null;
+  baseBranch: string;
+  /** The worktree that has the task's branch checked out: only how many files differ there, never where it is. */
+  worktree: { uncommitted: number } | null;
+  gate: { state: string; by: string | null } | null;
+  autopilot: {
+    state: string;
+    mode: string | null;
+    stage: string | null;
+    stageAt: string | null;
+    stopReason: string | null;
+    stopAt: string | null;
+    phase: string | null;
+  } | null;
+  pullRequest: { url: string; state: string | null; ci: string | null; fetchedAt: string | null } | null;
+  housekeepingFlags: string[];
+  actions: TaskAction[];
 }
 
 const STATUSES = new Set(['active', 'ready', 'consolidated', 'abandoned']);
-const isNullableState = (v: unknown): v is { state: string } | null => v === null || (isObject(v) && isString(v.state));
-const isPullRequest = (v: unknown): v is { url: string; state: string | null; ci: string | null } | null =>
-  v === null || (isObject(v) && isString(v.url) && isNullableString(v.state) && isNullableString(v.ci));
-/** A row of Jig's task list, the fields Jig UI reads, in Jig's own names. */
-type TaskRow = Omit<TaskSummary, 'pullRequest'> & { pull_request: TaskSummary['pullRequest'] };
+/** Jig's action ids this Jig UI knows; Jig may add ids without raising `schema`, and a consumer ignores those. */
+const ACTIONS = new Set(['start', 'pause', 'resume', 'approve-gate', 'answer-stop', 'set-class', 'ship', 'close', 'abandon', 'reopen']);
+const nullableStrings = (v: Json, keys: string[]): boolean => keys.every((k) => isNullableString(v[k]));
+const isGate = (v: unknown): boolean => v === null || (isObject(v) && isString(v.state) && isNullableString(v.by));
+const isAutopilot = (v: unknown): boolean =>
+  v === null || (isObject(v) && isString(v.state) && nullableStrings(v, ['mode', 'stage', 'stage_at', 'stop_reason', 'stop_at', 'phase']));
+const isPullRequest = (v: unknown): boolean =>
+  v === null || (isObject(v) && isString(v.url) && nullableStrings(v, ['state', 'ci', 'fetched_at']));
+const isWorktree = (v: unknown): boolean => v === null || (isObject(v) && typeof v.uncommitted === 'number');
+const isAction = (v: unknown): v is TaskAction =>
+  isObject(v) && isString(v.id) && isString(v.command) && typeof v.offered === 'boolean' && isNullableString(v.reason);
+
+/** A row of Jig's task list as Jig names it, only the fields Jig UI reads. */
+interface TaskRow {
+  id: string;
+  class: string | null;
+  status: TaskSummary['status'];
+  issue: string | null;
+  goal: string | null;
+  knowledge_consolidated: boolean;
+  paused: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+  branch: string | null;
+  base_branch: string;
+  worktree: { uncommitted: number } | null;
+  gate: { state: string; by: string | null } | null;
+  autopilot: { state: string; mode: string | null; stage: string | null; stage_at: string | null; stop_reason: string | null; stop_at: string | null; phase: string | null } | null;
+  pull_request: { url: string; state: string | null; ci: string | null; fetched_at: string | null } | null;
+  housekeeping_flags: string[];
+  actions: TaskAction[];
+}
 
 const isTaskRow = (v: unknown): v is TaskRow =>
   isObject(v) &&
   isString(v.id) &&
-  isNullableString(v.class) &&
   isString(v.status) &&
   STATUSES.has(v.status) &&
-  isNullableString(v.goal) &&
+  nullableStrings(v, ['class', 'issue', 'goal', 'created_at', 'updated_at', 'branch']) &&
+  typeof v.knowledge_consolidated === 'boolean' &&
   typeof v.paused === 'boolean' &&
-  isNullableString(v.branch) &&
-  isNullableState(v.gate) &&
-  isNullableState(v.autopilot) &&
-  isPullRequest(v.pull_request);
+  isString(v.base_branch) &&
+  isWorktree(v.worktree) &&
+  isGate(v.gate) &&
+  isAutopilot(v.autopilot) &&
+  isPullRequest(v.pull_request) &&
+  Array.isArray(v.housekeeping_flags) &&
+  v.housekeeping_flags.every(isString) &&
+  Array.isArray(v.actions) &&
+  v.actions.every(isAction);
+
+function summary(t: TaskRow): TaskSummary {
+  const { gate, autopilot: run, pull_request: pr } = t;
+  return {
+    id: t.id,
+    class: t.class,
+    status: t.status,
+    issue: t.issue,
+    goal: t.goal,
+    knowledgeConsolidated: t.knowledge_consolidated,
+    paused: t.paused,
+    createdAt: t.created_at,
+    updatedAt: t.updated_at,
+    branch: t.branch,
+    baseBranch: t.base_branch,
+    worktree: t.worktree && { uncommitted: t.worktree.uncommitted },
+    gate: gate && { state: gate.state, by: gate.by },
+    autopilot: run && {
+      state: run.state,
+      mode: run.mode,
+      stage: run.stage,
+      stageAt: run.stage_at,
+      stopReason: run.stop_reason,
+      stopAt: run.stop_at,
+      phase: run.phase,
+    },
+    pullRequest: pr && { url: pr.url, state: pr.state, ci: pr.ci, fetchedAt: pr.fetched_at },
+    housekeepingFlags: [...t.housekeeping_flags],
+    actions: t.actions.filter((a) => ACTIONS.has(a.id)).map(({ id, command, offered, reason }) => ({ id, command, offered, reason })),
+  };
+}
 
 /** The project's live tasks (`jig task list --json`) and how many finished ones it left out. */
 export async function readTasks(
@@ -189,18 +279,7 @@ export async function readTasks(
 ): Promise<{ revision: number; tasks: TaskSummary[]; hidden: number }> {
   const { revision, data } = await readJson(root, ['task', 'list'], platform);
   if (!Array.isArray(data.tasks) || !data.tasks.every(isTaskRow) || typeof data.hidden !== 'number') throw new JigShapeError();
-  const tasks = data.tasks.map(({ id, class: cls, status, goal, paused, branch, gate, autopilot, pull_request: pr }) => ({
-    id,
-    class: cls,
-    status,
-    goal,
-    paused,
-    branch,
-    gate: gate && { state: gate.state },
-    autopilot: autopilot && { state: autopilot.state },
-    pullRequest: pr && { url: pr.url, state: pr.state, ci: pr.ci },
-  }));
-  return { revision, tasks, hidden: data.hidden };
+  return { revision, tasks: data.tasks.map(summary), hidden: data.hidden };
 }
 
 /** True when `version` is at least the minimum Jig UI reads. */

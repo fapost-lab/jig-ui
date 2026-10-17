@@ -105,7 +105,7 @@ describe('readTasks', () => {
     expect(read.tasks[0]).toMatchObject({ id: expect.any(String), status: expect.any(String), paused: expect.any(Boolean) });
   });
 
-  it('reads the state a board needs: start, gate, autopilot, pull request', async () => {
+  it('reads what a board and a task show: start, gate, autopilot run, pull request, flags, actions', async () => {
     const read = await readTasks(answering('tasks-states', 'task-list-states.json'));
     expect(read.hidden).toBe(3);
     expect(read.tasks.map((t) => t.id)).toEqual(['backlog-item', 'design-waits', 'run-stopped', 'set-aside', 'shipped']);
@@ -113,17 +113,42 @@ describe('readTasks', () => {
       id: 'backlog-item',
       class: null,
       status: 'active',
+      issue: null,
       goal: null,
+      knowledgeConsolidated: false,
       paused: false,
+      createdAt: '2026-10-17',
+      updatedAt: '2026-10-17',
       branch: null,
+      baseBranch: 'main',
+      worktree: null,
       gate: null,
       autopilot: null,
       pullRequest: null,
+      housekeepingFlags: [],
+      actions: expect.any(Array),
     });
-    expect(read.tasks[1]?.gate).toEqual({ state: 'waiting' });
-    expect(read.tasks[2]?.autopilot).toEqual({ state: 'stopped' });
-    expect(read.tasks[3]?.paused).toBe(true);
-    expect(read.tasks[4]?.pullRequest).toEqual({ url: 'https://github.com/o/r/pull/7', state: 'open', ci: 'green' });
+    expect(read.tasks[0]?.actions.map((a) => a.id)).toEqual(['start', 'pause', 'resume', 'approve-gate', 'answer-stop', 'set-class', 'ship', 'close', 'abandon', 'reopen']);
+    expect(read.tasks[1]).toMatchObject({ gate: { state: 'waiting', by: null }, worktree: { uncommitted: 2 } });
+    expect(read.tasks[1]?.actions.find((a) => a.id === 'approve-gate')).toEqual({ id: 'approve-gate', command: 'jig task gate design-waits approved', offered: true, reason: null });
+    // An action id this Jig UI does not know is ignored, as Jig's contract asks of a consumer.
+    expect(read.tasks[1]?.actions.map((a) => a.id)).not.toContain('request-pause');
+    expect(read.tasks[2]?.autopilot).toEqual({
+      state: 'stopped',
+      mode: 'attended',
+      stage: 'implement',
+      stageAt: '2026-10-17T17:00:00Z',
+      stopReason: 'which column?',
+      stopAt: '2026-10-17T17:10:00Z',
+      phase: null,
+    });
+    expect(read.tasks[3]).toMatchObject({ paused: true, housekeepingFlags: ['STALE_CANDIDATE'] });
+    expect(read.tasks[4]?.pullRequest).toEqual({ url: 'https://github.com/o/r/pull/7', state: 'open', ci: 'green', fetchedAt: '2026-10-17T16:00:00Z' });
+  });
+
+  it("never hands on where a task's worktree is", async () => {
+    const read = await readTasks(answering('tasks-worktree', 'task-list-states.json'));
+    expect(JSON.stringify(read.tasks.map((t) => t.worktree))).not.toContain('/w/design-waits');
   });
 
   it.each([
@@ -135,6 +160,11 @@ describe('readTasks', () => {
     ['with an autopilot run without its state', (d: Record<string, any>) => (d.tasks[0].autopilot = { mode: 'attended' })],
     ['without its class', (d: Record<string, any>) => delete d.tasks[0].class],
     ['with a goal that is not text', (d: Record<string, any>) => (d.tasks[0].goal = 3)],
+    ['without its actions', (d: Record<string, any>) => delete d.tasks[0].actions],
+    ['with an action not saying whether it is offered', (d: Record<string, any>) => (d.tasks[0].actions[0].offered = 'yes')],
+    ['with a worktree without its count', (d: Record<string, any>) => (d.tasks[0].worktree = { path: '/w' })],
+    ['with housekeeping flags that are not text', (d: Record<string, any>) => (d.tasks[0].housekeeping_flags = [1])],
+    ['without its base branch', (d: Record<string, any>) => delete d.tasks[0].base_branch],
   ])('refuses a task %s', async (_, change) => {
     await expect(readTasks(answering(`case-${cases++}`, changed('task-list.json', change)))).rejects.toBeInstanceOf(JigShapeError);
   });

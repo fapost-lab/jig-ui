@@ -129,6 +129,13 @@ exit ${refuse ? 1 : 0}
   return dir;
 }
 
+/** A task-list row in Jig's shape: started, nothing waiting, unless `more` says otherwise. */
+const row = (id: string, more: Record<string, unknown> = {}) => ({
+  id, class: 'T2', status: 'active', issue: null, goal: null, knowledge_consolidated: false, paused: false,
+  created_at: '2026-10-17', updated_at: '2026-10-17', branch: `task/${id}`, base_branch: 'main', worktree: null,
+  gate: null, autopilot: null, pull_request: null, housekeeping_flags: [], actions: [], ...more,
+});
+
 /** Fails when `text` carries the temporary root, raw or as JSON escapes it (a Windows path's backslashes). */
 function expectNoPath(text: string): void {
   const root = realpathSync.native(webRoot);
@@ -193,10 +200,6 @@ describe('/api/projects and /api/workspace', () => {
 
   it('puts the cards of a project in their columns and carries no worktree path', async () => {
     const tree = join(realpathSync.native(webRoot), 'tree-of-busy').replace(/\\/g, '/');
-    const row = (id: string, more: Record<string, unknown>) => ({
-      id, class: 'T2', status: 'active', goal: null, paused: false, branch: `task/${id}`,
-      worktree: null, gate: null, autopilot: null, pull_request: null, ...more,
-    });
     const busy = project('busy', '0.29.0', false, [
       row('a', { branch: null }),
       row('b', { worktree: { path: tree, uncommitted: 1 }, gate: { state: 'waiting', by: null } }),
@@ -213,6 +216,35 @@ describe('/api/projects and /api/workspace', () => {
       ready: ['c'],
     });
     expectNoPath(text);
+  });
+
+  it("serves one task in full with its column, never a worktree path or a refusal naming one", async () => {
+    const tree = join(realpathSync.native(webRoot), 'tree-of-detailed').replace(/\\/g, '/');
+    const detailed = project('detailed', '0.29.0', false, [
+      row('w', {
+        worktree: { path: tree, uncommitted: 2 },
+        gate: { state: 'waiting', by: null },
+        actions: [
+          { id: 'approve-gate', command: 'jig task gate w approved', offered: true, reason: null },
+          { id: 'start', command: 'jig task start w', offered: false, reason: `checked out in ${tree}` },
+        ],
+      }),
+    ]);
+    await call('POST', '/api/projects', { path: detailed });
+    const res = await call('GET', '/api/projects/detailed/tasks/w');
+    const text = await res.text();
+    expect(JSON.parse(text).task).toMatchObject({
+      state: 'ready',
+      id: 'w',
+      column: { id: 'needs-you', title: 'Needs you' },
+      worktree: { uncommitted: 2 },
+      actions: [{ id: 'approve-gate', command: 'jig task gate w approved' }],
+    });
+    expectNoPath(text);
+    expect((await call('GET', '/api/projects/detailed/tasks/nobody')).status).toBe(404);
+    expect(((await (await call('GET', '/api/projects/detailed/tasks/nobody')).json()) as { error: { code: string } }).error.code).toBe('not-found');
+    expect((await call('GET', '/api/projects/nobody/tasks/w')).status).toBe(404);
+    expect(JSON.parse(await (await call('GET', '/api/projects/broken/tasks/w')).text()).task).toEqual({ id: 'broken', state: 'unreadable', code: 'failed' });
   });
 
   it.each([

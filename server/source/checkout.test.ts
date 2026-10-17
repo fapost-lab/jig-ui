@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { mainCheckout } from './checkout.js';
 
-const root = realpathSync(mkdtempSync(join(tmpdir(), 'jig-ui-checkout-')));
+const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'jig-ui-checkout-')));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' });

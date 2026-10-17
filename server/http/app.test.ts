@@ -105,7 +105,7 @@ describe('access guard', () => {
 
 /** A git clone whose `.ai/scripts/jig` answers `jig <version>`; no Jig at all without a version. */
 function project(name: string, version?: string): string {
-  const dir = join(realpathSync(webRoot), name);
+  const dir = join(realpathSync.native(webRoot), name);
   mkdirSync(dir, { recursive: true });
   execFileSync('git', ['init', '-q'], { cwd: dir });
   if (version) {
@@ -142,7 +142,7 @@ describe('/api/projects', () => {
         { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' },
       ],
     });
-    expect(text).not.toContain(realpathSync(webRoot));
+    expect(text).not.toContain(realpathSync.native(webRoot));
     expect(text).not.toContain('"path"');
 
     expect((await call('DELETE', '/api/projects/old')).status).toBe(204);
@@ -168,7 +168,7 @@ describe('/api/projects', () => {
     expect(res.status).toBe(422);
     const text = await res.text();
     expect(JSON.parse(text).error.code).toBe(code);
-    expect(text).not.toContain(realpathSync(webRoot));
+    expect(text).not.toContain(realpathSync.native(webRoot));
   });
 
   it('refuses every call without the token', async () => {

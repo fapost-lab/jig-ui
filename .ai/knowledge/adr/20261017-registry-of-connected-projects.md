@@ -55,5 +55,8 @@ signal. Task `project-registry`, design approved by the maintainer on 2026-10-17
 - The shape grows only by adding fields; changing what `id` or `path` means needs reading the old
   file.
 - An id may differ after a disconnect and a reconnect, if another project took it meanwhile.
-- `GET /api/projects` runs `jig --version` in every project on every request; caching belongs to
-  the live updates item.
+- Only the local ProjectSource adapter (`server/source/local.ts`) reads the registry, so its paths
+  stay a property of the local source, as adr-20261014-project-source-port-keeps-hosting-open
+  requires; the API sees ids.
+- Every read of the workspace runs `jig --version` and two JSON reads in every project; caching
+  belongs to the live updates item.

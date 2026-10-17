@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { serve } from '@hono/node-server';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../http/app.js';
+import { localSource } from '../source/local.js';
 import { configDir } from './config-dir.js';
 import {
   type InstanceInfo,
@@ -78,7 +79,7 @@ describe('probeInstance', () => {
       const s = serve({ fetch: (req) => app().fetch(req), hostname: '127.0.0.1', port: 0 }, () => resolve(s));
     });
     const port = (server.address() as { port: number }).port;
-    const app = () => createApp({ port, token, configDir: root, version: '0.1.0' });
+    const app = () => createApp({ port, token, source: localSource(root), version: '0.1.0' });
     try {
       expect(await probeInstance({ ...info, port, token })).toBe(true);
       expect(await probeInstance({ ...info, port, token: 'stale' })).toBe(false);

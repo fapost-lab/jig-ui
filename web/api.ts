@@ -36,8 +36,34 @@ export type Task = {
   started: boolean;
   gate: string | null;
   autopilot: string | null;
-  pullRequest: { url: string; state: string | null; ci: string | null } | null;
+  pullRequest: { url: string; state: string | null; ci: string | null; fetchedAt: string | null } | null;
 };
+
+export type TaskDetails =
+  | (Task & {
+      state: 'ready';
+      issue: string | null;
+      branch: string | null;
+      baseBranch: string;
+      createdAt: string | null;
+      updatedAt: string | null;
+      knowledgeConsolidated: boolean;
+      worktree: { uncommitted: number } | null;
+      gateBy: string | null;
+      run: {
+        mode: string | null;
+        stage: string | null;
+        stageAt: string | null;
+        stopReason: string | null;
+        stopAt: string | null;
+        phase: string | null;
+      } | null;
+      housekeepingFlags: string[];
+      actions: { id: string; command: string }[];
+      attention: Attention[];
+      column: { id: string; title: string };
+    })
+  | NotReady;
 
 export type Board =
   | { id: string; state: 'ready'; columns: { id: string; title: string; cards: Task[] }[]; finished: number }

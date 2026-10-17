@@ -25,6 +25,12 @@ export function columnOf(task: Task): ColumnId {
   return 'in-progress';
 }
 
+/** The column a task sits in, with its title. */
+export function placeOf(task: Task): { id: ColumnId; title: string } {
+  const id = columnOf(task);
+  return { id, title: COLUMNS.find((c) => c.id === id)?.title ?? id };
+}
+
 /** The board: every column, in a fixed order, its cards in the order Jig listed them. Computed on every read, never stored. */
 export function columns(tasks: Task[]): Column[] {
   return COLUMNS.map((c) => ({ ...c, cards: tasks.filter((t) => columnOf(t) === c.id) }));

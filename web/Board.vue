@@ -50,7 +50,8 @@ function badge(task: Task): string | undefined {
         <h3 :id="`column-${column.id}`">{{ column.title }} ({{ column.cards.length }})</h3>
         <ul>
           <li v-for="task in column.cards" :key="task.id">
-            <strong>{{ task.id }}</strong> <span v-if="task.class">{{ task.class }}</span>
+            <strong><a :href="`#/projects/${encodeURIComponent(id)}/tasks/${encodeURIComponent(task.id)}`">{{ task.id }}</a></strong>
+            <span v-if="task.class">{{ task.class }}</span>
             <p v-if="task.goal" class="goal">{{ task.goal }}</p>
             <p v-if="badge(task)">
               {{ badge(task) }}

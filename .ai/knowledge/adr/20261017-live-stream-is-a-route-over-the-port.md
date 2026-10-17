@@ -7,9 +7,9 @@ domains: []
 paths:
   - "server/http/**"
   - "server/source/**"
-summary: The SSE stream is GET /api/events in http/ over ProjectSource.subscribe; no live/ module (amends the port ADR's module list)
+summary: The SSE stream and task details are routes in http/ over ProjectSource; no live/ or task/ module (amends the port ADR's module list)
 ---
-# The live stream is a route over the port, not a `live/` module
+# The live stream and task details are routes over the port, not `live/` and `task/` modules
 
 ## Context
 
@@ -17,14 +17,19 @@ adr-20261014-project-source-port-keeps-hosting-open lists `live/` among the serv
 callers of ProjectSource. Task `live-updates` (design approved 2026-10-17) built the stream: it is
 `GET /api/events` in `server/http/app.ts`, a dozen lines over `ProjectSource.subscribe`. Following
 projects — the Watcher, the re-read, the comparison, the last read served while a page is open —
-lives in the local adapter, where the port's convention puts it (feature-live-updates).
+lives in the local adapter, where the port's convention puts it (feature-live-updates). Task
+`task-details` then built the details the same way: `GET /api/projects/:id/tasks/:task` reads
+`ProjectSource.task` and adds the board's column; nothing was left for a `task/` module
+(feature-task-details).
 
 ## Decision
 
 - There is no `server/live/` module. The SSE stream is a route in `server/http/`, which reaches
   projects only through `ProjectSource.subscribe`; it carries "project X changed, revision R",
   never data or a path.
-- This amends the module list of adr-20261014-project-source-port-keeps-hosting-open; the rest of
+- There is no `server/task/` module. Task details are a route in `server/http/` over
+  `ProjectSource.task`, with the column from `server/board/`.
+- This amends the module list of adr-20261014-project-source-port-keeps-hosting-open (`live/`, `task/`); the rest of
   that decision stands.
 
 ## Alternatives
@@ -36,5 +41,6 @@ lives in the local adapter, where the port's convention puts it (feature-live-up
 
 ## Consequences
 
-- `http/` is the only caller of `subscribe`. If the stream grows logic of its own (several signal
-  kinds, replay after a gap), that logic belongs behind the port or in a module of its own then.
+- `http/` is the only caller of `subscribe` and `task`. If either grows logic of its own (several
+  signal kinds, replay after a gap, details computed rather than read), that logic belongs behind
+  the port or in a module of its own then.

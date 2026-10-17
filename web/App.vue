@@ -2,17 +2,19 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { api, failure } from './api';
 import Board from './Board.vue';
+import TaskView from './Task.vue';
 import Workspace from './Workspace.vue';
 
 const version = ref<string>();
 const hash = ref(location.hash);
 const onHash = () => (hash.value = location.hash);
 
-/** `#/projects/<id>` opens that project's board; anything else is the workspace. */
-const boardId = computed(() => {
-  const match = /^#\/projects\/([^/]+)$/.exec(hash.value);
+/** `#/projects/<id>` opens that project's board, `#/projects/<id>/tasks/<task>` one task; anything else is the workspace. */
+const route = computed(() => {
+  const match = /^#\/projects\/([^/]+)(?:\/tasks\/([^/]+))?$/.exec(hash.value);
   try {
-    return match?.[1] ? decodeURIComponent(match[1]) : undefined;
+    if (!match?.[1]) return undefined;
+    return { project: decodeURIComponent(match[1]), task: match[2] && decodeURIComponent(match[2]) };
   } catch {
     return undefined; // a malformed escape: the workspace, not a crash
   }
@@ -35,7 +37,8 @@ onUnmounted(() => removeEventListener('hashchange', onHash));
     <p v-else-if="failure?.kind === 'not-running'" role="alert">Jig UI is not running. Start it with <code>npx @fapost/jig-ui</code>.</p>
     <template v-else>
       <h1>Jig UI {{ version }}</h1>
-      <Board v-if="boardId" :id="boardId" :key="boardId" />
+      <TaskView v-if="route?.task" :project="route.project" :task="route.task" :key="`${route.project}/${route.task}`" />
+      <Board v-else-if="route" :id="route.project" :key="route.project" />
       <Workspace v-else />
     </template>
   </main>

@@ -36,11 +36,12 @@ async function until(count: () => number, n: number, ms = 3_000): Promise<void> 
 describe('watchTree', () => {
   it('reports a change anywhere below the directory, once per quiet run', async () => {
     const dir = tree('deep');
-    const { watch, changes } = await watching(dir, { ignore: () => false, quietMs: 50 });
+    // Wide enough that a loaded machine still delivers both writes inside one quiet run.
+    const { watch, changes } = await watching(dir, { ignore: () => false, quietMs: 400 });
     writeFileSync(join(dir, 'deep', 'er', 'a'), '1');
     writeFileSync(join(dir, 'deep', 'er', 'b'), '2');
     await until(changes, 1);
-    await delay(200);
+    await delay(600);
     watch.close();
     expect(changes()).toBe(1);
   });

@@ -36,6 +36,9 @@ export type ProjectTasks = { state: 'ready'; tasks: Task[]; finished: number } |
 
 export type Refusal = { code: 'not-a-repository' | 'worktree' | 'no-jig'; message: string };
 
+/** A connected project changed; `revision` is Jig's with the read that saw it, `null` when unreadable. */
+export type Change = { id: string; revision: number | null };
+
 /**
  * The port through which the server reads and changes connected projects, named by id. The local
  * adapter (`local.ts`) holds the registry and runs Jig; a remote one would sit on the projects' machine.
@@ -49,4 +52,9 @@ export interface ProjectSource {
   tasks(id: string): Promise<ProjectTasks | undefined>;
   /** False when no project has that id. Nothing in the project is touched. */
   disconnect(id: string): Promise<boolean>;
+  /**
+   * Calls `listener` whenever a connected project changed — connected and disconnected included;
+   * returns the unsubscribe. Projects are followed only while someone listens.
+   */
+  subscribe(listener: (change: Change) => void): () => void;
 }

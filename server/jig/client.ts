@@ -11,6 +11,19 @@ export const MIN_JIG_VERSION = '0.29.0';
 const SCRIPT = join('.ai', 'scripts', 'jig');
 const TIMEOUT_MS = 10_000;
 
+/** The directory whose changes may change what Jig reports: the main checkout's `.ai/`. */
+export const watchDir = (root: string): string => join(root, '.ai');
+
+/**
+ * True for a path under `.ai/` (with `/` separators) that Jig writes while it only reads — its
+ * records of what it is doing under `runtime/` — so a change there is no sign of a change, and
+ * watching it would make every read trigger the next. `runtime/revision/` is where the clone's
+ * revision rises on each Jig write, and stays a sign. Jig names no such path in its contract
+ * (Jig 0.29.0, found by watching which files its reads touch).
+ */
+export const writtenByReads = (path: string): boolean =>
+  (path === 'runtime' || path.startsWith('runtime/')) && !path.startsWith('runtime/revision');
+
 /**
  * The bash that runs `.ai/scripts/jig`. On Windows it is Git's, found next to git itself
  * (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`): a `bash` on PATH may be WSL's.

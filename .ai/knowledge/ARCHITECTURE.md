@@ -25,28 +25,35 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   reads `jig status` (what needs the person) and `jig task list`, validated against fixtures of
   Jig 0.29.0 in `server/jig/fixtures/` (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, a project's live
-  tasks, connect, disconnect) and its local adapter (`local.ts`), which holds the registry and runs Jig. A
+  tasks, connect, disconnect, subscribe to changes) and its local adapter (`local.ts`), which holds the
+  registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
   read), `incompatible` (a newer Jig's shape), `unreadable` (Jig refused; its code only) or
   `unavailable` (convention-project-source).
+- `server/watch/` — Watcher: one recursive `fs.watch` per directory, debounced into "something
+  changed", knowing nothing of Jig (convention-watcher).
 - `server/board/` — a project's board: columns worked out from its tasks on every read
   (feature-board).
-- `server/http/` also serves `GET /api/workspace`, `GET /api/projects/:id/board` and connect /
-  disconnect under `/api/projects`, through the port only; responses name projects by id.
+- `server/http/` also serves `GET /api/workspace`, `GET /api/projects/:id/board`, connect /
+  disconnect under `/api/projects`, and `GET /api/events` — the SSE stream of "project X changed,
+  revision R" — through the port only; responses name projects by id.
   Directions: `http/` → `board/`, `source/`; `board/` → `source/` (types); `source/` → `jig/`,
-  `registry/`.
+  `registry/`, `watch/`.
 - `server/open-browser.ts` — opens the browser through `open.html` in the config directory, so
   the token is never a process argument (adr-20261017-browser-opens-through-a-redirect-file).
 - `web/` — the Vue 3 page: `App.vue` reads the address (`#/projects/<id>` is a board, anything
   else the workspace); `Workspace.vue` — a card per connected project with its task counts and
   what needs the person, connect and disconnect; `Board.vue` — one project's columns; `api.ts`
-  the shared fetch and types; Vite builds it into `dist/web` and the package ships it built. One TypeScript checks both sides
+  the shared fetch, types and the change stream each view re-fetches on; Vite builds it into `dist/web` and the package ships it built. One TypeScript checks both sides
   (adr-20261017-one-typescript-for-server-and-web).
 - **Start flow.** `npx @fapost/jig-ui` checks Node 24+, finds a running instance through the
   config directory and checks it answers with its token — then opens it and exits — or starts one
   on 127.0.0.1 with a fresh token and opens the browser on a link carrying it
   (adr-20261014-local-server-access-guard). Two starts at once: the one that loses the port opens
   the winner.
+- **Read and follow.** The page fetches; while it is open a change under a project's `.ai/`,
+  debounced, or the minute's rescan makes the local adapter re-read through Jig, and only a read
+  that differs sends "project X changed, revision R"; the page re-fetches, served from that read.
 - **Release flow.** A merge to `main` runs the CI matrix, builds `dist/` in a job without
   credentials, and publishes `<version>-next.<run>` under npm's `next` tag; a `v*` tag on a
   commit of `main` publishes `latest`. Details in `RELEASING.md`.
@@ -61,30 +68,22 @@ out of this heading.
 One npm package with a server and a page
 (adr-20261014-project-source-port-keeps-hosting-open):
 
-- `server/source/` — the local adapter grows a Watcher beside JigClient.
-- `server/watch/` — Watcher: recursive `fs.watch` on each project's `.ai/` plus a periodic
-  rescan, emitting "project changed" and nothing more.
 - `server/task/` — task details, read through ProjectSource.
-- `server/live/` — the SSE stream.
 - `server/http/` — the Hono app, the access guard and the built page; the only module that knows
   Hono.
-- `web/` — the Task view and a store that re-fetches on a live signal; knows nothing of the file
-  system or of localhost.
+- `web/` — the Task view; knows nothing of the file system or of localhost.
 
 ### Boundaries and dependency direction
 
-- `board/`, `task/`, `live/` depend on `source/`; only `source/` depends on `jig/` and `watch/`.
+- `board/`, `task/` depend on `source/`; only `source/` depends on `jig/` and `watch/`.
 - `http/` depends on the area modules; nothing depends on `http/`.
 - `web/` depends on the HTTP API only; shared types are the only code it shares with `server/`.
 
 ### Runtime flows
 
-The start flow is built (see Built above). Still to build:
+The start flow and read-and-follow are built (see Built above). Still to build:
 
-1. **Read and follow.** The page fetches light lists and heavy detail on demand. A file change
-   under a project's `.ai/`, debounced, makes ProjectSource re-read through Jig; `live/` sends
-   "project X changed, revision R" and the page re-fetches what it shows.
-2. **Change** (Phase 2). The page sends a command with the revision it saw; ProjectSource runs the
+1. **Change** (Phase 2). The page sends a command with the revision it saw; ProjectSource runs the
    matching Jig command; a stale revision comes back as Jig's refusal and is shown as a conflict.
 
 ### System-wide constraints and invariants

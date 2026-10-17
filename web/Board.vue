@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { api, type Board, describe, link, type Task } from './api';
+import { onMounted, onUnmounted, ref } from 'vue';
+import { api, type Board, describe, link, onChange, type Task } from './api';
 
 const props = defineProps<{ id: string }>();
 const board = ref<Board | 'not-connected'>();
 
-onMounted(async () => {
+let latest = 0;
+
+async function load(): Promise<void> {
+  const mine = ++latest;
   const res = await api(`/api/projects/${encodeURIComponent(props.id)}/board`);
   if (!res) return;
-  board.value = res.status === 404 ? 'not-connected' : ((await res.json()) as { board: Board }).board;
-});
+  const read = res.status === 404 ? 'not-connected' : ((await res.json()) as { board: Board }).board;
+  // A newer load may have started meanwhile: an older answer must not overwrite it.
+  if (mine === latest) board.value = read;
+}
+
+onMounted(load);
+onUnmounted(onChange((project) => (project === undefined || project === props.id) && void load()));
 
 /** True when the card's badge is about the task's pull request, so its link belongs beside it. */
 const aboutPullRequest = (task: Task): boolean =>

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { localSource } from '../source/local.js';
+import type { Change, ProjectSource } from '../source/project-source.js';
 import { createApp, readPackageVersion } from './app.js';
 
 const PORT = 4870;
@@ -250,3 +251,37 @@ describe('/api/projects and /api/workspace', () => {
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe('registry-unreadable');
   });
 });
+
+describe('/api/events', () => {
+  const listeners = new Set<(change: Change) => void>();
+  const source: ProjectSource = {
+    ...localSource(join(webRoot, 'events-config')),
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+  const events = createApp({ port: PORT, token: TOKEN, source, webRoot });
+
+  it('is refused without the token', async () => {
+    expect((await events.request('/api/events', { headers: { host: HOST } })).status).toBe(401);
+  });
+
+  it('streams each change as a signal naming the project by id, and ends the subscription with the stream', async () => {
+    const res = await events.request('/api/events', { headers: { host: HOST, cookie: COOKIE } });
+    expect(res.headers.get('content-type')).toContain('text/event-stream');
+    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+    await until(() => listeners.size === 1);
+    for (const listener of listeners) listener({ id: 'busy', revision: 9 });
+    const text = new TextDecoder().decode((await reader.read()).value);
+    expect(text).toBe('event: changed\ndata: {"project":"busy","revision":9}\n\n');
+    expectNoPath(text);
+    await reader.cancel();
+    await until(() => listeners.size === 0);
+    expect(listeners.size).toBe(0);
+  });
+});
+
+async function until(done: () => boolean, ms = 2_000): Promise<void> {
+  for (let waited = 0; !done() && waited < ms; waited += 10) await new Promise((r) => setTimeout(r, 10));
+}

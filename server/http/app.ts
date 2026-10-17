@@ -4,6 +4,7 @@ import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { type Context, Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import { columns } from '../board/columns.js';
 import { type ProjectSource, RegistryUnreadable } from '../source/project-source.js';
 import { localOnly, tokenAccess } from './access.js';
@@ -32,6 +33,9 @@ export interface AppOptions {
   /** Directory of the built page. */
   webRoot?: string;
 }
+
+/** How often an idle stream sends a comment, so a closed tab is noticed and its subscription ends. */
+const PING_MS = 30_000;
 
 const refuse = (c: Context, status: 404 | 422 | 500, code: string, message: string) =>
   c.json({ error: { code, message } }, status);
@@ -80,6 +84,20 @@ export function createApp({ port, token, source, version = readPackageVersion(),
     }
     return c.body(null, 204);
   });
+
+  // A signal, not data: the page re-fetches what it shows (adr-20261014-project-source-port-keeps-hosting-open).
+  app.get('/api/events', (c) =>
+    streamSSE(c, async (stream) => {
+      const unsubscribe = source.subscribe(({ id, revision }) => {
+        void stream.writeSSE({ event: 'changed', data: JSON.stringify({ project: id, revision }) });
+      });
+      stream.onAbort(unsubscribe);
+      while (!stream.aborted) {
+        await stream.sleep(PING_MS);
+        if (!stream.aborted) await stream.write(': ping\n\n');
+      }
+    }),
+  );
 
   app.all('/api/*', (c) => c.json({ error: 'not found' }, 404));
 

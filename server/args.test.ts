@@ -3,12 +3,17 @@ import { DEFAULT_PORT, parseCliArgs } from './args.js';
 
 describe('parseCliArgs', () => {
   it('runs on the default port with no arguments', () => {
-    expect(parseCliArgs([])).toEqual({ kind: 'run', port: DEFAULT_PORT });
+    expect(parseCliArgs([])).toEqual({ kind: 'run', port: DEFAULT_PORT, open: true });
   });
 
   it('reads --port in both forms', () => {
-    expect(parseCliArgs(['--port', '5000'])).toEqual({ kind: 'run', port: 5000 });
-    expect(parseCliArgs(['--port=5001'])).toEqual({ kind: 'run', port: 5001 });
+    expect(parseCliArgs(['--port', '5000'])).toEqual({ kind: 'run', port: 5000, open: true });
+    expect(parseCliArgs(['--port=5001'])).toEqual({ kind: 'run', port: 5001, open: true });
+  });
+
+  it('reads --no-open', () => {
+    expect(parseCliArgs(['--no-open'])).toEqual({ kind: 'run', port: DEFAULT_PORT, open: false });
+    expect(parseCliArgs(['--port', '5000', '--no-open'])).toEqual({ kind: 'run', port: 5000, open: false });
   });
 
   it('recognises help and version', () => {

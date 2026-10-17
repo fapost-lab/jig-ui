@@ -5,12 +5,12 @@ export const DEFAULT_PORT = 4870;
 export type CliCommand =
   | { kind: 'help' }
   | { kind: 'version' }
-  | { kind: 'run'; port: number }
+  | { kind: 'run'; port: number; open: boolean }
   | { kind: 'error'; message: string };
 
 /** Parses the command line (without the node and script entries). Pure: it never exits or prints. */
 export function parseCliArgs(argv: string[]): CliCommand {
-  let values: { port?: string; help?: boolean; version?: boolean };
+  let values: { port?: string; 'no-open'?: boolean; help?: boolean; version?: boolean };
   try {
     ({ values } = parseArgs({
       args: argv,
@@ -18,6 +18,7 @@ export function parseCliArgs(argv: string[]): CliCommand {
       allowPositionals: false,
       options: {
         port: { type: 'string' },
+        'no-open': { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
         version: { type: 'boolean', short: 'v' },
       },
@@ -28,11 +29,12 @@ export function parseCliArgs(argv: string[]): CliCommand {
 
   if (values.help) return { kind: 'help' };
   if (values.version) return { kind: 'version' };
-  if (values.port === undefined) return { kind: 'run', port: DEFAULT_PORT };
+  const open = !values['no-open'];
+  if (values.port === undefined) return { kind: 'run', port: DEFAULT_PORT, open };
 
   const port = /^\d+$/.test(values.port) ? Number(values.port) : Number.NaN;
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     return { kind: 'error', message: `Invalid --port value: ${values.port}. Use a number from 1 to 65535.` };
   }
-  return { kind: 'run', port };
+  return { kind: 'run', port, open };
 }

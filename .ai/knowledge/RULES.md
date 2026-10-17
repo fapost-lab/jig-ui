@@ -9,12 +9,16 @@ are added as sections of this file.
 - Jig UI never writes a file inside a connected project; every change is a `jig` command.
   (spec `jig-ui`; adr-20261014-jig-ui-is-an-optional-layer-over-jig. Checked in review: no file
   write outside the config directory.)
-- Jig UI stores nothing but its project registry and interface settings, in the user's config
-  directory, written atomically. (adr-20261014-local-server-access-guard. Checked in review.)
+- Jig UI stores nothing but its project registry, interface settings and the running instance's
+  `instance.json` and `open.html`, in the user's config directory, written atomically.
+  (adr-20261014-local-server-access-guard, adr-20261017-browser-opens-through-a-redirect-file.
+  Checked in review.)
 - A board column is computed from Jig's state on every read and never stored.
   (adr-20261014-board-columns-are-derived-from-jig-state. Checked in review.)
 - Only `server/jig/` runs `jig` or knows the shape of its output.
-  (convention-jig-client. Checked in review: no `child_process` and no Jig field names elsewhere.)
+  (convention-jig-client. Checked in review: nothing outside `server/jig/` spawns `jig` or names
+  Jig's fields; the only other `child_process` use is `server/open-browser.ts` starting the
+  system browser opener.)
 - The API and the page name projects by id; no path reaches `web/`.
   (adr-20261014-project-source-port-keeps-hosting-open. Checked by tests on the API responses.)
 - The server binds 127.0.0.1 unless a guard other than the local token is in place, refuses a

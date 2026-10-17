@@ -24,7 +24,7 @@ agent, and the page follows without a reload; stopping the UI changes nothing in
 
 Every item updates the pages in `docs/` it changes.
 
-- [ ] walking skeleton — `npx @fapost/jig-ui` starts one instance on 127.0.0.1 with a per-start token and the `Host`/`Origin` guard, opens the browser on the Vue page, and a second start opens the running one once it answers (after: package and release pipeline — it extends that package and ships through it)
+- [x] `walking-skeleton` — walking skeleton — `npx @fapost/jig-ui` starts one instance on 127.0.0.1 with a per-start token and the `Host`/`Origin` guard, opens the browser on the Vue page, and a second start opens the running one once it answers (after: package and release pipeline — it extends that package and ships through it)
 - [ ] project registry and connect — connect by path, a clone's main checkout only (a worktree path is refused and named), slug rules, disconnect; a project below Jig's minimum version is shown as such, not read (after: walking skeleton — the registry lives in its config directory and its page)
 - [ ] live updates — watcher with a periodic rescan per connected project, the whole `.ai/`, debounced into "project changed" over SSE; the page re-fetches and keeps the last good read when one fails; the cost is measured with several agents in several projects (after: project registry — it watches what is connected)
 - [ ] workspace dashboard — every connected project with its counts and what needs the person, from Jig's attention items (after: project registry — it lists connected projects)

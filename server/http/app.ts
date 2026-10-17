@@ -1,5 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { Hono, type MiddlewareHandler } from 'hono';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { serveStatic } from '@hono/node-server/serve-static';
+import { Hono } from 'hono';
+import { localOnly, tokenAccess } from './access.js';
 
 /**
  * Reads the version from the package's own package.json. The relative path is the same from
@@ -11,48 +15,32 @@ export function readPackageVersion(): string {
   return pkg.version;
 }
 
+/** The built page: `dist/web`, next to `dist/http` where this file runs when published. */
+export const DEFAULT_WEB_ROOT = fileURLToPath(new URL('../web', import.meta.url));
+
 export interface AppOptions {
   /** The port the server listens on; `Host` and `Origin` must name it. */
   port: number;
+  /** This start's token; the browser swaps it for a cookie that every API call must carry. */
+  token: string;
   version?: string;
+  /** Directory of the built page. */
+  webRoot?: string;
 }
 
-/** Refuses requests whose `Host` or `Origin` is not this server's own loopback address. */
-export function localOnly(port: number): MiddlewareHandler {
-  const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
-  const origins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`]);
-  return async (c, next) => {
-    const host = c.req.header('host');
-    const origin = c.req.header('origin');
-    if (host === undefined || !hosts.has(host.toLowerCase())) {
-      return c.text('Forbidden', 403);
-    }
-    if (origin !== undefined && !origins.has(origin.toLowerCase())) {
-      return c.text('Forbidden', 403);
-    }
-    await next();
-  };
-}
-
-export function createApp({ port, version = readPackageVersion() }: AppOptions): Hono {
+export function createApp({ port, token, version = readPackageVersion(), webRoot = DEFAULT_WEB_ROOT }: AppOptions): Hono {
   const app = new Hono();
   app.use(localOnly(port));
+  app.use(tokenAccess({ port, token }));
 
-  app.get('/', (c) =>
-    c.html(`<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Jig UI</title>
-  </head>
-  <body>
-    <h1>Jig UI &mdash; not built yet</h1>
-    <p>Version ${version}</p>
-  </body>
-</html>
-`),
-  );
+  app.get('/api/instance', (c) => c.json({ version }));
+  app.all('/api/*', (c) => c.json({ error: 'not found' }, 404));
+
+  if (existsSync(join(webRoot, 'index.html'))) {
+    app.use('/*', serveStatic({ root: webRoot }));
+  } else {
+    app.get('/', (c) => c.text('The page is not built. Run npm run build.', 503));
+  }
 
   return app;
 }

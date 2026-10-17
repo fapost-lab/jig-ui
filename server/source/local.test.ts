@@ -9,7 +9,19 @@ const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'jig-ui-source-')));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
 const envelope = (data: unknown) => JSON.stringify({ schema: 1, revision: 7, generated_at: '2026-10-17T00:00:00Z', data });
-const task = (id: string, status: string, paused = false) => ({ id, status, paused });
+/** A task-list row in Jig's shape: started, nothing waiting, no pull request, unless `more` says otherwise. */
+const task = (id: string, status: string, paused = false, more: Record<string, unknown> = {}) => ({
+  id,
+  class: 'T2',
+  status,
+  goal: `Goal of ${id}`,
+  paused,
+  branch: `task/${id}`,
+  gate: null,
+  autopilot: null,
+  pull_request: null,
+  ...more,
+});
 const attention = {
   kind: 'gate-waiting',
   subject: { type: 'task', id: 'b' },
@@ -93,6 +105,43 @@ describe('localSource', () => {
     await source.connect(newer);
     expect((await source.workspace()).at(-1)).toEqual({ id: 'newer', state: 'incompatible', jigVersion: '0.30.0' });
     await source.disconnect('newer');
+  });
+
+  it("lists a project's live tasks as a board reads them, with the finished ones counted", async () => {
+    await source.connect(
+      project('waiting', '0.29.0', {
+        tasks: {
+          tasks: [
+            task('f', 'active', false, { branch: null }),
+            task('g', 'active', false, { gate: { state: 'waiting', by: null }, autopilot: { state: 'stopped', mode: 'attended' } }),
+            task('h', 'ready', false, { pull_request: { url: 'https://x/pull/1', state: 'merged', ci: null, fetched_at: 'x' } }),
+          ],
+          hidden: 0,
+          housekeeping: null,
+        },
+      }),
+    );
+    expect(await source.tasks('busy')).toEqual({
+      state: 'ready',
+      finished: 2,
+      tasks: [
+        { id: 'a', class: 'T2', status: 'active', goal: 'Goal of a', paused: false, started: true, gate: null, autopilot: null, pullRequest: null },
+        expect.objectContaining({ id: 'b' }),
+        expect.objectContaining({ id: 'c', paused: true }),
+        expect.objectContaining({ id: 'd', status: 'ready' }),
+      ],
+    });
+    expect(await source.tasks('waiting')).toEqual({
+      state: 'ready',
+      finished: 0,
+      tasks: [
+        expect.objectContaining({ id: 'f', started: false, gate: null, autopilot: null }),
+        expect.objectContaining({ id: 'g', started: true, gate: 'waiting', autopilot: 'stopped' }),
+        expect.objectContaining({ id: 'h', pullRequest: { url: 'https://x/pull/1', state: 'merged', ci: null } }),
+      ],
+    });
+    expect(await source.tasks('old')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' });
+    expect(await source.tasks('nobody')).toBeUndefined();
   });
 
   it('disconnects by id', async () => {

@@ -24,18 +24,23 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
 - `server/jig/` — JigClient: the project's Jig version against `MIN_JIG_VERSION`, and the JSON
   reads `jig status` (what needs the person) and `jig task list`, validated against fixtures of
   Jig 0.29.0 in `server/jig/fixtures/` (convention-jig-client).
-- `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, connect,
-  disconnect) and its local adapter (`local.ts`), which holds the registry and runs Jig. A
+- `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, a project's live
+  tasks, connect, disconnect) and its local adapter (`local.ts`), which holds the registry and runs Jig. A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
   read), `incompatible` (a newer Jig's shape), `unreadable` (Jig refused; its code only) or
   `unavailable` (convention-project-source).
-- `server/http/` also serves `GET /api/workspace` and connect / disconnect under `/api/projects`,
-  through the port only; responses name projects by id. Directions: `http/` → `source/`;
-  `source/` → `jig/`, `registry/`.
+- `server/board/` — a project's board: columns worked out from its tasks on every read
+  (feature-board).
+- `server/http/` also serves `GET /api/workspace`, `GET /api/projects/:id/board` and connect /
+  disconnect under `/api/projects`, through the port only; responses name projects by id.
+  Directions: `http/` → `board/`, `source/`; `board/` → `source/` (types); `source/` → `jig/`,
+  `registry/`.
 - `server/open-browser.ts` — opens the browser through `open.html` in the config directory, so
   the token is never a process argument (adr-20261017-browser-opens-through-a-redirect-file).
-- `web/` — the Vue 3 page, the workspace: a card per connected project with its task counts and
-  what needs the person, a connect form and disconnect; Vite builds it into `dist/web` and the package ships it built. One TypeScript checks both sides
+- `web/` — the Vue 3 page: `App.vue` reads the address (`#/projects/<id>` is a board, anything
+  else the workspace); `Workspace.vue` — a card per connected project with its task counts and
+  what needs the person, connect and disconnect; `Board.vue` — one project's columns; `api.ts`
+  the shared fetch and types; Vite builds it into `dist/web` and the package ships it built. One TypeScript checks both sides
   (adr-20261017-one-typescript-for-server-and-web).
 - **Start flow.** `npx @fapost/jig-ui` checks Node 24+, finds a running instance through the
   config directory and checks it answers with its token — then opens it and exits — or starts one
@@ -59,13 +64,12 @@ One npm package with a server and a page
 - `server/source/` — the local adapter grows a Watcher beside JigClient.
 - `server/watch/` — Watcher: recursive `fs.watch` on each project's `.ai/` plus a periodic
   rescan, emitting "project changed" and nothing more.
-- `server/board/`, `server/task/` — the per-project board and task
-  details, read through ProjectSource.
+- `server/task/` — task details, read through ProjectSource.
 - `server/live/` — the SSE stream.
 - `server/http/` — the Hono app, the access guard and the built page; the only module that knows
   Hono.
-- `web/` — Vue 3 views (Workspace, Board, Task) and a store; knows nothing of the file system or
-  of localhost.
+- `web/` — the Task view and a store that re-fetches on a live signal; knows nothing of the file
+  system or of localhost.
 
 ### Boundaries and dependency direction
 

@@ -30,7 +30,8 @@ Why:      a later remote adapter (a connector on the projects' machine) must fit
 
 Callers (`board/`, `task/`, `live/`) depend on the port, never on `jig/` or `watch/` directly.
 
-The port is `ProjectSource` in `server/source/project-source.ts`; its local adapter
+The port is `ProjectSource` in `server/source/project-source.ts` — the workspace, a project's
+live tasks (`tasks(id)`, for the board), connect and disconnect; its local adapter
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
 only the path a person types to connect. A read that fails becomes a state of the project, not an
 error of the workspace: `unreadable` with Jig's failure code and never its message (it may name a

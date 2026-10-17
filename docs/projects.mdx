@@ -4,7 +4,7 @@ description: "Add a Jig project to Jig UI and remove it again."
 ---
 
 Jig UI shows the projects you connect on one page: each with its tasks counted and what waits for
-you in it. Boards per project come next.
+you in it, and a board of its tasks one click away.
 
 ## Connect a project
 
@@ -48,6 +48,23 @@ not readable shows why:
 | Jig UI needs 0.29.0 or later | The project's Jig is older than Jig UI reads. Run `jig upgrade` in the project; it is shown as readable on the next load, without connecting it again. |
 | The project directory is not there any more | The folder was moved or deleted. Disconnect it, then connect its new path. |
 | There is no Jig in the project any more | Jig was removed from the project. |
+
+## The board
+
+**Open board** on a readable project shows its live tasks in five columns. Jig UI works the
+column out from the task's state in Jig every time it reads it, and stores it nowhere; the first
+rule that fits wins:
+
+| Column | A task is here when |
+| --- | --- |
+| Paused | it is paused (`jig task pause`) |
+| Backlog | it is filed but not started (`jig task start` not run yet) |
+| Needs you | its design waits at its gate, or changed after approval, or its autopilot run stopped with a question |
+| Ready | its work is done (`status ready`); the card says whether a pull request is open, its CI, or merged |
+| In progress | anything else that is live |
+
+A card shows the task's id, class and goal, and what it waits for. Finished tasks are only
+counted under the board. The order inside a column is Jig's (by id) for now.
 
 ## Disconnect a project
 

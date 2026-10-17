@@ -4,6 +4,7 @@ import { isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { type Context, Hono } from 'hono';
+import { columns } from '../board/columns.js';
 import { type ProjectSource, RegistryUnreadable } from '../source/project-source.js';
 import { localOnly, tokenAccess } from './access.js';
 
@@ -55,6 +56,14 @@ export function createApp({ port, token, source, version = readPackageVersion(),
   app.get('/api/instance', (c) => c.json({ version }));
 
   app.get('/api/workspace', async (c) => c.json({ projects: await source.workspace() }));
+
+  app.get('/api/projects/:id/board', async (c) => {
+    const id = c.req.param('id');
+    const read = await source.tasks(id);
+    if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+    if (read.state !== 'ready') return c.json({ board: read });
+    return c.json({ board: { id, state: 'ready', columns: columns(read.tasks), finished: read.finished } });
+  });
 
   app.post('/api/projects', async (c) => {
     const body: unknown = await c.req.json().catch(() => undefined);

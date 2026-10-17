@@ -102,14 +102,47 @@ describe('readTasks', () => {
   it('reads the live tasks', async () => {
     const read = await readTasks(answering('tasks', 'task-list.json'));
     expect(read.tasks.length).toBeGreaterThan(0);
-    expect(read.tasks[0]).toEqual({ id: expect.any(String), status: expect.any(String), paused: expect.any(Boolean) });
+    expect(read.tasks[0]).toMatchObject({ id: expect.any(String), status: expect.any(String), paused: expect.any(Boolean) });
+  });
+
+  it('reads the state a board needs: start, gate, autopilot, pull request', async () => {
+    const read = await readTasks(answering('tasks-states', 'task-list-states.json'));
+    expect(read.hidden).toBe(3);
+    expect(read.tasks.map((t) => t.id)).toEqual(['backlog-item', 'design-waits', 'run-stopped', 'set-aside', 'shipped']);
+    expect(read.tasks[0]).toEqual({
+      id: 'backlog-item',
+      class: null,
+      status: 'active',
+      goal: null,
+      paused: false,
+      branch: null,
+      gate: null,
+      autopilot: null,
+      pullRequest: null,
+    });
+    expect(read.tasks[1]?.gate).toEqual({ state: 'waiting' });
+    expect(read.tasks[2]?.autopilot).toEqual({ state: 'stopped' });
+    expect(read.tasks[3]?.paused).toBe(true);
+    expect(read.tasks[4]?.pullRequest).toEqual({ url: 'https://github.com/o/r/pull/7', state: 'open', ci: 'green' });
   });
 
   it.each([
     ['without its status', (d: Record<string, any>) => delete d.tasks[0].status],
     ['with a status this Jig UI does not know', (d: Record<string, any>) => (d.tasks[0].status = 'parked')],
+    ['with a gate without its state', (d: Record<string, any>) => (d.tasks[0].gate = { by: null })],
+    ['with a pull request without its url', (d: Record<string, any>) => (d.tasks[0].pull_request = { state: 'open', ci: null })],
+    ['without its branch', (d: Record<string, any>) => delete d.tasks[0].branch],
+    ['with an autopilot run without its state', (d: Record<string, any>) => (d.tasks[0].autopilot = { mode: 'attended' })],
+    ['without its class', (d: Record<string, any>) => delete d.tasks[0].class],
+    ['with a goal that is not text', (d: Record<string, any>) => (d.tasks[0].goal = 3)],
   ])('refuses a task %s', async (_, change) => {
     await expect(readTasks(answering(`case-${cases++}`, changed('task-list.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+describe('readTasks, the list as a whole', () => {
+  it('refuses a list without its count of hidden tasks', async () => {
+    await expect(readTasks(answering(`case-${cases++}`, changed('task-list.json', (d) => delete d.hidden)))).rejects.toBeInstanceOf(JigShapeError);
   });
 });
 

@@ -201,7 +201,9 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
 
   /** Keeps what was shown over one torn read; otherwise the read is what the project shows. */
   function settle(entry: Entry, read: Read): void {
-    if (torn(read) && entry.shown && !torn(entry.shown) && !entry.held) {
+    // While following, only a read this following showed is kept: one from before it was never shown through it.
+    const ours = !following() || entry.readIn === session;
+    if (torn(read) && entry.shown && !torn(entry.shown) && !entry.held && ours) {
       entry.held = true;
       return;
     }
@@ -223,11 +225,16 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     entry.reading = (async () => {
       do {
         entry.dirty = false;
-        const before = entry.shown && JSON.stringify(entry.shown);
+        const was = entry.readIn;
+        const before = JSON.stringify(entry.shown);
         settle(entry, await readProject(entry.project));
-        const changed = before !== undefined && JSON.stringify(entry.shown) !== before;
-        if (following() && entries.get(entry.project.id) === entry && (entry.news || changed)) {
-          entry.news = false;
+        // Compared only with a read of this following, checked once the read is in: one from before
+        // it, or from a following that ended meanwhile, was never shown through this one.
+        const changed = following() && was === session && JSON.stringify(entry.shown) !== before;
+        // News lasts one read: one made while nobody listens tells nobody, and must not tell the next listener.
+        const news = entry.news;
+        entry.news = false;
+        if (following() && entries.get(entry.project.id) === entry && (news || changed)) {
           signal({ id: entry.project.id, revision: entry.shown?.revision ?? null });
         }
       } while (entry.dirty);

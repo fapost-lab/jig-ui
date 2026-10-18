@@ -472,6 +472,50 @@ describe('localSource, following changes', () => {
     expect(seen).toEqual([]);
   });
 
+  it('signals nothing when following starts for a project connected while nobody listened', async () => {
+    const earlier = localSource(join(root, 'earlier-config'));
+    const project = liveProject('earlier');
+    await earlier.connect(project.dir);
+    const seen: Change[] = [];
+    const stop = earlier.subscribe((change) => seen.push(change));
+    await delay(100);
+    await settled(project.dir);
+    stop();
+    expect(seen).toEqual([]);
+  });
+
+  it('signals nothing when following starts for a project that changed while nobody listened', async () => {
+    const meanwhile = localSource(join(root, 'meanwhile-config'));
+    const project = liveProject('meanwhile');
+    await meanwhile.connect(project.dir);
+    project.answer(3, [task('a', 'active'), task('m', 'active')]); // outside .ai/, while nobody listens
+    const seen: Change[] = [];
+    const stop = meanwhile.subscribe((change) => seen.push(change));
+    await delay(100);
+    await settled(project.dir);
+    stop();
+    expect(seen).toEqual([]);
+    expect(await meanwhile.tasks('meanwhile')).toMatchObject({ tasks: [{ id: 'a' }, { id: 'm' }] });
+  });
+
+  it('believes a torn first read of a following over a read made while nobody listened, and signals the next', async () => {
+    const held = localSource(join(root, 'held-config'), { quietMs: 30, maxWaitMs: 200 });
+    const project = liveProject('held');
+    await held.connect(project.dir);
+    project.answer(2, [task('a', 'active')], true); // Jig mid-write
+    writeFileSync(join(project.dir, 'slow'), '');
+    const seen: Change[] = [];
+    const stop = held.subscribe((change) => seen.push(change));
+    await delay(50); // the first read of the following is under way
+    expect(await held.tasks('held')).toMatchObject({ state: 'unreadable' }); // not the read from before it
+    rmSync(join(project.dir, 'slow'));
+    project.answer(3, [task('a', 'active'), task('b', 'active')]);
+    touch(project.dir);
+    await until(() => seen.length > 0);
+    stop();
+    expect(seen).toEqual([{ id: 'held', revision: 3 }]);
+  });
+
   it('signals a project registered by another Jig UI on its next rescan', async () => {
     const config = join(root, 'shared-config');
     const rescanning = localSource(config, { rescanMs: 300 });

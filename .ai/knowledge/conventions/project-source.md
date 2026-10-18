@@ -38,7 +38,8 @@ error of the workspace: `unreadable` with Jig's failure code and never its messa
 path), `incompatible` when Jig answered in a shape JigClient does not read. A task's details carry no
 worktree path and only the actions Jig offers — a refused action's reason is Jig's text and may
 name a path (feature-task-details). Either one right after a good
-read is held back once — the last good read stays — and believed the second time.
+read is held back once — the last good read stays — and believed the second time; while following,
+only a read this following showed is kept, so a torn first read of a following is believed.
 
 `subscribe(listener)` returns the unsubscribe. The local adapter follows projects only while
 someone listens: a Watcher per project (convention-watcher) and a rescan every minute; each change

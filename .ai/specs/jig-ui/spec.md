@@ -141,6 +141,15 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
 - Stack: Vue 3 + Vite + TypeScript in the browser, Hono on Node.js with Server-Sent Events for
   live updates, one process serving both the API and the built page (maintainer, 2026-10-14).
   Details and rejected options are in `stack.md`.
+- Running `npx @fapost/jig-ui` inside a Jig project connects that project and opens its board;
+  run anywhere else, it starts as before. Run from a worktree, it connects the clone's main
+  checkout and says so in the terminal. Disconnecting stays on the page; the command has no
+  `disconnect` (maintainer, 2026-10-18). Rejected: an explicit `connect [path]` subcommand — a
+  second word for the common case, when the folder already says which project is meant.
+  Rejected: refusing a worktree as the page does — the terminal can name the main checkout itself,
+  and the page's refusal exists because a pasted path may be a mistake. This covers most of the
+  `jig init` fog item without a hook on Jig's side; the fog item stays for registering a project
+  without running Jig UI.
 - Public documentation lives in `docs/` of this repository and is published with Mintlify
   (maintainer, 2026-10-14). The requirements page states the Node.js requirement the installer
   checks.

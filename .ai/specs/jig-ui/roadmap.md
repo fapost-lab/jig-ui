@@ -32,6 +32,7 @@ Every item updates the pages in `docs/` it changes.
 - [x] `task-details` — task details — status, stage, gate, artifacts, pull request, dependencies, attention, opened from a card (after: project board — a card opens it)
 - [x] `design-system` — design system and canvas — shadcn-vue on Tailwind v4 with light and dark themes and a look chosen from prototypes; vue-router; `#/canvas` showing every component in every variant and state; the Vue conventions written into knowledge; the workspace, the board and task details rebuilt on the components (after: task details — it rebuilds the three screens that exist)
 - [x] `specs-and-epics` — specs and epics — each spec with its phases, progress and epic branch beside the board, from Jig's spec list (after: project board — shown on the project's page; design system and canvas — built on its components)
+- [ ] connect by running in the project — `npx @fapost/jig-ui` in a Jig project's folder (or a worktree of it) connects its main checkout, through the running instance when there is one, and opens its board; anywhere else it starts as before (after: project registry — it connects through the registry)
 - [ ] fog: registration by `jig init` — needs a hook on Jig's side that keeps the UI optional
 
 ## Phase 2 — Planning from the UI
@@ -60,8 +61,9 @@ instead of being overwritten.
 5. task details
 6. design system and canvas
 7. specs and epics
-8. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
-9. conflict display
+8. connect by running in the project
+9. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
+10. conflict display
 
 <!--
 Rules (jig-idea §8):

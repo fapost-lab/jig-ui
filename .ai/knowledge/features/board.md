@@ -6,6 +6,7 @@ domains: []
 paths:
   - "server/board/**"
   - web/views/BoardView.vue
+  - "web/components/Board*.vue"
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
 reviewed_at: 2026-10-18
 ---
@@ -20,10 +21,11 @@ Ready, In progress) and served by `GET /api/projects/:id/board`. Cards are light
 and what the task waits for (gate, autopilot run, pull request — `web/lib/waits.ts`). Finished
 tasks are only counted.
 
-`web/views/BoardView.vue` shows the board two ways, switched by the person and remembered by the
-browser (`localStorage` `jig-ui.board-view`): Board, the columns side by side, where a click
-expands a card into its details; List, the columns as folding groups of one-line rows, a selected
-row's details in a pane on the right. Both read the details on demand (feature-task-details).
+`web/views/BoardView.vue` reads the board and shows it two ways, switched by the person and
+remembered by the browser (`localStorage` `jig-ui.board-view`): Board (`BoardColumns`), the
+columns side by side, where a click expands a card into its details; List (`BoardList`), the
+columns as folding groups of one-line rows, a selected row's details in a pane on the right. The
+two take the columns and the selected task as props and emit the choice; the view holds it. Both read the details on demand (feature-task-details).
 
 ## Why
 

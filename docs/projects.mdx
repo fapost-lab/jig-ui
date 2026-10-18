@@ -31,6 +31,11 @@ A path is refused when it is:
 
 Connecting a project that is already connected changes nothing.
 
+Jig UI reads a project by running the project's own Jig — `.ai/scripts/jig`, from the project's
+files — when you connect it, after each change in it while the page is open, and once a minute.
+Connect only projects whose Jig you would run yourself; that includes running
+`npx @fapost/jig-ui` inside a project, which connects it.
+
 ## What the page shows
 
 A row of tabs runs along the top: `jig-ui://` for this page, then one tab per connected project

@@ -1,11 +1,20 @@
 <script setup lang="ts">
-import type { Task } from '@/api';
-import { Badge } from '@/components/ui/badge';
-import { toneText } from '@/lib/tones';
-import { waits } from '@/lib/waits';
+  import { computed } from 'vue';
+  import type { Task } from '@/api';
+  import { Badge } from '@/components/ui/badge';
+  import { toneText } from '@/lib/tones';
+  import { waits } from '@/lib/waits';
 
-defineProps<{ task: Task; selected: boolean }>();
-defineEmits<{ select: [] }>();
+  const props = defineProps<{
+    task: Task;
+    selected: boolean;
+  }>();
+
+  defineEmits<{
+    select: [];
+  }>();
+
+  const note = computed(() => waits(props.task));
 </script>
 
 <template>
@@ -20,6 +29,6 @@ defineEmits<{ select: [] }>();
     <Badge v-if="task.class" variant="outline" class="shrink-0">{{ task.class }}</Badge>
     <span v-else class="w-7 shrink-0" />
     <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ task.goal }}</span>
-    <span v-if="waits(task)" class="shrink-0" :class="toneText[waits(task)!.tone]">{{ waits(task)!.text }}</span>
+    <span v-if="note" class="shrink-0" :class="toneText[note.tone]">{{ note.text }}</span>
   </button>
 </template>

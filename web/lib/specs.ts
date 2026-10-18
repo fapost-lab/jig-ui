@@ -1,13 +1,19 @@
 import type { SpecItem } from '@/api';
 
 /** A run of an item's words: plain, or `code` as the roadmap marks it. */
-export type Words = { text: string; code: boolean }[];
+export type Words = {
+  text: string;
+  code: boolean;
+}[];
 
 /**
  * An item's words as a row shows them: without the leading `` `task-id` — `` or `fog:` the row
  * already shows, its dependencies (`(after: …)`) apart, and backticked runs marked as code.
  */
-export function itemWords(item: SpecItem): { words: Words; after: Words | null } {
+export function itemWords(item: SpecItem): {
+  words: Words;
+  after: Words | null;
+} {
   let text = item.text;
   // Jig takes an em dash, `-` or `--` after the id, with any spaces around it.
   if (item.task !== null) text = text.replace(new RegExp(`^\`${item.task.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\`\\s+(—|--|-)\\s+`), '');

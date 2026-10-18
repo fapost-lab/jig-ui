@@ -43,7 +43,7 @@ are added as sections of this file.
   (spec `jig-ui`, Phase 0. Checked in review of `.github/workflows/`.)
 - Every action in `.github/workflows/` is pinned to a full commit SHA with its version in a
   comment; Dependabot proposes updates. (spec `jig-ui`, Phase 0. Checked in review.)
-- Code passes `npm run lint` — ESLint for correctness, Prettier for layout
+- Code passes `npm run lint` — ESLint for correctness and the layout Prettier leaves open, Prettier for the rest of the layout
   (convention-code-style. Checked by CI and a full `jig verify`.)
 - Work that changes what a user sees or does updates the pages in `docs/` it affects.
   (spec `jig-ui`, roadmap. Checked in review.)

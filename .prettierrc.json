@@ -1,6 +1,7 @@
 {
   "singleQuote": true,
   "printWidth": 140,
+  "vueIndentScriptAndStyle": true,
   "plugins": ["prettier-plugin-tailwindcss"],
   "tailwindStylesheet": "./web/style.css",
   "tailwindFunctions": ["cn", "cva"]

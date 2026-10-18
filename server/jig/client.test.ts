@@ -101,6 +101,7 @@ describe('readStatus', () => {
 
   it.each([
     ['an item without a title', (d: Record<string, any>) => delete d.attention[0].title],
+    ['an item without its url, which may only be null', (d: Record<string, any>) => delete d.attention[0].url],
     ['attention that is not a list', (d: Record<string, any>) => (d.attention = {})],
     ['housekeeping without stale', (d: Record<string, any>) => (d.housekeeping = { ran_at: 'x' })],
   ])('refuses %s', async (_, change) => {
@@ -249,6 +250,7 @@ describe('readSpecs', () => {
 
   it.each([
     ['without its id', (d: Record<string, any>) => delete d.specs[0].id],
+    ['without its title, which may only be null', (d: Record<string, any>) => delete d.specs[0].title],
     ['with an epic in a state Jig UI does not know', (d: Record<string, any>) => (d.specs[1].epic.state = 'merged')],
     ['with an epic without its branch', (d: Record<string, any>) => delete d.specs[1].epic.branch],
     ['with progress that is not a count', (d: Record<string, any>) => (d.specs[0].progress.done = -1)],

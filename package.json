@@ -26,16 +26,18 @@
     "dev": "npm run build && (tsc -p tsconfig.build.json --watch --preserveWatchOutput & vite build --watch & node --watch dist/cli.js --no-open)",
     "typecheck": "tsc --noEmit && vue-tsc --noEmit -p web/tsconfig.json",
     "lint": "eslint . && prettier --check \"server/**/*.ts\" \"web/**/*.{ts,vue,css}\" \"*.{ts,js}\"",
-    "format": "prettier --write \"server/**/*.ts\" \"web/**/*.{ts,vue,css}\" \"*.{ts,js}\" && eslint --fix .",
+    "format": "eslint --fix . && prettier --write \"server/**/*.ts\" \"web/**/*.{ts,vue,css}\" \"*.{ts,js}\"",
     "test": "vitest run"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.5",
-    "hono": "^4.13.13"
+    "hono": "^4.13.13",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@lucide/vue": "^1.59.0",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.19.2",
     "@vitejs/plugin-vue": "^6.0.10",

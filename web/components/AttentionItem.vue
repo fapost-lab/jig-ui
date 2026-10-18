@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ExternalLink } from '@lucide/vue';
-import { type Attention, link } from '@/api';
-import { toneRule } from '@/lib/tones';
+  import { ExternalLink } from '@lucide/vue';
+  import { type Attention, link } from '@/api';
+  import { toneRule } from '@/lib/tones';
 
-defineProps<{ item: Attention }>();
+  defineProps<{
+    item: Attention;
+  }>();
 </script>
 
 <template>

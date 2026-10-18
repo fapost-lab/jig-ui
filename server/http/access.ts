@@ -27,11 +27,16 @@ function sameSecret(given: string | undefined, token: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+interface TokenOptions {
+  port: number;
+  token: string;
+}
+
 /**
  * The per-start token: `/?token=` swaps it for a cookie and redirects to `/`, and every `/api/*`
  * request without that cookie is refused. Static files need no token; they carry no data.
  */
-export function tokenAccess({ port, token }: { port: number; token: string }): MiddlewareHandler {
+export function tokenAccess({ port, token }: TokenOptions): MiddlewareHandler {
   const cookie = cookieName(port);
   return async (c, next) => {
     const path = c.req.path;

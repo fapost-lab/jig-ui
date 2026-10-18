@@ -38,12 +38,16 @@ error of the workspace: `unreadable` with Jig's failure code and never its messa
 path), `incompatible` when Jig answered in a shape JigClient does not read. A task's details carry no
 worktree path and only the actions Jig offers — a refused action's reason is Jig's text and may
 name a path (feature-task-details). Either one right after a good
-read is held back once — the last good read stays — and believed the second time.
+read is held back once — the last good read stays — and believed the second time; while following,
+only a read this following showed is kept, so a torn first read of a following is believed.
 
 `subscribe(listener)` returns the unsubscribe. The local adapter follows projects only while
 someone listens: a Watcher per project (convention-watcher) and a rescan every minute; each change
 re-reads the project, and the listener hears `{ id, revision }` only when the read differs from
-the last one — connect and disconnect included. Meanwhile `workspace()`, `tasks(id)`, `task(id, taskId)` and `specs(id)` answer
+the last one, and for a project connected or disconnected — one another Jig UI registered too,
+by the next sweep. The reads that start a following signal nothing: a subscriber reads what it
+needs once its subscription is open, and is told only of changes after that (task `review-fixes`:
+those signals made every page read everything two or three times). Meanwhile `workspace()`, `tasks(id)`, `task(id, taskId)` and `specs(id)` answer
 from that last read (feature-live-updates) — a read made in this following, never one that
 finished after the last listener left (task `specs-and-epics`: the next listener was served it).
 

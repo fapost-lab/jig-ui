@@ -112,7 +112,7 @@ describe('connectThrough', () => {
       expect(await connectThrough({ ...info, port, token }, '/p')).toEqual({ id: 'p', created: true });
       expect(await connectThrough({ ...info, port, token }, '/q')).toEqual({ code: 'no-jig', message: 'There is no Jig.' });
       expect(await connectThrough({ ...info, port, token: 'stale' }, '/p')).toMatchObject({ code: 'unexpected' });
-      expect(await connectThrough({ ...info, port, token }, '/broken')).toEqual({ code: 'unexpected', message: 'Jig UI answered 500.' });
+      expect(await connectThrough({ ...info, port, token }, '/broken')).toMatchObject({ code: 'internal' });
       expect(asked).toEqual(['/p', '/q', '/broken']);
     } finally {
       server.close();

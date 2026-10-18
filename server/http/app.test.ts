@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { localSource } from '../source/local.js';
 import type { Change, ProjectSource } from '../source/project-source.js';
 import { createApp, readPackageVersion } from './app.js';
@@ -232,7 +232,14 @@ describe('/api/projects and /api/workspace', () => {
     ]);
     await call('POST', '/api/projects', { path: busy });
     const text = await (await call('GET', '/api/projects/busy/board')).text();
-    const { board } = JSON.parse(text) as { board: { columns: { id: string; cards: { id: string }[] }[] } };
+    const { board } = JSON.parse(text) as {
+      board: {
+        columns: {
+          id: string;
+          cards: { id: string }[];
+        }[];
+      };
+    };
     expect(Object.fromEntries(board.columns.map((c) => [c.id, c.cards.map((t) => t.id)]))).toEqual({
       backlog: ['a'],
       'in-progress': [],
@@ -299,6 +306,15 @@ describe('/api/projects and /api/workspace', () => {
     expectNoPath(text);
   });
 
+  it.each([
+    ['no JSON', { 'content-type': 'application/json' }, '{', 400],
+    ['no body', {}, undefined, 422],
+  ])('refuses a connect with %s as usage, in the API form', async (_what, headers, body, status) => {
+    const res = await projects.request('/api/projects', { method: 'POST', headers: { host: HOST, cookie: COOKIE, ...headers }, body });
+    expect(res.status).toBe(status);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('usage');
+  });
+
   it('refuses every call without the token', async () => {
     expect((await projects.request('/api/workspace', { headers: { host: HOST } })).status).toBe(401);
     expect((await projects.request('/api/projects', { method: 'POST', headers: { host: HOST } })).status).toBe(401);
@@ -313,6 +329,36 @@ describe('/api/projects and /api/workspace', () => {
     const res = await unreadable.request('/api/workspace', { headers: { host: HOST, cookie: COOKIE } });
     expect(res.status).toBe(500);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe('registry-unreadable');
+  });
+
+  it('answers an error it did not foresee in JSON, without its message', async () => {
+    const failing: ProjectSource = {
+      ...localSource(join(webRoot, 'failing-config')),
+      workspace: () => Promise.reject(new Error('EACCES: /home/someone/.config/jig-ui')),
+    };
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const res = await createApp({ port: PORT, token: TOKEN, source: failing, webRoot }).request('/api/workspace', {
+      headers: { host: HOST, cookie: COOKIE },
+    });
+    quiet.mockRestore();
+    expect(res.status).toBe(500);
+    const text = await res.text();
+    expect(JSON.parse(text).error.code).toBe('internal');
+    expectNoPath(text);
+  });
+});
+
+describe('headers', () => {
+  it.each([
+    ['the page', { host: HOST }, 200],
+    ['an API answer', { host: HOST, cookie: COOKIE }, 200],
+    ['a refusal', { host: 'evil.example' }, 403],
+  ])('sets the security headers on %s', async (_what, headers, status) => {
+    const res = await get(status === 200 && 'cookie' in headers ? '/api/instance' : '/', headers);
+    expect(res.status).toBe(status);
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(res.headers.get('referrer-policy')).toBe('no-referrer');
+    expect(res.headers.get('strict-transport-security')).toBeNull();
   });
 });
 

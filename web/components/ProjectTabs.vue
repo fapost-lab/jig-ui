@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import type { Project } from '@/api';
-import { attentionFill } from '@/lib/tones';
+  import type { Project } from '@/api';
+  import { attentionFill } from '@/lib/tones';
 
-/** `current` is the project whose page is open, if any; the count on a tab is what needs the person there. The slot goes at the right end. */
-defineProps<{ projects: Project[]; current?: string; version?: string }>();
+  /** `current` is the project whose page is open, if any; the count on a tab is what needs the person there. The slot goes at the right end. */
+  defineProps<{
+    projects: Project[];
+    current?: string;
+    version?: string;
+  }>();
 </script>
 
 <template>

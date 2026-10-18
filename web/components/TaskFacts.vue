@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ExternalLink } from '@lucide/vue';
-import { link, type ReadyDetails } from '@/api';
-import { toneRule } from '@/lib/tones';
+  import { ExternalLink } from '@lucide/vue';
+  import { link, type ReadyDetails } from '@/api';
+  import { toneRule } from '@/lib/tones';
 
-defineProps<{ details: ReadyDetails }>();
+  defineProps<{
+    details: ReadyDetails;
+  }>();
 </script>
 
 <template>

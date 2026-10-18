@@ -1,5 +1,5 @@
 // Sample data for the canvas: every state a component shows, in the shapes of api.ts.
-import type { Attention, Project, ReadyDetails, Spec, SpecItem, Task } from '@/api';
+import type { Attention, Column, Project, ReadyDetails, Spec, SpecItem, Task } from '@/api';
 
 const task = (id: string, more: Partial<Task>): Task => ({
   id,
@@ -58,6 +58,18 @@ export const tasks: Task[] = [
   task('a-task-with-a-rather-long-identifier-that-wraps', { goal: null }),
 ];
 
+/** The samples placed as the board places them: every column with cards. */
+export const board: Column[] = [
+  { id: 'needs-you', title: 'Needs you', cards: tasks.slice(0, 3) },
+  { id: 'in-progress', title: 'In progress', cards: [tasks[3]!, tasks[11]!] },
+  { id: 'ready', title: 'Ready', cards: tasks.slice(4, 9) },
+  { id: 'backlog', title: 'Backlog', cards: [tasks[10]!] },
+  { id: 'paused', title: 'Paused', cards: [tasks[9]!] },
+];
+
+/** A board with no live task. */
+export const emptyBoard: Column[] = board.map((c) => ({ ...c, cards: [] }));
+
 export const columns = [
   { id: 'needs-you', title: 'Needs you', count: 3 },
   { id: 'in-progress', title: 'In progress', count: 1 },
@@ -71,6 +83,7 @@ export const attention: Attention[] = [
   {
     kind: 'gate',
     subject: { type: 'task', id: 'design-system' },
+    tasks: ['design-system'],
     title: 'Design waits at its gate',
     detail: null,
     todo: 'Review the design and approve it: jig task gate design-system approved',
@@ -79,6 +92,7 @@ export const attention: Attention[] = [
   {
     kind: 'pull-request-ci-failed',
     subject: { type: 'task', id: 'refusal-fixture' },
+    tasks: ['refusal-fixture'],
     title: 'CI failed',
     detail: 'pull request #19',
     todo: 'Look at the failing check.',
@@ -87,6 +101,7 @@ export const attention: Attention[] = [
   {
     kind: 'housekeeping',
     subject: { type: 'project', id: null },
+    tasks: [],
     title: 'Housekeeping never ran',
     detail: null,
     todo: 'Run jig housekeeping.',

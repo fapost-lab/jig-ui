@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { doneFill } from '@/lib/tones';
+  import { doneFill } from '@/lib/tones';
 
-defineProps<{ done: number; total: number }>();
+  defineProps<{
+    done: number;
+    total: number;
+  }>();
 </script>
 
 <template>

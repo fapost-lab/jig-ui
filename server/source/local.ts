@@ -63,7 +63,13 @@ function count(tasks: TaskSummary[]): TaskCounts {
 type NotReady = Exclude<ProjectView, { state: 'ready' }>;
 
 /** One read of a project: what the workspace, the board, each task's details and the specs show, and the revision it came from. */
-type Read = { view: ProjectView; tasks: ProjectTasks; details: TaskDetails[]; specs: ProjectSpecs; revision: number | null };
+type Read = {
+  view: ProjectView;
+  tasks: ProjectTasks;
+  details: TaskDetails[];
+  specs: ProjectSpecs;
+  revision: number | null;
+};
 
 /** A live task as a board's card shows it. */
 const card = (t: TaskSummary & { status: Task['status'] }): Task => ({
@@ -161,6 +167,8 @@ interface Entry {
   /** The read under way; a change meanwhile sets `dirty` for one more after it. */
   reading?: Promise<void>;
   dirty: boolean;
+  /** Registered since the page last read the workspace: its first read is signalled too. */
+  news: boolean;
 }
 
 export interface LocalOptions {
@@ -182,16 +190,20 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
   /** Counts the times following started; a read that finishes after a stop belongs to none. */
   let session = 0;
   const following = (): boolean => rescan !== undefined;
+  /** The ids the last sweep of this following found registered; none before its first. */
+  let known: Set<string> | undefined;
 
   const entryOf = (project: Project): Entry => {
     let entry = entries.get(project.id);
-    if (!entry) entries.set(project.id, (entry = { project, held: false, dirty: false }));
+    if (!entry) entries.set(project.id, (entry = { project, held: false, dirty: false, news: false }));
     return entry;
   };
 
   /** Keeps what was shown over one torn read; otherwise the read is what the project shows. */
   function settle(entry: Entry, read: Read): void {
-    if (torn(read) && entry.shown && !torn(entry.shown) && !entry.held) {
+    // While following, only a read this following showed is kept: one from before it was never shown through it.
+    const ours = !following() || entry.readIn === session;
+    if (torn(read) && entry.shown && !torn(entry.shown) && !entry.held && ours) {
       entry.held = true;
       return;
     }
@@ -200,8 +212,12 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     entry.readIn = following() ? session : undefined;
   }
 
-  /** Reads the project again — one read at a time — and signals when what it shows changed. */
-  function refresh(entry: Entry): Promise<void> {
+  /**
+   * Reads the project again — one read at a time — and signals when what it shows changed. The
+   * first read since following started signals nothing: every page reads when its stream opens.
+   */
+  function refresh(entry: Entry, news = false): Promise<void> {
+    entry.news ||= news;
     if (entry.reading) {
       entry.dirty = true;
       return entry.reading;
@@ -209,9 +225,16 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     entry.reading = (async () => {
       do {
         entry.dirty = false;
+        const was = entry.readIn;
         const before = JSON.stringify(entry.shown);
         settle(entry, await readProject(entry.project));
-        if (following() && entries.get(entry.project.id) === entry && JSON.stringify(entry.shown) !== before) {
+        // Compared only with a read of this following, checked once the read is in: one from before
+        // it, or from a following that ended meanwhile, was never shown through this one.
+        const changed = following() && was === session && JSON.stringify(entry.shown) !== before;
+        // News lasts one read: one made while nobody listens tells nobody, and must not tell the next listener.
+        const news = entry.news;
+        entry.news = false;
+        if (following() && entries.get(entry.project.id) === entry && (news || changed)) {
           signal({ id: entry.project.id, revision: entry.shown?.revision ?? null });
         }
       } while (entry.dirty);
@@ -249,6 +272,8 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     const projects = await readProjects(configDir).catch(() => undefined);
     if (!projects || !following()) return;
     const ids = new Set(projects.map((p) => p.id));
+    const before = known;
+    known = ids;
     for (const [id, entry] of entries) {
       if (ids.has(id)) continue;
       entry.watch?.close();
@@ -257,12 +282,13 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     for (const project of projects) {
       const entry = entryOf(project);
       follow(entry); // a watcher that failed, or a directory that came back
-      void refresh(entry);
+      void refresh(entry, before !== undefined && !before.has(project.id)); // one another Jig UI connected
     }
   }
 
   function start(): void {
     session++;
+    known = undefined;
     rescan = setInterval(() => void sweep(), rescanMs);
     rescan.unref();
     void sweep();
@@ -290,7 +316,10 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       const { project, created } = await addProject(configDir, found.root);
       const entry = entryOf(project);
       if (following()) follow(entry);
-      await refresh(entry);
+      // News too when another Jig UI registered it since the last sweep: this page has not heard of it.
+      const news = created || (known !== undefined && !known.has(project.id));
+      known?.add(project.id);
+      await refresh(entry, news);
       return { project: (entry.shown as Read).view, created };
     },
     async tasks(id) {
@@ -312,6 +341,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       if (!(await removeProject(configDir, id))) return false;
       entries.get(id)?.watch?.close();
       entries.delete(id);
+      known?.delete(id); // connected again before the next sweep, it is news again
       if (following()) signal({ id, revision: null });
       return true;
     },

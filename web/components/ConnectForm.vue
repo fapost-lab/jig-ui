@@ -1,12 +1,19 @@
 <script setup lang="ts">
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+  import { Button } from '@/components/ui/button';
+  import { Input } from '@/components/ui/input';
+  import { Label } from '@/components/ui/label';
 
-/** `refusal` is why the last connect was refused, word for word from the server. */
-defineProps<{ busy: boolean; refusal?: string }>();
-defineEmits<{ connect: [path: string] }>();
-const path = defineModel<string>({ default: '' });
+  /** `refusal` is why the last connect was refused, word for word from the server. */
+  defineProps<{
+    busy: boolean;
+    refusal?: string;
+  }>();
+
+  defineEmits<{
+    connect: [path: string];
+  }>();
+
+  const path = defineModel<string>({ default: '' });
 </script>
 
 <template>

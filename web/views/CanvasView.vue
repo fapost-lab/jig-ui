@@ -1,39 +1,41 @@
 <script setup lang="ts">
-// The maintainer's page of every component in every variant and state, light and dark side by
-// side. A component added to components/ or components/ui/ gets a section here.
-import { Copy } from '@lucide/vue';
-import ActionList from '@/components/ActionList.vue';
-import AttentionItem from '@/components/AttentionItem.vue';
-import ColumnHeader from '@/components/ColumnHeader.vue';
-import ConnectForm from '@/components/ConnectForm.vue';
-import CopyCommand from '@/components/CopyCommand.vue';
-import ProjectCard from '@/components/ProjectCard.vue';
-import ProgressBar from '@/components/ProgressBar.vue';
-import ProjectTabs from '@/components/ProjectTabs.vue';
-import SpecCard from '@/components/SpecCard.vue';
-import SpecItemRow from '@/components/SpecItemRow.vue';
-import TaskBrief from '@/components/TaskBrief.vue';
-import TaskCard from '@/components/TaskCard.vue';
-import TaskFacts from '@/components/TaskFacts.vue';
-import TaskRow from '@/components/TaskRow.vue';
-import ThemeToggle from '@/components/ThemeToggle.vue';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { toneRule, toneText } from '@/lib/tones';
-import CanvasSection from './CanvasSection.vue';
-import { actions, attention, columns, details, projects, specItems, specs, tasks } from './canvas-samples';
+  // The maintainer's page of every component in every variant and state, light and dark side by
+  // side. A component added to components/ or components/ui/ gets a section here.
+  import { Copy } from '@lucide/vue';
+  import ActionList from '@/components/ActionList.vue';
+  import AttentionItem from '@/components/AttentionItem.vue';
+  import BoardColumns from '@/components/BoardColumns.vue';
+  import BoardList from '@/components/BoardList.vue';
+  import ColumnHeader from '@/components/ColumnHeader.vue';
+  import ConnectForm from '@/components/ConnectForm.vue';
+  import CopyCommand from '@/components/CopyCommand.vue';
+  import ProjectCard from '@/components/ProjectCard.vue';
+  import ProgressBar from '@/components/ProgressBar.vue';
+  import ProjectTabs from '@/components/ProjectTabs.vue';
+  import SpecCard from '@/components/SpecCard.vue';
+  import SpecItemRow from '@/components/SpecItemRow.vue';
+  import TaskBrief from '@/components/TaskBrief.vue';
+  import TaskCard from '@/components/TaskCard.vue';
+  import TaskFacts from '@/components/TaskFacts.vue';
+  import TaskRow from '@/components/TaskRow.vue';
+  import ThemeToggle from '@/components/ThemeToggle.vue';
+  import { Badge } from '@/components/ui/badge';
+  import { Button } from '@/components/ui/button';
+  import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+  import { Input } from '@/components/ui/input';
+  import { Label } from '@/components/ui/label';
+  import { Separator } from '@/components/ui/separator';
+  import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+  import { toneRule, toneText } from '@/lib/tones';
+  import CanvasSection from './CanvasSection.vue';
+  import { actions, attention, board, columns, details, emptyBoard, projects, specItems, specs, tasks } from './canvas-samples';
 
-const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
-const buttonSizes = ['xs', 'sm', 'default', 'lg'] as const;
-const iconSizes = ['icon-xs', 'icon-sm', 'icon', 'icon-lg'] as const;
-const badgeVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
-const tones = ['attention', 'good', 'bad', 'quiet'] as const;
+  const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
+  const buttonSizes = ['xs', 'sm', 'default', 'lg'] as const;
+  const iconSizes = ['icon-xs', 'icon-sm', 'icon', 'icon-lg'] as const;
+  const badgeVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
+  const tones = ['attention', 'good', 'bad', 'quiet'] as const;
 </script>
 
 <template>
@@ -161,6 +163,27 @@ const tones = ['attention', 'good', 'bad', 'quiet'] as const;
     <CanvasSection title="TaskRow" note="each note; selected">
       <div>
         <TaskRow v-for="(task, i) in tasks" :key="task.id" :task="task" :selected="i === 2" />
+      </div>
+    </CanvasSection>
+
+    <CanvasSection title="BoardColumns" note="cards in every column, one open with its details; no live task">
+      <div class="flex h-[28rem] flex-col">
+        <BoardColumns project="jig-ui" :columns="board" :selected="tasks[2]!.id" :details="details[0]" />
+      </div>
+      <div class="flex h-40 flex-col">
+        <BoardColumns project="jig-ui" :columns="emptyBoard" />
+      </div>
+    </CanvasSection>
+
+    <CanvasSection title="BoardList" note="a row picked with its details; nothing picked; no live task">
+      <div class="flex h-[28rem] flex-col">
+        <BoardList project="jig-ui" :columns="board" :selected="tasks[2]!.id" :details="details[0]" />
+      </div>
+      <div class="flex h-64 flex-col">
+        <BoardList project="jig-ui" :columns="board" />
+      </div>
+      <div class="flex h-64 flex-col">
+        <BoardList project="jig-ui" :columns="emptyBoard" />
       </div>
     </CanvasSection>
 

@@ -1,7 +1,12 @@
 // This module is imported by the CLI entry before anything else, so it must parse on old Node.js.
 export const MINIMUM_NODE_MAJOR = 24;
 
-export type NodeVersionCheck = { ok: true } | { ok: false; message: string };
+export type NodeVersionCheck =
+  | { ok: true }
+  | {
+      ok: false;
+      message: string;
+    };
 
 /** Checks a Node.js version string such as `v24.1.0` or `24.1.0` against the supported minimum. */
 export function checkNodeVersion(version: string): NodeVersionCheck {

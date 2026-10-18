@@ -1,21 +1,25 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronRight } from '@lucide/vue';
-import { ref } from 'vue';
-import type { Spec } from '@/api';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { toneText } from '@/lib/tones';
-import ProgressBar from './ProgressBar.vue';
-import SpecItemRow from './SpecItemRow.vue';
+  import { ChevronDown, ChevronRight } from '@lucide/vue';
+  import { ref } from 'vue';
+  import type { Spec } from '@/api';
+  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+  import { toneText } from '@/lib/tones';
+  import ProgressBar from './ProgressBar.vue';
+  import SpecItemRow from './SpecItemRow.vue';
 
-/** `live`: the ids of the project's live tasks; an item naming one links to its details. */
-const props = defineProps<{ spec: Spec; project: string; live: string[] }>();
+  /** `live`: the ids of the project's live tasks; an item naming one links to its details. */
+  const props = defineProps<{
+    spec: Spec;
+    project: string;
+    live: string[];
+  }>();
 
-/** Phases folded away; a finished phase starts folded. */
-const folded = ref(new Set(props.spec.phases.flatMap((p, i) => (p.total > 0 && p.done === p.total ? [i] : []))));
-function fold(i: number, open: boolean): void {
-  if (open) folded.value.delete(i);
-  else folded.value.add(i);
-}
+  /** Phases folded away; a finished phase starts folded. */
+  const folded = ref(new Set(props.spec.phases.flatMap((p, i) => (p.total > 0 && p.done === p.total ? [i] : []))));
+  function fold(i: number, open: boolean): void {
+    if (open) folded.value.delete(i);
+    else folded.value.add(i);
+  }
 </script>
 
 <template>

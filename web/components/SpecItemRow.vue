@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import type { SpecItem } from '@/api';
-import { itemWords } from '@/lib/specs';
+  import { computed } from 'vue';
+  import type { SpecItem } from '@/api';
+  import { itemWords } from '@/lib/specs';
 
-/** `live`: the item's task is live, so its details can be opened. */
-const props = defineProps<{ item: SpecItem; project: string; live: boolean }>();
-const shown = computed(() => itemWords(props.item));
+  /** `live`: the item's task is live, so its details can be opened. */
+  const props = defineProps<{
+    item: SpecItem;
+    project: string;
+    live: boolean;
+  }>();
+
+  const shown = computed(() => itemWords(props.item));
 </script>
 
 <template>

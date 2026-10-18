@@ -443,18 +443,20 @@ describe('localSource, following changes', () => {
   });
 
   it('finds a change the system watcher never reported on its next rescan', async () => {
-    const rescanning = localSource(join(root, 'rescan-config'), { rescanMs: 300 });
+    // A rescan less often than a read takes: one sooner keeps a read under way for good.
+    const rescanning = localSource(join(root, 'rescan-config'), { rescanMs: 1_500 });
     const quiet = liveProject('quiet');
     await rescanning.connect(quiet.dir);
     const seen: Change[] = [];
     const stop = rescanning.subscribe((change) => seen.push(change));
-    await until(() => calls(quiet.dir).length >= 6);
+    // The page's read once its stream is open: it waits for the read that starts the following, which signals nothing.
+    await rescanning.tasks('quiet');
     seen.length = 0;
     quiet.answer(5, [task('a', 'active'), task('z', 'active')]); // outside .ai/: no event
-    await until(() => seen.length > 0);
+    await until(() => seen.length > 0, 8_000);
     stop();
     expect(seen).toEqual([{ id: 'quiet', revision: 5 }]);
-  });
+  }, 15_000);
 
   it('signals nothing for the reads that start following: every page reads when its stream opens', async () => {
     const config = join(root, 'opening-config');

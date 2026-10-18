@@ -43,6 +43,11 @@ checkout or a hand edit (Jig's `schemas/json.md`). So the files are watched, and
   cost about 0.8 of a core in Jig. With no writes, no Jig ran between rescans. A 250 ms quiet time
   read once per write — three times the cost. Since task `specs-and-epics` a read also runs
   `spec list --json` (~0.1 s, feature-specs).
+- **A rescan must come less often than a read takes.** A rescan that lands during a read sets it to
+  run once more, so with `rescanMs` below a read's duration the reads never end and a caller
+  waiting for the first read of a following waits for good. 60 s against a read of ~1–2 s (Windows'
+  bash is the slowest); a test that lowers it keeps it above its stand-in Jig's read (task
+  `review-fixes`: a 300 ms rescan with a slow stand-in hung).
 - **A torn read is kept back once.** `unreadable` or `incompatible` right after a good read is not
   shown; the next read is believed (convention-project-source).
 - Watching runs only while a stream is open; no page, no watcher, no rescan. A page closes its

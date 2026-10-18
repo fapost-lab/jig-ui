@@ -1,6 +1,6 @@
 {
   "name": "@fapost/jig-ui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A local web interface for Jig, the agent SDLC framework.",
   "license": "MIT",
   "type": "module",

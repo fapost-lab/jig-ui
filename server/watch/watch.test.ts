@@ -87,6 +87,15 @@ describe('watchTree', () => {
     expect(changes).toBe(0);
   });
 
+  it('closes and reports a change once the directory is removed', async () => {
+    const dir = tree('removed');
+    const { watch, changes } = await watching(dir, { ignore: () => false, quietMs: 20 });
+    rmSync(dir, { recursive: true });
+    await until(changes, 1);
+    expect(watch.open).toBe(false);
+    expect(changes()).toBe(1);
+  });
+
   it('is not open for a directory that is not there, and does not throw', () => {
     const watch = watchTree(join(root, 'nowhere'), { ignore: () => false, onChange: () => undefined });
     expect(watch.open).toBe(false);

@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/watch/**"
 summary: "MAY/MUST/MUST NOT for the Watcher in server/watch: report that a tree changed, never what, never Jig"
-reviewed_at: 2026-10-17
+reviewed_at: 2026-10-18
 ---
 # Watcher — noticing that a project changed
 
@@ -24,7 +24,9 @@ Why:      an event is never read as data (stack.md); what changed is read throug
 
 Its one owner is the local adapter (`server/source/local.ts`), which passes JigClient's
 `watchDir` and `writtenByReads`, so the Watcher learns nothing of Jig's layout. A directory that
-is not there gives a Watch that is not `open`; the adapter's rescan starts another.
+is not there gives a Watch that is not `open`, and so does one removed while watched (Linux
+would otherwise keep following its old inode and miss it coming back); the adapter's rescan
+starts another.
 
 ## Example
 

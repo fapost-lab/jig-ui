@@ -1,13 +1,14 @@
 ---
 id: adr-20261017-live-stream-is-a-route-over-the-port
 type: adr
-status: proposed
+status: accepted
 date: 2026-10-17
 domains: []
 paths:
   - "server/http/**"
   - "server/source/**"
 summary: The SSE stream and task details are routes in http/ over ProjectSource; no live/ or task/ module (amends the port ADR's module list)
+reviewed_at: 2026-10-18
 ---
 # The live stream and task details are routes over the port, not `live/` and `task/` modules
 
@@ -20,7 +21,8 @@ projects — the Watcher, the re-read, the comparison, the last read served whil
 lives in the local adapter, where the port's convention puts it (feature-live-updates). Task
 `task-details` then built the details the same way: `GET /api/projects/:id/tasks/:task` reads
 `ProjectSource.task` and adds the board's column; nothing was left for a `task/` module
-(feature-task-details).
+(feature-task-details). Task `specs-and-epics` (2026-10-18) added `GET /api/projects/:id/specs`
+over `ProjectSource.specs` the same way (feature-specs).
 
 ## Decision
 
@@ -28,7 +30,8 @@ lives in the local adapter, where the port's convention puts it (feature-live-up
   projects only through `ProjectSource.subscribe`; it carries "project X changed, revision R",
   never data or a path.
 - There is no `server/task/` module. Task details are a route in `server/http/` over
-  `ProjectSource.task`, with the column from `server/board/`.
+  `ProjectSource.task`, with the column from `server/board/`. A project's specs are a route over
+  `ProjectSource.specs` likewise.
 - This amends the module list of adr-20261014-project-source-port-keeps-hosting-open (`live/`, `task/`); the rest of
   that decision stands.
 
@@ -41,6 +44,6 @@ lives in the local adapter, where the port's convention puts it (feature-live-up
 
 ## Consequences
 
-- `http/` is the only caller of `subscribe` and `task`. If either grows logic of its own (several
+- `http/` is the only caller of `subscribe`, `task` and `specs`. If any of them grows logic of its own (several
   signal kinds, replay after a gap, details computed rather than read), that logic belongs behind
   the port or in a module of its own then.

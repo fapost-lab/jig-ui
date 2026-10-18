@@ -1,0 +1,96 @@
+{
+  "schema": 1,
+  "revision": 1792229689,
+  "generated_at": "2026-10-18T11:36:55Z",
+  "data": {
+    "specs": [
+      {
+        "id": "jig-ui",
+        "title": "Jig UI — a local control center for Jig projects",
+        "missing_files": [],
+        "release": null,
+        "epic": null,
+        "progress": { "done": 2, "total": 5, "filed": 1, "fog": 1 },
+        "phases": [
+          {
+            "phase": 0,
+            "title": "Package and release",
+            "done": 1,
+            "total": 1,
+            "filed": 0,
+            "fog": 0,
+            "items": [
+              {
+                "text": "`release-pipeline` — package and release pipeline — the `@fapost/jig-ui` package",
+                "checked": true,
+                "task": "release-pipeline",
+                "fog": false
+              }
+            ]
+          },
+          {
+            "phase": 1,
+            "title": "Read-only UI",
+            "done": 1,
+            "total": 3,
+            "filed": 1,
+            "fog": 1,
+            "items": [
+              { "text": "`design-system` — design system and canvas", "checked": true, "task": "design-system", "fog": false },
+              {
+                "text": "`specs-and-epics` — specs and epics (after: project board — shown on the project's page)",
+                "checked": false,
+                "task": "specs-and-epics",
+                "fog": false
+              },
+              { "text": "fog: registration by `jig init` — needs a hook on Jig's side", "checked": false, "task": null, "fog": true }
+            ]
+          },
+          {
+            "phase": null,
+            "title": null,
+            "done": 0,
+            "total": 1,
+            "filed": 0,
+            "fog": 0,
+            "items": [{ "text": "an item before any phase heading", "checked": false, "task": null, "fog": false }]
+          }
+        ]
+      },
+      {
+        "id": "billing",
+        "title": "Billing in one place",
+        "missing_files": [],
+        "release": "minor",
+        "epic": {
+          "branch": "epic/billing",
+          "state": "open",
+          "checked_out": false,
+          "missing": false,
+          "ref": "refs/remotes/origin/epic/billing"
+        },
+        "progress": { "done": 0, "total": 1, "filed": 0, "fog": 0 },
+        "phases": [
+          {
+            "phase": 1,
+            "title": "Invoices",
+            "done": 0,
+            "total": 1,
+            "filed": 0,
+            "fog": 0,
+            "items": [{ "text": "invoices from orders", "checked": false, "task": null, "fog": false }]
+          }
+        ]
+      },
+      {
+        "id": "half-written",
+        "title": null,
+        "missing_files": ["spec.md", "roadmap.md"],
+        "release": null,
+        "epic": null,
+        "progress": null,
+        "phases": []
+      }
+    ]
+  }
+}

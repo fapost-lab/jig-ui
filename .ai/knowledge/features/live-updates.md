@@ -8,7 +8,7 @@ paths:
   - server/source/local.ts
   - web/api.ts
 summary: Why the page follows projects by watching .ai/ and re-reading through Jig, what is ignored, and the measured debounce
-reviewed_at: 2026-10-17
+reviewed_at: 2026-10-18
 ---
 # Live updates
 
@@ -40,7 +40,8 @@ checkout or a hand edit (Jig's `schemas/json.md`). So the files are watched, and
   21 reads for 20 writes. The server process used ~0.4 s CPU a minute; each read runs Jig three
   times (version 0.03 s, `status --json` 0.4 s, `task list --json` 0.2 s), so three busy projects
   cost about 0.8 of a core in Jig. With no writes, no Jig ran between rescans. A 250 ms quiet time
-  read once per write — three times the cost.
+  read once per write — three times the cost. Since task `specs-and-epics` a read also runs
+  `spec list --json` (~0.1 s, feature-specs).
 - **A torn read is kept back once.** `unreadable` or `incompatible` right after a good read is not
   shown; the next read is believed (convention-project-source).
 - Watching runs only while a stream is open; no page, no watcher, no rescan. A page closes its

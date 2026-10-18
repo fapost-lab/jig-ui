@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-10-17
+reviewed_at: 2026-10-18
 ---
 # ProjectSource — how the server reaches a project
 
@@ -29,7 +29,8 @@ Why:      a later remote adapter (a connector on the projects' machine) must fit
 Callers (`board/`, and `http/` for task details and the change stream) depend on the port, never on `jig/` or `watch/` directly.
 
 The port is `ProjectSource` in `server/source/project-source.ts` — the workspace, a project's
-live tasks (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), connect,
+live tasks (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), its specs
+(`specs(id)`), connect,
 disconnect, and `subscribe` to changes; its local adapter
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
 only the path a person types to connect. A read that fails becomes a state of the project, not an
@@ -42,8 +43,9 @@ read is held back once — the last good read stays — and believed the second 
 `subscribe(listener)` returns the unsubscribe. The local adapter follows projects only while
 someone listens: a Watcher per project (convention-watcher) and a rescan every minute; each change
 re-reads the project, and the listener hears `{ id, revision }` only when the read differs from
-the last one — connect and disconnect included. Meanwhile `workspace()`, `tasks(id)` and `task(id, taskId)` answer
-from that last read (feature-live-updates).
+the last one — connect and disconnect included. Meanwhile `workspace()`, `tasks(id)`, `task(id, taskId)` and `specs(id)` answer
+from that last read (feature-live-updates) — a read made in this following, never one that
+finished after the last listener left (task `specs-and-epics`: the next listener was served it).
 
 ## Example
 

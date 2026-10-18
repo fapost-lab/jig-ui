@@ -290,6 +290,117 @@ export async function readTasks(
   return { revision, tasks: data.tasks.map(summary), hidden: data.hidden };
 }
 
+/** A roadmap item: its words as the roadmap has them, and the task it names, if any. */
+export interface SpecItem {
+  text: string;
+  checked: boolean;
+  task: string | null;
+  fog: boolean;
+}
+
+/** How far a roadmap or one of its phases is: items checked, all items, items with a task filed, fog items. */
+export interface SpecProgress {
+  done: number;
+  total: number;
+  filed: number;
+  fog: number;
+}
+
+/** A roadmap phase; `phase` and `title` are `null` for items before any phase heading. */
+export interface SpecPhase extends SpecProgress {
+  phase: number | null;
+  title: string | null;
+  items: SpecItem[];
+}
+
+/** A spec as `jig spec list --json` reports it; the roadmap is read from the epic while one is open. */
+export interface Spec {
+  id: string;
+  title: string | null;
+  /** The spec's own files that are not there: `spec.md`, `roadmap.md`. */
+  missingFiles: string[];
+  /** The version level the epic's release raises, as the roadmap records it. */
+  release: string | null;
+  /** `fetched`: the roadmap was read from the remote branch as of the last fetch; `missing`: the branch is nowhere. */
+  epic: { branch: string; state: 'open' | 'finished'; checkedOut: boolean; missing: boolean; fetched: boolean } | null;
+  /** `null` when the roadmap could not be read. */
+  progress: SpecProgress | null;
+  phases: SpecPhase[];
+}
+
+const isCount = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0;
+const isProgress = (v: unknown): v is SpecProgress =>
+  isObject(v) && isCount(v.done) && isCount(v.total) && isCount(v.filed) && isCount(v.fog);
+const isItem = (v: unknown): v is SpecItem =>
+  isObject(v) && isString(v.text) && typeof v.checked === 'boolean' && isNullableString(v.task) && typeof v.fog === 'boolean';
+const isPhase = (v: unknown): v is SpecPhase =>
+  isObject(v) &&
+  isProgress(v) &&
+  (v.phase === null || isCount(v.phase)) &&
+  isNullableString(v.title) &&
+  Array.isArray(v.items) &&
+  v.items.every(isItem);
+
+/** A spec as Jig names it, only the fields Jig UI reads. */
+interface SpecRow {
+  id: string;
+  title: string | null;
+  missing_files: string[];
+  release: string | null;
+  epic: { branch: string; state: 'open' | 'finished'; checked_out: boolean; missing: boolean; ref: string | null } | null;
+  progress: SpecProgress | null;
+  phases: SpecPhase[];
+}
+
+const isEpic = (v: unknown): boolean =>
+  v === null ||
+  (isObject(v) &&
+    isString(v.branch) &&
+    (v.state === 'open' || v.state === 'finished') &&
+    typeof v.checked_out === 'boolean' &&
+    typeof v.missing === 'boolean' &&
+    isNullableString(v.ref));
+
+const isSpecRow = (v: unknown): v is SpecRow =>
+  isObject(v) &&
+  isString(v.id) &&
+  isNullableString(v.title) &&
+  Array.isArray(v.missing_files) &&
+  v.missing_files.every(isString) &&
+  isNullableString(v.release) &&
+  isEpic(v.epic) &&
+  (v.progress === null || isProgress(v.progress)) &&
+  Array.isArray(v.phases) &&
+  v.phases.every(isPhase);
+
+const progress = ({ done, total, filed, fog }: SpecProgress): SpecProgress => ({ done, total, filed, fog });
+
+/** The project's specs (`jig spec list --json`), in Jig's order. */
+export async function readSpecs(root: string, platform: NodeJS.Platform = process.platform): Promise<Spec[]> {
+  const { data } = await readJson(root, ['spec', 'list'], platform);
+  if (!Array.isArray(data.specs) || !data.specs.every(isSpecRow)) throw new JigShapeError();
+  return data.specs.map((s) => ({
+    id: s.id,
+    title: s.title,
+    missingFiles: [...s.missing_files],
+    release: s.release,
+    epic: s.epic && {
+      branch: s.epic.branch,
+      state: s.epic.state,
+      checkedOut: s.epic.checked_out,
+      missing: s.epic.missing,
+      fetched: s.epic.ref?.startsWith('refs/remotes/') === true,
+    },
+    progress: s.progress && progress(s.progress),
+    phases: s.phases.map((p) => ({
+      ...progress(p),
+      phase: p.phase,
+      title: p.title,
+      items: p.items.map(({ text, checked, task, fog }) => ({ text, checked, task, fog })),
+    })),
+  }));
+}
+
 /** True when `version` is at least the minimum Jig UI reads. */
 export function supports(version: string, minimum: string = MIN_JIG_VERSION): boolean {
   const a = version.split('.').map(Number);

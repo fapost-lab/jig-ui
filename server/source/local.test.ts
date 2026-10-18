@@ -43,10 +43,10 @@ const attention = {
 };
 
 /**
- * A git clone whose Jig answers `--version`, `status --json` and `task list --json` from files, and
+ * A git clone whose Jig answers `--version`, `status --json`, `task list --json` and `spec list --json` from files, and
  * logs every call to `calls.log`. `status` given as a string is printed as is, with exit 1.
  */
-function project(name: string, version: string, answers: { status?: unknown; tasks?: unknown } = {}): string {
+function project(name: string, version: string, answers: { status?: unknown; tasks?: unknown; specs?: unknown } = {}): string {
   const dir = join(root, name);
   mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
   execFileSync('git', ['init', '-q'], { cwd: dir });
@@ -56,6 +56,7 @@ function project(name: string, version: string, answers: { status?: unknown; tas
     refused ? (answers.status as string) : envelope(answers.status ?? { attention: [], housekeeping: null }),
   );
   writeFileSync(join(dir, 'tasks.json'), envelope(answers.tasks ?? { tasks: [], hidden: 0, housekeeping: null }));
+  writeFileSync(join(dir, 'specs.json'), envelope(answers.specs ?? { specs: [] }));
   writeFileSync(
     join(dir, '.ai', 'scripts', 'jig'),
     `#!/usr/bin/env bash
@@ -64,6 +65,7 @@ case "$*" in
   --version) echo "jig ${version}" ;;
   "status --json") cat status.json; exit ${refused ? 1 : 0} ;;
   "task list --json") cat tasks.json ;;
+  "spec list --json") cat specs.json ;;
 esac
 `,
   );
@@ -115,6 +117,52 @@ describe('localSource', () => {
     ]);
     expect(calls(old)).not.toContain('status --json');
     expect(calls(old)).not.toContain('task list --json');
+    expect(calls(old)).not.toContain('spec list --json');
+  });
+
+  it("serves a project's specs, read with its board, and the project's state when it cannot be read", async () => {
+    const spec = {
+      id: 'billing',
+      title: 'Billing',
+      missing_files: [],
+      release: 'minor',
+      epic: { branch: 'epic/billing', state: 'open', checked_out: true, missing: false, ref: 'refs/heads/epic/billing' },
+      progress: { done: 1, total: 2, filed: 1, fog: 0 },
+      phases: [
+        {
+          phase: 1,
+          title: 'Invoices',
+          done: 1,
+          total: 2,
+          filed: 1,
+          fog: 0,
+          items: [
+            { text: '`invoices` — invoices', checked: true, task: 'invoices', fog: false },
+            { text: 'refunds', checked: false, task: null, fog: false },
+          ],
+        },
+      ],
+    };
+    const planned = project('planned', '0.29.0', { specs: { specs: [spec] } });
+    await source.connect(planned);
+    expect(calls(planned)).toContain('spec list --json');
+    expect(await source.specs('planned')).toEqual({
+      state: 'ready',
+      specs: [
+        {
+          id: 'billing',
+          title: 'Billing',
+          missingFiles: [],
+          release: 'minor',
+          epic: { branch: 'epic/billing', state: 'open', checkedOut: true, missing: false, fetched: false },
+          progress: { done: 1, total: 2, filed: 1, fog: 0 },
+          phases: [spec.phases[0]],
+        },
+      ],
+    });
+    expect(await source.specs('old')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' });
+    expect(await source.specs('nobody')).toBeUndefined();
+    await source.disconnect('planned');
   });
 
   it('carries no part of a refusal but its code', async () => {
@@ -220,8 +268,9 @@ describe('localSource', () => {
 });
 
 /**
- * A clone whose Jig answers from `status.json` and `tasks.json` (an envelope with an `error` exits
- * 1), logs every call, and on every call writes under `.ai/runtime/working/` as Jig's reads do.
+ * A clone whose Jig answers from `status.json` and `tasks.json`, and no specs (an envelope with an `error` exits
+ * 1), logs every call, and on every call writes under `.ai/runtime/working/` as Jig's reads do; a
+ * `slow` file makes every call take 0.4 s.
  */
 function liveProject(name: string): { dir: string; answer: (revision: number, tasks: unknown[], statusError?: boolean) => void } {
   const dir = join(root, name);
@@ -234,10 +283,12 @@ function liveProject(name: string): { dir: string; answer: (revision: number, ta
     `#!/usr/bin/env bash
 echo "$*" >> calls.log
 mkdir -p .ai/runtime/working && echo "$*" > .ai/runtime/working/session
+[ -f slow ] && sleep 0.4
 case "$*" in
   --version) echo "jig 0.29.0" ;;
   "status --json") cat status.json; if grep -q '"error"' status.json; then exit 1; fi ;;
   "task list --json") cat tasks.json ;;
+  "spec list --json") echo '{"schema":1,"revision":1,"generated_at":"x","data":{"specs":[]}}' ;;
 esac
 `,
   );
@@ -356,6 +407,26 @@ describe('localSource, following changes', () => {
     live.answer(4, [task('fresh', 'active')]); // outside .ai/, while nobody listens: no event
     const stop = source.subscribe(() => undefined);
     expect(await source.tasks('live')).toMatchObject({ tasks: [{ id: 'fresh' }] });
+    stop();
+  });
+
+  it('serves the next listener no read that finished after the last one left', async () => {
+    const quick = localSource(join(root, 'late-config'), { quietMs: 50, maxWaitMs: 100 });
+    const late = liveProject('late');
+    await quick.connect(late.dir);
+    let stop = quick.subscribe(() => undefined);
+    await settled(late.dir);
+    writeFileSync(join(late.dir, 'slow'), '');
+    late.answer(2, [task('stale', 'active')]);
+    const before = calls(late.dir).length;
+    touch(late.dir);
+    await until(() => calls(late.dir).length > before); // a read is under way
+    stop();
+    await settled(late.dir, 1_000);
+    rmSync(join(late.dir, 'slow'));
+    late.answer(3, [task('fresh', 'active')]); // outside .ai/, while nobody listens: no event
+    stop = quick.subscribe(() => undefined);
+    expect(await quick.tasks('late')).toMatchObject({ tasks: [{ id: 'fresh' }] });
     stop();
   });
 

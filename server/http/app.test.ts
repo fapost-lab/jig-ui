@@ -114,7 +114,7 @@ function project(name: string, version?: string, refuse = false, tasks: unknown[
   mkdirSync(dir, { recursive: true });
   execFileSync('git', ['init', '-q'], { cwd: dir });
   if (version) {
-    const data = `"data":{"attention":[],"housekeeping":null,"tasks":${JSON.stringify(tasks)},"hidden":0}`;
+    const data = `"data":{"attention":[],"housekeeping":null,"tasks":${JSON.stringify(tasks)},"hidden":0,"specs":[]}`;
     const error = `"error":{"code":"failed","message":"cannot read ${dir.replace(/\\/g, '/')}"}`;
     mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
     writeFileSync(
@@ -213,6 +213,16 @@ describe('/api/projects and /api/workspace', () => {
     expect((await call('GET', '/api/projects/nobody/board')).status).toBe(404);
   });
 
+  it("serves a project's specs, its state when it is not readable, and 404 for an unknown id", async () => {
+    const text = await (await call('GET', '/api/projects/ready/specs')).text();
+    expect(JSON.parse(text)).toEqual({ specs: { state: 'ready', specs: [] } });
+    expectNoPath(text);
+    expect(await (await call('GET', '/api/projects/broken/specs')).json()).toEqual({
+      specs: { id: 'broken', state: 'unreadable', code: 'failed' },
+    });
+    expect((await call('GET', '/api/projects/nobody/specs')).status).toBe(404);
+  });
+
   it('puts the cards of a project in their columns and carries no worktree path', async () => {
     const tree = join(realpathSync.native(webRoot), 'tree-of-busy').replace(/\\/g, '/');
     const busy = project('busy', '0.29.0', false, [
@@ -292,6 +302,7 @@ describe('/api/projects and /api/workspace', () => {
   it('refuses every call without the token', async () => {
     expect((await projects.request('/api/workspace', { headers: { host: HOST } })).status).toBe(401);
     expect((await projects.request('/api/projects', { method: 'POST', headers: { host: HOST } })).status).toBe(401);
+    expect((await projects.request('/api/projects/ready/specs', { headers: { host: HOST } })).status).toBe(401);
   });
 
   it('reports an unreadable registry and leaves it as it is', async () => {

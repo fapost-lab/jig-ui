@@ -18,12 +18,17 @@ function tree(name: string): string {
 
 /**
  * Watches `dir` and counts the changes it reports from now on. macOS delivers the creation of the
- * tree late, so the count starts after the watcher has settled.
+ * tree late, and a late event fires one quiet time after it: the count starts only once a whole
+ * quiet time and more has passed with nothing reported.
  */
 async function watching(dir: string, options: Omit<WatchOptions, 'onChange'>): Promise<{ watch: Watch; changes: () => number }> {
   let changes = 0;
   const watch = watchTree(dir, { ...options, onChange: () => changes++ });
-  await delay(400);
+  const settle = (options.quietMs ?? 1_000) + 300;
+  for (let seen = -1; seen !== changes;) {
+    seen = changes;
+    await delay(settle);
+  }
   changes = 0;
   return { watch, changes: () => changes };
 }

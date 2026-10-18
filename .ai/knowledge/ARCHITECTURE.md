@@ -22,7 +22,8 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   registry, `projects.json`, of connected projects by id and main-checkout path
   (adr-20261017-registry-of-connected-projects). It knows neither git nor Jig.
 - `server/jig/` — JigClient: the project's Jig version against `MIN_JIG_VERSION`, and the JSON
-  reads `jig status` (what needs the person) and `jig task list`, validated against fixtures of
+  reads `jig status` (what needs the person), `jig task list` and `jig spec list` (feature-specs),
+  validated against fixtures of
   Jig 0.29.0 in `server/jig/fixtures/` (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, a project's live
   tasks, one task in full, connect, disconnect, subscribe to changes) and its local adapter (`local.ts`), which holds the
@@ -35,7 +36,8 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
 - `server/board/` — a project's board: columns worked out from its tasks on every read
   (feature-board).
 - `server/http/` also serves `GET /api/workspace`, `GET /api/projects/:id/board`,
-  `GET /api/projects/:id/tasks/:task` (feature-task-details), connect /
+  `GET /api/projects/:id/tasks/:task` (feature-task-details), `GET /api/projects/:id/specs`
+  (feature-specs), connect /
   disconnect under `/api/projects`, and `GET /api/events` — the SSE stream of "project X changed,
   revision R" — through the port only; responses name projects by id.
   Directions: `http/` → `board/`, `source/`; `board/` → `source/` (types); `source/` → `jig/`,

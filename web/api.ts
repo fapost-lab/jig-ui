@@ -65,9 +65,10 @@ export type TaskDetails =
     })
   | NotReady;
 
-export type Board =
-  | { id: string; state: 'ready'; columns: { id: string; title: string; cards: Task[] }[]; finished: number }
-  | NotReady;
+/** A task's details when its project could be read. */
+export type ReadyDetails = Extract<TaskDetails, { state: 'ready' }>;
+
+export type Board = { id: string; state: 'ready'; columns: { id: string; title: string; cards: Task[] }[]; finished: number } | NotReady;
 
 export type Failure = { error: { code: string; message: string } };
 
@@ -89,6 +90,14 @@ export async function api(input: string, init?: RequestInit): Promise<Response |
     failure.value = { kind: 'not-running' };
   }
   return undefined;
+}
+
+/** One task in full, or why there is none: no such project, no such live task; undefined when `api` failed. */
+export async function readTask(project: string, task: string): Promise<TaskDetails | 'not-connected' | 'not-found' | undefined> {
+  const res = await api(`/api/projects/${encodeURIComponent(project)}/tasks/${encodeURIComponent(task)}`);
+  if (!res) return undefined;
+  if (res.ok) return ((await res.json()) as { task: TaskDetails }).task;
+  return ((await res.json()) as Failure).error.code === 'not-found' ? 'not-found' : 'not-connected';
 }
 
 /** What a project's state means, for a person. */

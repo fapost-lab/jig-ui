@@ -10,7 +10,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "noEmit": true
+    "noEmit": true,
+    // Read by shadcn-vue's CLI, which looks for the page's alias in this file only; server/ does not use it.
+    "paths": { "@/*": ["./web/*"] }
   },
   "include": ["server/**/*"]
 }

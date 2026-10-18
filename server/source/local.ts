@@ -14,7 +14,17 @@ import {
 import { addProject, type Project, readProjects, removeProject } from '../registry/projects.js';
 import { type Watch, watchTree } from '../watch/watch.js';
 import { mainCheckout } from './checkout.js';
-import type { Attention, Change, ProjectSource, ProjectTasks, ProjectView, Refusal, Task, TaskCounts, TaskDetails } from './project-source.js';
+import type {
+  Attention,
+  Change,
+  ProjectSource,
+  ProjectTasks,
+  ProjectView,
+  Refusal,
+  Task,
+  TaskCounts,
+  TaskDetails,
+} from './project-source.js';
 
 /** Jig's version in the checkout: `null` when Jig is there but names no version Jig UI can read. */
 async function version(root: string): Promise<string | null | undefined> {

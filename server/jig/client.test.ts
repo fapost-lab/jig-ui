@@ -69,7 +69,7 @@ const refusal = (code: string) => expect.objectContaining({ code }) as unknown a
 // Contract tests: the fixtures are what Jig 0.29.0 printed (status-attention.json adds items in the
 // documented shape, an unknown kind included); each read pins the fields Jig UI relies on.
 describe('readStatus', () => {
-  it('reads what needs the person, in Jig\'s order, an unknown kind included', async () => {
+  it("reads what needs the person, in Jig's order, an unknown kind included", async () => {
     const read = await readStatus(answering('status', 'status-attention.json'));
     expect(read.revision).toBe(1792229323);
     expect(read.housekeepingStale).toBe(true);
@@ -128,9 +128,25 @@ describe('readTasks', () => {
       housekeepingFlags: [],
       actions: expect.any(Array),
     });
-    expect(read.tasks[0]?.actions.map((a) => a.id)).toEqual(['start', 'pause', 'resume', 'approve-gate', 'answer-stop', 'set-class', 'ship', 'close', 'abandon', 'reopen']);
+    expect(read.tasks[0]?.actions.map((a) => a.id)).toEqual([
+      'start',
+      'pause',
+      'resume',
+      'approve-gate',
+      'answer-stop',
+      'set-class',
+      'ship',
+      'close',
+      'abandon',
+      'reopen',
+    ]);
     expect(read.tasks[1]).toMatchObject({ gate: { state: 'waiting', by: null }, worktree: { uncommitted: 2 } });
-    expect(read.tasks[1]?.actions.find((a) => a.id === 'approve-gate')).toEqual({ id: 'approve-gate', command: 'jig task gate design-waits approved', offered: true, reason: null });
+    expect(read.tasks[1]?.actions.find((a) => a.id === 'approve-gate')).toEqual({
+      id: 'approve-gate',
+      command: 'jig task gate design-waits approved',
+      offered: true,
+      reason: null,
+    });
     // An action id this Jig UI does not know is ignored, as Jig's contract asks of a consumer.
     expect(read.tasks[1]?.actions.map((a) => a.id)).not.toContain('request-pause');
     expect(read.tasks[2]?.autopilot).toEqual({
@@ -143,7 +159,12 @@ describe('readTasks', () => {
       phase: null,
     });
     expect(read.tasks[3]).toMatchObject({ paused: true, housekeepingFlags: ['STALE_CANDIDATE'] });
-    expect(read.tasks[4]?.pullRequest).toEqual({ url: 'https://github.com/o/r/pull/7', state: 'open', ci: 'green', fetchedAt: '2026-10-17T16:00:00Z' });
+    expect(read.tasks[4]?.pullRequest).toEqual({
+      url: 'https://github.com/o/r/pull/7',
+      state: 'open',
+      ci: 'green',
+      fetchedAt: '2026-10-17T16:00:00Z',
+    });
   });
 
   it("never hands on where a task's worktree is", async () => {
@@ -172,7 +193,14 @@ describe('readTasks', () => {
 
 describe('readTasks, the list as a whole', () => {
   it('refuses a list without its count of hidden tasks', async () => {
-    await expect(readTasks(answering(`case-${cases++}`, changed('task-list.json', (d) => delete d.hidden)))).rejects.toBeInstanceOf(JigShapeError);
+    await expect(
+      readTasks(
+        answering(
+          `case-${cases++}`,
+          changed('task-list.json', (d) => delete d.hidden),
+        ),
+      ),
+    ).rejects.toBeInstanceOf(JigShapeError);
   });
 });
 

@@ -217,7 +217,15 @@ interface TaskRow {
   base_branch: string;
   worktree: { uncommitted: number } | null;
   gate: { state: string; by: string | null } | null;
-  autopilot: { state: string; mode: string | null; stage: string | null; stage_at: string | null; stop_reason: string | null; stop_at: string | null; phase: string | null } | null;
+  autopilot: {
+    state: string;
+    mode: string | null;
+    stage: string | null;
+    stage_at: string | null;
+    stop_reason: string | null;
+    stop_at: string | null;
+    phase: string | null;
+  } | null;
   pull_request: { url: string; state: string | null; ci: string | null; fetched_at: string | null } | null;
   housekeeping_flags: string[];
   actions: TaskAction[];

@@ -3,7 +3,9 @@
   "compilerOptions": {
     "noEmit": false,
     "rootDir": "server",
-    "outDir": "dist"
+    "outDir": "dist",
+    // The page's @ alias (root tsconfig, for shadcn-vue's CLI) must not resolve in the server build.
+    "paths": {}
   },
   "include": ["server/**/*"],
   "exclude": ["server/**/*.test.ts"]

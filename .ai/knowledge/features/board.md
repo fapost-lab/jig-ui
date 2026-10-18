@@ -5,18 +5,25 @@ status: active
 domains: []
 paths:
   - "server/board/**"
-  - web/Board.vue
-summary: Board columns from Jig's task state (Paused, Backlog, Needs you, Ready, In progress), first rule wins; why Needs you is read from state, not attention
-reviewed_at: 2026-10-17
+  - web/views/BoardView.vue
+summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
+reviewed_at: 2026-10-18
 ---
 # Board
 
 ## What
 
-A connected project's live tasks in five columns — Paused, Backlog, Needs you, Ready, In progress —
-worked out from Jig's task list on every read by `server/board/columns.ts` (`columnOf`, first rule
-that fits wins) and served by `GET /api/projects/:id/board`. Cards are light: id, class, goal, and
-what the task waits for (gate, autopilot run, pull request). Finished tasks are only counted.
+A connected project's live tasks in five columns, shown in the order of `COLUMNS` — Needs you,
+In progress, Ready, Backlog, Paused — worked out from Jig's task list on every read by
+`server/board/columns.ts` (`columnOf`, first rule that fits wins: Paused, Backlog, Needs you,
+Ready, In progress) and served by `GET /api/projects/:id/board`. Cards are light: id, class, goal,
+and what the task waits for (gate, autopilot run, pull request — `web/lib/waits.ts`). Finished
+tasks are only counted.
+
+`web/views/BoardView.vue` shows the board two ways, switched by the person and remembered by the
+browser (`localStorage` `jig-ui.board-view`): Board, the columns side by side, where a click
+expands a card into its details; List, the columns as folding groups of one-line rows, a selected
+row's details in a pane on the right. Both read the details on demand (feature-task-details).
 
 ## Why
 
@@ -31,6 +38,8 @@ done, or moving.
 - "Needs you" is read from the task's own state — a gate waiting or changed, an autopilot run
   stopped — so a task's column does not depend on the clone's `agent.git` or on housekeeping.
 - Order inside a column is Jig's list order (by id) until Phase 2 brings Jig's queue.
+- The order of the columns is not the order of the rules: what waits for the person comes first
+  (maintainer, task `design-system`, 2026-10-18).
 
 ## Decisions and rejected alternatives
 
@@ -38,5 +47,9 @@ done, or moving.
 - "Needs you" from Jig's attention items — rejected: a ready task would sit there whenever the
   person's git level is `none` (the `git-step` item), and pull request items move with
   housekeeping, not with the task. Attention stays on the workspace page.
-- vue-router for the board's address — rejected for two screens; the page reads
-  `#/projects/<id>` itself (`web/App.vue`).
+- vue-router for the board's address — rejected for two screens in `project-board`; adopted
+  with the design system when the page reached four (adr-20261018-page-built-from-shadcn-vue-with-router-and-canvas). The address stays
+  `#/projects/<id>`.
+- Board and List as two addresses — rejected: the switch is a way of looking at one board.
+- The view remembered in Jig UI's settings file — rejected: a preference of one browser need
+  not survive it.

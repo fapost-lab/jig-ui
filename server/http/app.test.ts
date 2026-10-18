@@ -131,9 +131,24 @@ exit ${refuse ? 1 : 0}
 
 /** A task-list row in Jig's shape: started, nothing waiting, unless `more` says otherwise. */
 const row = (id: string, more: Record<string, unknown> = {}) => ({
-  id, class: 'T2', status: 'active', issue: null, goal: null, knowledge_consolidated: false, paused: false,
-  created_at: '2026-10-17', updated_at: '2026-10-17', branch: `task/${id}`, base_branch: 'main', worktree: null,
-  gate: null, autopilot: null, pull_request: null, housekeeping_flags: [], actions: [], ...more,
+  id,
+  class: 'T2',
+  status: 'active',
+  issue: null,
+  goal: null,
+  knowledge_consolidated: false,
+  paused: false,
+  created_at: '2026-10-17',
+  updated_at: '2026-10-17',
+  branch: `task/${id}`,
+  base_branch: 'main',
+  worktree: null,
+  gate: null,
+  autopilot: null,
+  pull_request: null,
+  housekeeping_flags: [],
+  actions: [],
+  ...more,
 });
 
 /** Fails when `text` carries the temporary root, raw or as JSON escapes it (a Windows path's backslashes). */
@@ -188,7 +203,7 @@ describe('/api/projects and /api/workspace', () => {
         id: 'ready',
         state: 'ready',
         finished: 0,
-        columns: ['backlog', 'in-progress', 'needs-you', 'paused', 'ready'].map((id) => expect.objectContaining({ id, cards: [] })),
+        columns: ['needs-you', 'in-progress', 'ready', 'backlog', 'paused'].map((id) => expect.objectContaining({ id, cards: [] })),
       },
     });
     expectNoPath(text);
@@ -218,7 +233,7 @@ describe('/api/projects and /api/workspace', () => {
     expectNoPath(text);
   });
 
-  it("serves one task in full with its column, never a worktree path or a refusal naming one", async () => {
+  it('serves one task in full with its column, never a worktree path or a refusal naming one', async () => {
     const tree = join(realpathSync.native(webRoot), 'tree-of-detailed').replace(/\\/g, '/');
     const detailed = project('detailed', '0.29.0', false, [
       row('w', {
@@ -242,9 +257,15 @@ describe('/api/projects and /api/workspace', () => {
     });
     expectNoPath(text);
     expect((await call('GET', '/api/projects/detailed/tasks/nobody')).status).toBe(404);
-    expect(((await (await call('GET', '/api/projects/detailed/tasks/nobody')).json()) as { error: { code: string } }).error.code).toBe('not-found');
+    expect(((await (await call('GET', '/api/projects/detailed/tasks/nobody')).json()) as { error: { code: string } }).error.code).toBe(
+      'not-found',
+    );
     expect((await call('GET', '/api/projects/nobody/tasks/w')).status).toBe(404);
-    expect(JSON.parse(await (await call('GET', '/api/projects/broken/tasks/w')).text()).task).toEqual({ id: 'broken', state: 'unreadable', code: 'failed' });
+    expect(JSON.parse(await (await call('GET', '/api/projects/broken/tasks/w')).text()).task).toEqual({
+      id: 'broken',
+      state: 'unreadable',
+      code: 'failed',
+    });
   });
 
   it.each([

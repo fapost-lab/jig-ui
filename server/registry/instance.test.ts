@@ -6,15 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../http/app.js';
 import { localSource } from '../source/local.js';
 import { configDir } from './config-dir.js';
-import {
-  type InstanceInfo,
-  OPEN_FILE,
-  probeInstance,
-  readInstance,
-  removeInstance,
-  writeConfigFile,
-  writeInstance,
-} from './instance.js';
+import { type InstanceInfo, OPEN_FILE, probeInstance, readInstance, removeInstance, writeConfigFile, writeInstance } from './instance.js';
 
 const root = mkdtempSync(join(tmpdir(), 'jig-ui-config-'));
 afterAll(() => rmSync(root, { recursive: true, force: true }));

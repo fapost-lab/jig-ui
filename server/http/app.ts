@@ -37,8 +37,7 @@ export interface AppOptions {
 /** How often an idle stream sends a comment, so a closed tab is noticed and its subscription ends. */
 const PING_MS = 30_000;
 
-const refuse = (c: Context, status: 404 | 422 | 500, code: string, message: string) =>
-  c.json({ error: { code, message } }, status);
+const refuse = (c: Context, status: 404 | 422 | 500, code: string, message: string) => c.json({ error: { code, message } }, status);
 
 /** The path the person typed, absolute; `~/` stands for their home. */
 function absolute(path: unknown): string | undefined {

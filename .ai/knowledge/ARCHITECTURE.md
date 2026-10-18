@@ -42,11 +42,17 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   `registry/`, `watch/`.
 - `server/open-browser.ts` — opens the browser through `open.html` in the config directory, so
   the token is never a process argument (adr-20261017-browser-opens-through-a-redirect-file).
-- `web/` — the Vue 3 page: `App.vue` reads the address (`#/projects/<id>` is a board,
-  `#/projects/<id>/tasks/<task>` a task's details, anything else the workspace); `Workspace.vue` — a card per connected project with its task counts and
-  what needs the person, connect and disconnect; `Board.vue` — one project's columns; `Task.vue` — one task's details (`#/projects/<id>/tasks/<task>`); `api.ts`
-  the shared fetch, types and the change stream each view re-fetches on; Vite builds it into `dist/web` and the package ships it built. One TypeScript checks both sides
-  (adr-20261017-one-typescript-for-server-and-web).
+- `web/` — the Vue 3 page, built from shadcn-vue components on Tailwind (adr-20261018-page-built-from-shadcn-vue-with-router-and-canvas,
+  convention-vue). `router.ts` — vue-router in hash mode: `#/` the workspace, `#/projects/<id>`
+  a board, `#/projects/<id>/tasks/<task>` a task's details, `#/canvas` every component in every
+  state (loaded lazily, linked from nowhere), anything else `#/`. `App.vue` — the project tabs
+  and the theme switch over the current view. `views/` — one per address (and the canvas's
+  helpers), the only callers of `api()` and `onChange()` besides `App.vue`; `components/` — Jig UI's own, props in and events out;
+  `components/ui/` — shadcn-vue's, knowing nothing of Jig; `lib/` — what a card says, the colours
+  that mean something, and the theme. `api.ts` — the shared fetch, types and the change stream each view
+  re-fetches on. Vite builds it into `dist/web` and the package ships it built. One TypeScript
+  checks both sides (adr-20261017-one-typescript-for-server-and-web).
+  Directions: `views/` → `components/` → `components/ui/`; `lib/` from any of them.
 - **Start flow.** `npx @fapost/jig-ui` checks Node 24+, finds a running instance through the
   config directory and checks it answers with its token — then opens it and exits — or starts one
   on 127.0.0.1 with a fresh token and opens the browser on a link carrying it

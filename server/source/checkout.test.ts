@@ -27,8 +27,14 @@ describe('mainCheckout', () => {
     expect(await mainCheckout(separate)).toEqual({ kind: 'main', root: separate });
   });
 
-  it('refuses a worktree', async () => {
-    expect(await mainCheckout(join(root, 'tree'))).toEqual({ kind: 'worktree' });
+  it("tells a worktree, with its clone's main checkout", async () => {
+    expect(await mainCheckout(join(root, 'tree'))).toEqual({ kind: 'worktree', main: clone });
+  });
+
+  it('tells a worktree of a bare clone, which has no main checkout', async () => {
+    git(root, 'clone', '-q', '--bare', clone, join(root, 'bare.git'));
+    git(join(root, 'bare.git'), 'worktree', 'add', '-q', '--detach', join(root, 'bare-tree'));
+    expect(await mainCheckout(join(root, 'bare-tree'))).toEqual({ kind: 'worktree', main: null });
   });
 
   it('refuses a directory outside git, and one that does not exist', async () => {

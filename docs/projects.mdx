@@ -8,7 +8,12 @@ you in it, a board of its tasks one click away, and each task's details from its
 
 ## Connect a project
 
-Paste the path of the project's **main checkout** — the folder you cloned — into the field on the
+**From the project's folder.** Run `npx @fapost/jig-ui` in the project — its root or any folder
+inside it. Jig UI connects the project and opens its board, starting itself first if it is not
+running. In a worktree it connects the clone's main checkout and says so. Run anywhere else, it
+only starts. Running it again in a connected project changes nothing; it opens the board.
+
+**From the page.** Paste the path of the project's **main checkout** — the folder you cloned — into the field on the
 page and choose **Connect**. A path inside the project works too; Jig UI connects the project's
 root. `~/` stands for your home folder.
 
@@ -20,7 +25,8 @@ A path is refused when it is:
 
 - **not inside a git repository**, or does not exist;
 - **a worktree.** A task started in a worktree keeps its records in the main checkout, which lists
-  every task of the clone. Connect the main checkout instead;
+  every task of the clone. Connect the main checkout instead (run from the worktree, the command
+  does that for you);
 - **a repository without Jig.** Run `jig init` in it first.
 
 Connecting a project that is already connected changes nothing.

@@ -4,7 +4,8 @@ import { promisify } from 'node:util';
 
 const run = promisify(execFile);
 
-export type Checkout = { kind: 'main'; root: string } | { kind: 'worktree' } | { kind: 'not-a-repository' };
+/** A worktree names its clone's main checkout; `null` when the clone is bare and has none. */
+export type Checkout = { kind: 'main'; root: string } | { kind: 'worktree'; main: string | null } | { kind: 'not-a-repository' };
 
 /**
  * Where `path` sits in git: a clone's main checkout (its root, even from a subdirectory), a
@@ -23,5 +24,21 @@ export async function mainCheckout(path: string): Promise<Checkout> {
   }
   const [top, own, common] = stdout.trim().split(/\r?\n/);
   if (!top || !own || !common) return { kind: 'not-a-repository' };
-  return (await realpath(own)) === (await realpath(common)) ? { kind: 'main', root: await realpath(top) } : { kind: 'worktree' };
+  if ((await realpath(own)) === (await realpath(common))) return { kind: 'main', root: await realpath(top) };
+  return { kind: 'worktree', main: await mainWorktree(path) };
+}
+
+/**
+ * The main working tree, which `git worktree list` names first — not `dirname(--git-common-dir)`, which
+ * misses for a worktree of a submodule. A bare clone's first entry is the repository itself.
+ */
+async function mainWorktree(path: string): Promise<string | null> {
+  try {
+    const { stdout } = await run('git', ['worktree', 'list', '--porcelain'], { cwd: path, timeout: 10_000 });
+    const [first, second] = stdout.split(/\r?\n/);
+    if (!first?.startsWith('worktree ') || second === 'bare') return null;
+    return await realpath(first.slice('worktree '.length));
+  } catch {
+    return null;
+  }
 }

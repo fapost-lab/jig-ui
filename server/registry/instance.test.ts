@@ -5,8 +5,18 @@ import { serve } from '@hono/node-server';
 import { afterAll, describe, expect, it } from 'vitest';
 import { createApp } from '../http/app.js';
 import { localSource } from '../source/local.js';
+import type { ProjectSource } from '../source/project-source.js';
 import { configDir } from './config-dir.js';
-import { type InstanceInfo, OPEN_FILE, probeInstance, readInstance, removeInstance, writeConfigFile, writeInstance } from './instance.js';
+import {
+  connectThrough,
+  type InstanceInfo,
+  OPEN_FILE,
+  probeInstance,
+  readInstance,
+  removeInstance,
+  writeConfigFile,
+  writeInstance,
+} from './instance.js';
 
 const root = mkdtempSync(join(tmpdir(), 'jig-ui-config-'));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -79,5 +89,34 @@ describe('probeInstance', () => {
       server.close();
     }
     expect(await probeInstance({ ...info, port, token })).toBe(false);
+  });
+});
+
+describe('connectThrough', () => {
+  it('connects through the instance with its token, and passes on a refusal', async () => {
+    const token = 'live-token';
+    const asked: string[] = [];
+    const source = {
+      connect: async (path: string) => {
+        asked.push(path);
+        if (path === '/broken') throw new Error('EACCES');
+        return path === '/p' ? { project: { id: 'p' }, created: true } : { code: 'no-jig', message: 'There is no Jig.' };
+      },
+    } as unknown as ProjectSource;
+    const server = await new Promise<ReturnType<typeof serve>>((resolve) => {
+      const s = serve({ fetch: (req) => app().fetch(req), hostname: '127.0.0.1', port: 0 }, () => resolve(s));
+    });
+    const port = (server.address() as { port: number }).port;
+    const app = () => createApp({ port, token, source, version: '0.1.0' });
+    try {
+      expect(await connectThrough({ ...info, port, token }, '/p')).toEqual({ id: 'p', created: true });
+      expect(await connectThrough({ ...info, port, token }, '/q')).toEqual({ code: 'no-jig', message: 'There is no Jig.' });
+      expect(await connectThrough({ ...info, port, token: 'stale' }, '/p')).toMatchObject({ code: 'unexpected' });
+      expect(await connectThrough({ ...info, port, token }, '/broken')).toEqual({ code: 'unexpected', message: 'Jig UI answered 500.' });
+      expect(asked).toEqual(['/p', '/q', '/broken']);
+    } finally {
+      server.close();
+    }
+    expect(await connectThrough({ ...info, port, token }, '/p')).toMatchObject({ code: 'unreachable' });
   });
 });

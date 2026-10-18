@@ -59,7 +59,10 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   config directory and checks it answers with its token — then opens it and exits — or starts one
   on 127.0.0.1 with a fresh token and opens the browser on a link carrying it
   (adr-20261014-local-server-access-guard). Two starts at once: the one that loses the port opens
-  the winner.
+  the winner. Run in a git checkout, the command then asks the instance that serves — its own or
+  the running one — to connect the folder (`POST /api/projects` with the token, so only that
+  instance writes the registry), a worktree standing for its clone's main checkout, and opens the
+  board at `#/projects/<id>`; outside a Jig project it says nothing.
 - **Read and follow.** The page fetches; while it is open a change under a project's `.ai/`,
   debounced, or the minute's rescan makes the local adapter re-read through Jig, and only a read
   that differs sends "project X changed, revision R"; the page re-fetches, served from that read.

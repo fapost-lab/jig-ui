@@ -59,3 +59,25 @@ export async function probeInstance(info: InstanceInfo, timeoutMs = 1000): Promi
     return false;
   }
 }
+
+/** What a connect through a running instance came to: the project's id, or the code and message it was refused with. */
+export type Connected = { id: string; created: boolean } | { code: string; message: string };
+
+/** Asks the instance to connect `path`, as the page does: the instance owns the registry, so no second process writes it. */
+export async function connectThrough(info: Pick<InstanceInfo, 'port' | 'token'>, path: string, timeoutMs = 15_000): Promise<Connected> {
+  try {
+    const res = await fetch(`http://127.0.0.1:${info.port}/api/projects`, {
+      method: 'POST',
+      headers: { cookie: `${cookieName(info.port)}=${info.token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ path }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    // A failure the instance did not foresee answers in plain text.
+    const body = (await res.json().catch(() => ({}))) as { project?: { id: string }; error?: { code: string; message: string } | string };
+    if (body.project) return { id: body.project.id, created: res.status === 201 };
+    if (typeof body.error === 'object') return body.error;
+    return { code: 'unexpected', message: `Jig UI answered ${res.status}.` };
+  } catch (error) {
+    return { code: 'unreachable', message: error instanceof Error ? error.message : String(error) };
+  }
+}

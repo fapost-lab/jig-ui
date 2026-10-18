@@ -30,7 +30,8 @@ Every item updates the pages in `docs/` it changes.
 - [x] `workspace-dashboard` — workspace dashboard — every connected project with its counts and what needs the person, from Jig's attention items (after: project registry — it lists connected projects)
 - [x] `project-board` — project board — columns derived from Jig's task state, never stored; light cards (after: project registry — one board per connected project)
 - [x] `task-details` — task details — status, stage, gate, artifacts, pull request, dependencies, attention, opened from a card (after: project board — a card opens it)
-- [ ] specs and epics — each spec with its phases, progress and epic branch beside the board, from Jig's spec list (after: project board — shown on the project's page)
+- [ ] `design-system` — design system and canvas — shadcn-vue on Tailwind v4 with light and dark themes and a look chosen from prototypes; vue-router; `#/canvas` showing every component in every variant and state; the Vue conventions written into knowledge; the workspace, the board and task details rebuilt on the components (after: task details — it rebuilds the three screens that exist)
+- [ ] specs and epics — each spec with its phases, progress and epic branch beside the board, from Jig's spec list (after: project board — shown on the project's page; design system and canvas — built on its components)
 - [ ] fog: registration by `jig init` — needs a hook on Jig's side that keeps the UI optional
 
 ## Phase 2 — Planning from the UI
@@ -56,9 +57,11 @@ instead of being overwritten.
 2. walking skeleton
 3. project registry and connect
 4. live updates; workspace dashboard; project board
-5. task details; specs and epics
-6. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
-7. conflict display
+5. task details
+6. design system and canvas
+7. specs and epics
+8. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
+9. conflict display
 
 <!--
 Rules (jig-idea §8):

@@ -20,9 +20,15 @@ server/
   live/       SSE: "project X changed, revision R"
   http/       Hono app, token and Host/Origin guard, the built page
 web/
-  views:      Workspace, Board, Task
-  store:      fetch on load, refetch on an SSE event
+  ui/         shadcn-vue components (button/, badge/, card/ …): know nothing of Jig
+  components/ Jig UI's own, built from ui/: task card, board column, project row …
+  views/      one per route: Workspace, Board, Task, Canvas; the only callers of api.ts
+  lib/        cn() and other helpers
+  api.ts      fetch on load, refetch on an SSE event
 ```
+
+In `web/`, dependencies point one way: `views/` → `components/` → `ui/` (maintainer,
+2026-10-18). A component that fetches is a view.
 
 - **JigClient** is the only module that knows Jig's commands and JSON shapes. A change of Jig's
   contract is a change here and in its contract tests, nowhere else. The other modules see typed

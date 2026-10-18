@@ -1,25 +1,33 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronRight } from '@lucide/vue';
-import { computed, ref } from 'vue';
-import type { Column, ReadyDetails } from '@/api';
-import { Badge } from '@/components/ui/badge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import ColumnHeader from './ColumnHeader.vue';
-import TaskBrief from './TaskBrief.vue';
-import TaskRow from './TaskRow.vue';
+  import { ChevronDown, ChevronRight } from '@lucide/vue';
+  import { computed, ref } from 'vue';
+  import type { Column, ReadyDetails } from '@/api';
+  import { Badge } from '@/components/ui/badge';
+  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+  import ColumnHeader from './ColumnHeader.vue';
+  import TaskBrief from './TaskBrief.vue';
+  import TaskRow from './TaskRow.vue';
 
-/** The board as folding groups of rows; `selected` is the row whose `details` the pane shows. */
-const props = defineProps<{ project: string; columns: Column[]; selected?: string; details?: ReadyDetails | 'unavailable' }>();
-defineEmits<{ select: [task: string] }>();
+  /** The board as folding groups of rows; `selected` is the row whose `details` the pane shows. */
+  const props = defineProps<{
+    project: string;
+    columns: Column[];
+    selected?: string;
+    details?: ReadyDetails | 'unavailable';
+  }>();
 
-const picked = computed(() => props.columns.flatMap((c) => c.cards).find((t) => t.id === props.selected));
+  defineEmits<{
+    select: [task: string];
+  }>();
 
-/** Columns folded away; all open to begin with. */
-const folded = ref(new Set<string>());
-function fold(id: string, open: boolean): void {
-  if (open) folded.value.delete(id);
-  else folded.value.add(id);
-}
+  const picked = computed(() => props.columns.flatMap((c) => c.cards).find((t) => t.id === props.selected));
+
+  /** Columns folded away; all open to begin with. */
+  const folded = ref(new Set<string>());
+  function fold(id: string, open: boolean): void {
+    if (open) folded.value.delete(id);
+    else folded.value.add(id);
+  }
 </script>
 
 <template>

@@ -1,28 +1,30 @@
 <script setup lang="ts">
-import { ArrowLeft } from '@lucide/vue';
-import { onMounted, onUnmounted, ref } from 'vue';
-import { describe, onChange, readTask, type TaskDetails } from '@/api';
-import ActionList from '@/components/ActionList.vue';
-import AttentionItem from '@/components/AttentionItem.vue';
-import TaskFacts from '@/components/TaskFacts.vue';
-import { Badge } from '@/components/ui/badge';
-import { toneRule } from '@/lib/tones';
-import { waits } from '@/lib/waits';
+  import { ArrowLeft } from '@lucide/vue';
+  import { computed, onUnmounted, ref } from 'vue';
+  import { describe, onChange, readTask, type TaskDetails } from '@/api';
+  import ActionList from '@/components/ActionList.vue';
+  import AttentionItem from '@/components/AttentionItem.vue';
+  import TaskFacts from '@/components/TaskFacts.vue';
+  import { Badge } from '@/components/ui/badge';
+  import { lastWins } from '@/lib/last-wins';
+  import { toneRule } from '@/lib/tones';
+  import { waits } from '@/lib/waits';
 
-const props = defineProps<{ project: string; task: string }>();
-const details = ref<TaskDetails | 'not-connected' | 'not-found'>();
+  const props = defineProps<{
+    project: string;
+    task: string;
+  }>();
 
-let latest = 0;
+  const details = ref<TaskDetails | 'not-connected' | 'not-found'>();
 
-async function load(): Promise<void> {
-  const mine = ++latest;
-  const read = await readTask(props.project, props.task);
-  // A newer load may have started meanwhile: an older answer must not overwrite it.
-  if (read && mine === latest) details.value = read;
-}
+  const load = lastWins(
+    () => readTask(props.project, props.task),
+    (read) => (details.value = read),
+  );
 
-onMounted(load);
-onUnmounted(onChange((project) => (project === undefined || project === props.project) && void load()));
+  const note = computed(() => (typeof details.value === 'object' && details.value.state === 'ready' ? waits(details.value) : undefined));
+
+  onUnmounted(onChange((project) => (project === undefined || project === props.project) && void load()));
 </script>
 
 <template>
@@ -45,7 +47,7 @@ onUnmounted(onChange((project) => (project === undefined || project === props.pr
     <p v-else-if="details.state !== 'ready'">{{ describe(details) }}</p>
     <template v-else>
       <p v-if="details.goal">{{ details.goal }}</p>
-      <p v-if="waits(details)" :class="toneRule[waits(details)!.tone]">{{ waits(details)!.text }}</p>
+      <p v-if="note" :class="toneRule[note.tone]">{{ note.text }}</p>
       <TaskFacts :details="details" class="border-y py-3" />
 
       <section v-if="details.attention.length > 0" aria-labelledby="needs-you" class="flex flex-col gap-3">

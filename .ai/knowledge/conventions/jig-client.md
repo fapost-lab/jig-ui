@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-10-17
+reviewed_at: 2026-10-18
 ---
 # JigClient — the only module that knows Jig
 
@@ -29,12 +29,17 @@ Why:      a change of Jig's contract must be a change here and in its contract t
 The minimum Jig the package reads is `MIN_JIG_VERSION` in `server/jig/client.ts` — 0.29.0, the
 first Jig that prints JSON. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
 found from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`), never a
-`bash` on PATH, which may be WSL's.
+`bash` on PATH, which may be WSL's. It is asked once per process; a failed ask is not kept.
+
+Each shape of Jig's output is one zod schema, written as Jig prints it and turned into Jig UI's
+camelCase by its `.transform`; the exported types are its `z.output`
+(adr-20261018-jig-answers-checked-by-zod-schemas). Keys Jig adds without raising `schema` are
+dropped by `z.object`, so nothing Jig UI does not read gets past `server/jig/`.
 
 ## Example
 
-A task-list read runs Jig's JSON task listing, validates the envelope and each row — the status
-among Jig's own words — and returns typed tasks. Jig's refusal throws `JigRefusal` with its code
+A task-list read runs Jig's JSON task listing, checks the envelope, then `data` through the
+`TaskList` schema — the status among Jig's own words — and returns typed tasks. Jig's refusal throws `JigRefusal` with its code
 (an unknown code is `failed`); an envelope of another shape throws `JigShapeError`, which the
 project shows as `incompatible` ("update Jig UI"), never half-parsed. Each read has a contract
 test over a fixture in `server/jig/fixtures/`.

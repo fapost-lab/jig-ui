@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Moon, Sun } from '@lucide/vue';
-import { Button } from '@/components/ui/button';
-import { theme } from '@/lib/theme';
+  import { Moon, Sun } from '@lucide/vue';
+  import { Button } from '@/components/ui/button';
+  import { theme } from '@/lib/theme';
 </script>
 
 <template>

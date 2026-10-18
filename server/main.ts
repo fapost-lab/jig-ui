@@ -38,7 +38,13 @@ async function show(info: Address, open: boolean, dir: string, project?: string)
 }
 
 /** The folder this command runs in, as a checkout to connect: a worktree stands for its clone's main checkout. */
-async function here(): Promise<{ path: string; worktree: boolean } | undefined> {
+async function here(): Promise<
+  | {
+      path: string;
+      worktree: boolean;
+    }
+  | undefined
+> {
   const checkout = await mainCheckout(process.cwd());
   if (checkout.kind === 'main') return { path: checkout.root, worktree: false };
   // A bare clone's worktree has no main checkout: nothing to connect, said as outside a project.

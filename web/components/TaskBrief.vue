@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import type { ReadyDetails } from '@/api';
-import ActionList from './ActionList.vue';
-import TaskFacts from './TaskFacts.vue';
+  import type { ReadyDetails } from '@/api';
+  import ActionList from './ActionList.vue';
+  import TaskFacts from './TaskFacts.vue';
 
-/** `details` is undefined while it is read, and 'unavailable' when the task or its project cannot be read. */
-defineProps<{ project: string; task: string; details?: ReadyDetails | 'unavailable' }>();
+  /** `details` is undefined while it is read, and 'unavailable' when the task or its project cannot be read. */
+  defineProps<{
+    project: string;
+    task: string;
+    details?: ReadyDetails | 'unavailable';
+  }>();
 </script>
 
 <template>

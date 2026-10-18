@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { columnAccent } from '@/lib/tones';
+  import { columnAccent } from '@/lib/tones';
 
-defineProps<{ id: string; title: string; count: number }>();
+  defineProps<{
+    id: string;
+    title: string;
+    count: number;
+  }>();
 </script>
 
 <template>

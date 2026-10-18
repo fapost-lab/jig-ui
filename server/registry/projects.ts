@@ -43,7 +43,7 @@ export function slugFor(root: string, taken: ReadonlySet<string>): string {
   const base =
     basename(root)
       .normalize('NFKD')
-      .replace(/[̀-ͯ]/g, '')
+      .replace(/\p{M}/gu, '')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'project';
@@ -65,7 +65,13 @@ async function save(dir: string, projects: Project[]): Promise<void> {
 }
 
 /** Connects the checkout at `root`; a checkout already connected keeps its id. */
-export function addProject(dir: string, root: string): Promise<{ project: Project; created: boolean }> {
+export function addProject(
+  dir: string,
+  root: string,
+): Promise<{
+  project: Project;
+  created: boolean;
+}> {
   return serialized(async () => {
     const projects = await readProjects(dir);
     const existing = projects.find((p) => p.path === root);

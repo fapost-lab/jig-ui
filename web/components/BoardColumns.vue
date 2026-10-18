@@ -1,11 +1,19 @@
 <script setup lang="ts">
-import type { Column, ReadyDetails } from '@/api';
-import ColumnHeader from './ColumnHeader.vue';
-import TaskCard from './TaskCard.vue';
+  import type { Column, ReadyDetails } from '@/api';
+  import ColumnHeader from './ColumnHeader.vue';
+  import TaskCard from './TaskCard.vue';
 
-/** The board side by side; `selected` is the card expanded into its `details`. */
-defineProps<{ project: string; columns: Column[]; selected?: string; details?: ReadyDetails | 'unavailable' }>();
-defineEmits<{ toggle: [task: string] }>();
+  /** The board side by side; `selected` is the card expanded into its `details`. */
+  defineProps<{
+    project: string;
+    columns: Column[];
+    selected?: string;
+    details?: ReadyDetails | 'unavailable';
+  }>();
+
+  defineEmits<{
+    toggle: [task: string];
+  }>();
 </script>
 
 <template>

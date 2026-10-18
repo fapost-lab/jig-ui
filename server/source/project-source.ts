@@ -12,11 +12,35 @@ export interface TaskCounts {
 
 /** What the page learns about a connected project; never its path. */
 export type ProjectView =
-  | { id: string; state: 'ready'; jigVersion: string; counts: TaskCounts; attention: Attention[]; housekeepingStale: boolean }
-  | { id: string; state: 'unsupported'; jigVersion: string | null; minimum: string }
-  | { id: string; state: 'incompatible'; jigVersion: string }
-  | { id: string; state: 'unavailable'; reason: 'missing' | 'no-jig' }
-  | { id: string; state: 'unreadable'; code: string };
+  | {
+      id: string;
+      state: 'ready';
+      jigVersion: string;
+      counts: TaskCounts;
+      attention: Attention[];
+      housekeepingStale: boolean;
+    }
+  | {
+      id: string;
+      state: 'unsupported';
+      jigVersion: string | null;
+      minimum: string;
+    }
+  | {
+      id: string;
+      state: 'incompatible';
+      jigVersion: string;
+    }
+  | {
+      id: string;
+      state: 'unavailable';
+      reason: 'missing' | 'no-jig';
+    }
+  | {
+      id: string;
+      state: 'unreadable';
+      code: string;
+    };
 
 /** A live task as a board shows it; where it stands is Jig's, the column the board's. */
 export interface Task {
@@ -28,7 +52,12 @@ export interface Task {
   started: boolean;
   gate: string | null;
   autopilot: string | null;
-  pullRequest: { url: string; state: string | null; ci: string | null; fetchedAt: string | null } | null;
+  pullRequest: {
+    url: string;
+    state: string | null;
+    ci: string | null;
+    fetchedAt: string | null;
+  } | null;
 }
 
 /** One live task in full, as its details show it; never where its worktree is. */
@@ -53,24 +82,49 @@ export interface TaskDetails extends Task {
   } | null;
   housekeepingFlags: string[];
   /** What Jig offers to do next, with its command. Refused ones are left out: Jig's reasons may name a path. */
-  actions: { id: string; command: string }[];
+  actions: {
+    id: string;
+    command: string;
+  }[];
   /** What needs the person about this task, from Jig's attention items. */
   attention: Attention[];
 }
 
 /** A project's live tasks and how many finished ones are left out, or why it cannot be read. */
-export type ProjectTasks = { state: 'ready'; tasks: Task[]; finished: number } | Exclude<ProjectView, { state: 'ready' }>;
+export type ProjectTasks =
+  | {
+      state: 'ready';
+      tasks: Task[];
+      finished: number;
+    }
+  | Exclude<ProjectView, { state: 'ready' }>;
 
 /** One live task of a project, `null` when the project has no live task of that id; or why the project cannot be read. */
-export type ProjectTask = { state: 'ready'; task: TaskDetails | null } | Exclude<ProjectView, { state: 'ready' }>;
+export type ProjectTask =
+  | {
+      state: 'ready';
+      task: TaskDetails | null;
+    }
+  | Exclude<ProjectView, { state: 'ready' }>;
 
 /** A project's specs, in Jig's order, or why the project cannot be read. */
-export type ProjectSpecs = { state: 'ready'; specs: Spec[] } | Exclude<ProjectView, { state: 'ready' }>;
+export type ProjectSpecs =
+  | {
+      state: 'ready';
+      specs: Spec[];
+    }
+  | Exclude<ProjectView, { state: 'ready' }>;
 
-export type Refusal = { code: 'not-a-repository' | 'worktree' | 'no-jig'; message: string };
+export type Refusal = {
+  code: 'not-a-repository' | 'worktree' | 'no-jig';
+  message: string;
+};
 
 /** A connected project changed; `revision` is Jig's with the read that saw it, `null` when unreadable. */
-export type Change = { id: string; revision: number | null };
+export type Change = {
+  id: string;
+  revision: number | null;
+};
 
 /**
  * The port through which the server reads and changes connected projects, named by id. The local
@@ -80,7 +134,13 @@ export interface ProjectSource {
   /** Every connected project, in the order it was connected. */
   workspace(): Promise<ProjectView[]>;
   /** Connects the project a path names; one already connected keeps its id. */
-  connect(path: string): Promise<{ project: ProjectView; created: boolean } | Refusal>;
+  connect(path: string): Promise<
+    | {
+        project: ProjectView;
+        created: boolean;
+      }
+    | Refusal
+  >;
   /** A connected project's live tasks; `undefined` when no project has that id. */
   tasks(id: string): Promise<ProjectTasks | undefined>;
   /** One live task of a connected project; `undefined` when no project has that id. */

@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/http/**"
 summary: "MAY/MUST/MUST NOT for the replaceable access guard in server/http: every route, /api needs the token, no route decides access"
-reviewed_at: 2026-10-17
+reviewed_at: 2026-10-18
 ---
 # AccessGuard — who may use the server
 
@@ -24,6 +24,9 @@ MUST NOT: read or log the credential anywhere but the comparison; let a route de
 Why:      a hosted Jig UI swaps the guard, not the routes; a route that checks access on its
           own survives the swap and keeps the old rule.
 ```
+
+`secureHeaders` (no HSTS: the server is plain http on 127.0.0.1) runs before the guard so its
+refusals carry the headers too; it sets headers and decides no access.
 
 ## Example
 

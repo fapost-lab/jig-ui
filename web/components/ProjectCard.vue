@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { describe, type Project } from '@/api';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import AttentionItem from './AttentionItem.vue';
+  import { describe, type Project } from '@/api';
+  import { Button } from '@/components/ui/button';
+  import { Card } from '@/components/ui/card';
+  import AttentionItem from './AttentionItem.vue';
 
-defineProps<{ project: Project }>();
-defineEmits<{ disconnect: [] }>();
+  defineProps<{
+    project: Project;
+  }>();
+
+  defineEmits<{
+    disconnect: [];
+  }>();
 </script>
 
 <template>

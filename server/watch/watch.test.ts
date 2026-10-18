@@ -21,7 +21,13 @@ function tree(name: string): string {
  * tree late, and a late event fires one quiet time after it: the count starts only once a whole
  * quiet time and more has passed with nothing reported.
  */
-async function watching(dir: string, options: Omit<WatchOptions, 'onChange'>): Promise<{ watch: Watch; changes: () => number }> {
+async function watching(
+  dir: string,
+  options: Omit<WatchOptions, 'onChange'>,
+): Promise<{
+  watch: Watch;
+  changes: () => number;
+}> {
   let changes = 0;
   const watch = watchTree(dir, { ...options, onChange: () => changes++ });
   const settle = (options.quietMs ?? 1_000) + 300;

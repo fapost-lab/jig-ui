@@ -1,6 +1,9 @@
 <script setup lang="ts">
-/** One canvas entry: the same specimens in a light and a dark panel, side by side. */
-defineProps<{ title: string; note?: string }>();
+  /** One canvas entry: the same specimens in a light and a dark panel, side by side. */
+  defineProps<{
+    title: string;
+    note?: string;
+  }>();
 </script>
 
 <template>

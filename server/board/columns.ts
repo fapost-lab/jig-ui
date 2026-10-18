@@ -9,7 +9,10 @@ export interface Column {
 }
 
 /** The board's order: what waits for the person first, then what moves, what is done, what is not begun, what is set aside. */
-const COLUMNS: { id: ColumnId; title: string }[] = [
+const COLUMNS: {
+  id: ColumnId;
+  title: string;
+}[] = [
   { id: 'needs-you', title: 'Needs you' },
   { id: 'in-progress', title: 'In progress' },
   { id: 'ready', title: 'Ready' },
@@ -27,7 +30,10 @@ export function columnOf(task: Task): ColumnId {
 }
 
 /** The column a task sits in, with its title. */
-export function placeOf(task: Task): { id: ColumnId; title: string } {
+export function placeOf(task: Task): {
+  id: ColumnId;
+  title: string;
+} {
   const id = columnOf(task);
   return { id, title: COLUMNS.find((c) => c.id === id)?.title ?? id };
 }

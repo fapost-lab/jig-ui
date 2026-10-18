@@ -1,20 +1,23 @@
 <script setup lang="ts">
-import { Check, Copy } from '@lucide/vue';
-import { ref } from 'vue';
-import { Button } from '@/components/ui/button';
+  import { Check, Copy } from '@lucide/vue';
+  import { ref } from 'vue';
+  import { Button } from '@/components/ui/button';
 
-const props = defineProps<{ command: string }>();
-const copied = ref(false);
+  const props = defineProps<{
+    command: string;
+  }>();
 
-async function copy(): Promise<void> {
-  try {
-    await navigator.clipboard.writeText(props.command);
-    copied.value = true;
-    setTimeout(() => (copied.value = false), 1500);
-  } catch {
-    // No clipboard (a browser that refuses it): the command stays on screen to select by hand.
+  const copied = ref(false);
+
+  async function copy(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(props.command);
+      copied.value = true;
+      setTimeout(() => (copied.value = false), 1500);
+    } catch {
+      // No clipboard (a browser that refuses it): the command stays on screen to select by hand.
+    }
   }
-}
 </script>
 
 <template>

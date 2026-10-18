@@ -61,7 +61,15 @@ export async function probeInstance(info: InstanceInfo, timeoutMs = 1000): Promi
 }
 
 /** What a connect through a running instance came to: the project's id, or the code and message it was refused with. */
-export type Connected = { id: string; created: boolean } | { code: string; message: string };
+export type Connected =
+  | {
+      id: string;
+      created: boolean;
+    }
+  | {
+      code: string;
+      message: string;
+    };
 
 /** Asks the instance to connect `path`, as the page does: the instance owns the registry, so no second process writes it. */
 export async function connectThrough(info: Pick<InstanceInfo, 'port' | 'token'>, path: string, timeoutMs = 15_000): Promise<Connected> {
@@ -72,8 +80,16 @@ export async function connectThrough(info: Pick<InstanceInfo, 'port' | 'token'>,
       body: JSON.stringify({ path }),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    // A failure the instance did not foresee answers in plain text.
-    const body = (await res.json().catch(() => ({}))) as { project?: { id: string }; error?: { code: string; message: string } | string };
+    // An instance before 0.2.0 answers a failure it did not foresee in plain text.
+    const body = (await res.json().catch(() => ({}))) as {
+      project?: { id: string };
+      error?:
+        | {
+            code: string;
+            message: string;
+          }
+        | string;
+    };
     if (body.project) return { id: body.project.id, created: res.status === 201 };
     if (typeof body.error === 'object') return body.error;
     return { code: 'unexpected', message: `Jig UI answered ${res.status}.` };

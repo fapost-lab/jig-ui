@@ -1,118 +1,68 @@
+import { hc, type InferResponseType } from 'hono/client';
 import { ref } from 'vue';
+import type { AppType } from '../server/http/app';
 
-export type Attention = {
-  kind: string;
-  subject: { type: string; id: string | null };
-  title: string;
-  detail: string | null;
-  todo: string;
-  url: string | null;
-};
+/** The server's API, typed by its own routes (`AppType`); only its type crosses into the page. */
+export const client = hc<AppType>('/');
+type Api = typeof client.api;
+type Ok<R> = InferResponseType<R, 200>;
 
-/** A project that cannot be read, and why. */
-export type NotReady =
-  | { id: string; state: 'unsupported'; jigVersion: string | null; minimum: string }
-  | { id: string; state: 'incompatible'; jigVersion: string }
-  | { id: string; state: 'unavailable'; reason: 'missing' | 'no-jig' }
-  | { id: string; state: 'unreadable'; code: string };
-
-export type Project =
-  | {
-      id: string;
-      state: 'ready';
-      jigVersion: string;
-      counts: { active: number; paused: number; ready: number };
-      attention: Attention[];
-      housekeepingStale: boolean;
-    }
-  | NotReady;
-
-export type Task = {
-  id: string;
-  class: string | null;
-  status: 'active' | 'ready';
-  goal: string | null;
-  paused: boolean;
-  started: boolean;
-  gate: string | null;
-  autopilot: string | null;
-  pullRequest: { url: string; state: string | null; ci: string | null; fetchedAt: string | null } | null;
-};
-
-export type TaskDetails =
-  | (Task & {
-      state: 'ready';
-      issue: string | null;
-      branch: string | null;
-      baseBranch: string;
-      createdAt: string | null;
-      updatedAt: string | null;
-      knowledgeConsolidated: boolean;
-      worktree: { uncommitted: number } | null;
-      gateBy: string | null;
-      run: {
-        mode: string | null;
-        stage: string | null;
-        stageAt: string | null;
-        stopReason: string | null;
-        stopAt: string | null;
-        phase: string | null;
-      } | null;
-      housekeepingFlags: string[];
-      actions: { id: string; command: string }[];
-      attention: Attention[];
-      column: { id: string; title: string };
-    })
-  | NotReady;
-
+export type Project = Ok<Api['workspace']['$get']>['projects'][number];
+export type Attention = Extract<Project, { state: 'ready' }>['attention'][number];
+export type Board = Ok<Api['projects'][':id']['board']['$get']>['board'];
+export type Column = Extract<Board, { state: 'ready' }>['columns'][number];
+export type Task = Column['cards'][number];
+export type TaskDetails = Ok<Api['projects'][':id']['tasks'][':task']['$get']>['task'];
 /** A task's details when its project could be read. */
 export type ReadyDetails = Extract<TaskDetails, { state: 'ready' }>;
+export type Specs = Ok<Api['projects'][':id']['specs']['$get']>['specs'];
+export type Spec = Extract<Specs, { state: 'ready' }>['specs'][number];
+export type SpecItem = Spec['phases'][number]['items'][number];
+export type Failure = InferResponseType<Api['projects']['$post'], 422>;
 
-export type Board = { id: string; state: 'ready'; columns: { id: string; title: string; cards: Task[] }[]; finished: number } | NotReady;
-
-export type SpecItem = { text: string; checked: boolean; task: string | null; fog: boolean };
-export type SpecProgress = { done: number; total: number; filed: number; fog: number };
-export type SpecPhase = SpecProgress & { phase: number | null; title: string | null; items: SpecItem[] };
-export type Spec = {
-  id: string;
-  title: string | null;
-  missingFiles: string[];
-  release: string | null;
-  epic: { branch: string; state: 'open' | 'finished'; checkedOut: boolean; missing: boolean; fetched: boolean } | null;
-  progress: SpecProgress | null;
-  phases: SpecPhase[];
-};
-
-export type Specs = { state: 'ready'; specs: Spec[] } | NotReady;
-
-export type Failure = { error: { code: string; message: string } };
-
-/** Why the page cannot show anything: the session or the server ended, or the registry cannot be read. */
+/** Why the page cannot show anything: the session or the server ended, the registry cannot be read, or the server failed. */
 export const failure = ref<
-  { kind: 'registry-unreadable'; message: string } | { kind: 'session-ended' } | { kind: 'not-running' } | undefined
+  | {
+      kind: 'registry-unreadable';
+      message: string;
+    }
+  | { kind: 'session-ended' }
+  | { kind: 'not-running' }
+  | { kind: 'internal' }
+  | undefined
 >();
 
-/** A fetch that turns the end of the session or of the server into `failure`. */
-export async function api(input: string, init?: RequestInit): Promise<Response | undefined> {
+/** A call that turns the end of the session or of the server, or a failure of the server, into `failure`. */
+export async function call<
+  R extends {
+    status: number;
+    json(): Promise<unknown>;
+  },
+>(request: () => Promise<R>): Promise<R | undefined> {
+  let res: R;
   try {
-    const res = await fetch(input, init);
-    if (res.status === 401) failure.value = { kind: 'session-ended' };
-    else if (res.status === 500) {
-      const { error } = (await res.json()) as Failure;
-      failure.value = { kind: 'registry-unreadable', message: error.message };
-    } else return res;
+    res = await request();
   } catch {
     failure.value = { kind: 'not-running' };
+    return undefined;
   }
+  if (res.status === 401) failure.value = { kind: 'session-ended' };
+  else if (res.status === 500) {
+    const body = (await res.json().catch(() => undefined)) as Partial<Failure> | undefined;
+    failure.value =
+      body?.error?.code === 'registry-unreadable' ? { kind: 'registry-unreadable', message: body.error.message } : { kind: 'internal' };
+  } else return res;
   return undefined;
 }
 
-/** One task in full, or why there is none: no such project, no such live task; undefined when `api` failed. */
+/** One task in full, or why there is none: no such project, no such live task; undefined when `call` failed. */
 export async function readTask(project: string, task: string): Promise<TaskDetails | 'not-connected' | 'not-found' | undefined> {
-  const res = await api(`/api/projects/${encodeURIComponent(project)}/tasks/${encodeURIComponent(task)}`);
+  const res = await call(() =>
+    client.api.projects[':id'].tasks[':task'].$get({ param: { id: encodeURIComponent(project), task: encodeURIComponent(task) } }),
+  );
   if (!res) return undefined;
-  if (res.ok) return ((await res.json()) as { task: TaskDetails }).task;
-  return ((await res.json()) as Failure).error.code === 'not-found' ? 'not-found' : 'not-connected';
+  if (res.status === 200) return (await res.json()).task;
+  return (await res.json()).error.code === 'not-found' ? 'not-found' : 'not-connected';
 }
 
 /** What a project's state means, for a person. */
@@ -137,11 +87,16 @@ type Listener = (project?: string) => void;
 const listeners = new Set<Listener>();
 let events: EventSource | undefined;
 
-/** Follows the server's change signals; one stream for the whole page. Returns the unsubscribe. */
+/**
+ * Follows the server's change signals; one stream for the whole page. Returns the unsubscribe.
+ * It is also the first read: `listener` runs once the stream is open — at once if it already is —
+ * because a read made before the server follows the project is read again when it starts to.
+ */
 export function onChange(listener: Listener): () => void {
   if (listeners.size === 0) document.addEventListener('visibilitychange', follow); // added once: same function
   listeners.add(listener);
   follow();
+  if (events?.readyState === EventSource.OPEN) listener();
   return () => listeners.delete(listener);
 }
 
@@ -167,5 +122,5 @@ function follow(): void {
     for (const listener of listeners) listener(project);
   });
   // The browser retries on its own; asking the server says whether it ended or the session did.
-  events.addEventListener('error', () => void api('/api/instance'));
+  events.addEventListener('error', () => void call(() => client.api.instance.$get()));
 }

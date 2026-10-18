@@ -1,14 +1,25 @@
 <script setup lang="ts">
-import { ExternalLink } from '@lucide/vue';
-import type { ReadyDetails, Task } from '@/api';
-import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
-import { toneRule } from '@/lib/tones';
-import { waits } from '@/lib/waits';
-import TaskBrief from './TaskBrief.vue';
+  import { ExternalLink } from '@lucide/vue';
+  import { computed } from 'vue';
+  import type { ReadyDetails, Task } from '@/api';
+  import { Badge } from '@/components/ui/badge';
+  import { Card } from '@/components/ui/card';
+  import { toneRule } from '@/lib/tones';
+  import { waits } from '@/lib/waits';
+  import TaskBrief from './TaskBrief.vue';
 
-defineProps<{ project: string; task: Task; open: boolean; details?: ReadyDetails | 'unavailable' }>();
-defineEmits<{ toggle: [] }>();
+  const props = defineProps<{
+    project: string;
+    task: Task;
+    open: boolean;
+    details?: ReadyDetails | 'unavailable';
+  }>();
+
+  defineEmits<{
+    toggle: [];
+  }>();
+
+  const note = computed(() => waits(props.task));
 </script>
 
 <template>
@@ -20,11 +31,11 @@ defineEmits<{ toggle: [] }>();
       </span>
       <span v-if="task.goal" class="text-muted-foreground" :class="!open && 'line-clamp-2'">{{ task.goal }}</span>
     </button>
-    <p v-if="waits(task)" :class="toneRule[waits(task)!.tone]">
-      {{ waits(task)!.text }}
+    <p v-if="note" :class="toneRule[note.tone]">
+      {{ note.text }}
       <a
-        v-if="waits(task)!.url"
-        :href="waits(task)!.url"
+        v-if="note.url"
+        :href="note.url"
         target="_blank"
         rel="noopener noreferrer"
         class="inline-flex items-center gap-1 underline underline-offset-2"

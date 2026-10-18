@@ -5,7 +5,16 @@ import { promisify } from 'node:util';
 const run = promisify(execFile);
 
 /** A worktree names its clone's main checkout; `null` when the clone is bare and has none. */
-export type Checkout = { kind: 'main'; root: string } | { kind: 'worktree'; main: string | null } | { kind: 'not-a-repository' };
+export type Checkout =
+  | {
+      kind: 'main';
+      root: string;
+    }
+  | {
+      kind: 'worktree';
+      main: string | null;
+    }
+  | { kind: 'not-a-repository' };
 
 /**
  * Where `path` sits in git: a clone's main checkout (its root, even from a subdirectory), a

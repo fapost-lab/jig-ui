@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, describe, expect, it } from 'vitest';
+import { addProject } from '../registry/projects.js';
 import { localSource } from './local.js';
 import type { Change } from './project-source.js';
 
@@ -46,7 +47,15 @@ const attention = {
  * A git clone whose Jig answers `--version`, `status --json`, `task list --json` and `spec list --json` from files, and
  * logs every call to `calls.log`. `status` given as a string is printed as is, with exit 1.
  */
-function project(name: string, version: string, answers: { status?: unknown; tasks?: unknown; specs?: unknown } = {}): string {
+function project(
+  name: string,
+  version: string,
+  answers: {
+    status?: unknown;
+    tasks?: unknown;
+    specs?: unknown;
+  } = {},
+): string {
   const dir = join(root, name);
   mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
   execFileSync('git', ['init', '-q'], { cwd: dir });
@@ -272,7 +281,10 @@ describe('localSource', () => {
  * 1), logs every call, and on every call writes under `.ai/runtime/working/` as Jig's reads do; a
  * `slow` file makes every call take 0.4 s.
  */
-function liveProject(name: string): { dir: string; answer: (revision: number, tasks: unknown[], statusError?: boolean) => void } {
+function liveProject(name: string): {
+  dir: string;
+  answer: (revision: number, tasks: unknown[], statusError?: boolean) => void;
+} {
   const dir = join(root, name);
   mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
   mkdirSync(join(dir, '.ai', 'workspace'), { recursive: true });
@@ -442,5 +454,64 @@ describe('localSource, following changes', () => {
     await until(() => seen.length > 0);
     stop();
     expect(seen).toEqual([{ id: 'quiet', revision: 5 }]);
+  });
+
+  it('signals nothing for the reads that start following: every page reads when its stream opens', async () => {
+    const config = join(root, 'opening-config');
+    const first = liveProject('first');
+    const second = liveProject('second');
+    await addProject(config, first.dir);
+    await addProject(config, second.dir);
+    const opening = localSource(config); // a Jig UI just started: it has read nothing
+    const seen: Change[] = [];
+    const stop = opening.subscribe((change) => seen.push(change));
+    await opening.workspace();
+    await settled(first.dir);
+    await settled(second.dir);
+    stop();
+    expect(seen).toEqual([]);
+  });
+
+  it('signals a project registered by another Jig UI on its next rescan', async () => {
+    const config = join(root, 'shared-config');
+    const rescanning = localSource(config, { rescanMs: 300 });
+    const seen: Change[] = [];
+    const stop = rescanning.subscribe((change) => seen.push(change));
+    await delay(100);
+    await addProject(config, liveProject('elsewhere').dir);
+    await until(() => seen.length > 0);
+    stop();
+    expect(seen).toEqual([{ id: 'elsewhere', revision: 1 }]);
+  });
+
+  it('signals a project another Jig UI registered, when this one connects it before its next rescan', async () => {
+    const config = join(root, 'both-config');
+    const both = localSource(config);
+    const seen: Change[] = [];
+    const stop = both.subscribe((change) => seen.push(change));
+    await delay(100);
+    const twice = liveProject('twice');
+    await addProject(config, twice.dir);
+    expect(await both.connect(twice.dir)).toMatchObject({ created: false });
+    stop();
+    expect(seen).toEqual([{ id: 'twice', revision: 1 }]);
+  });
+
+  it('signals a project disconnected here and registered again by another Jig UI on its next rescan', async () => {
+    const config = join(root, 'again-config');
+    const rescanning = localSource(config, { rescanMs: 300 });
+    const again = liveProject('again');
+    await addProject(config, again.dir);
+    const seen: Change[] = [];
+    const stop = rescanning.subscribe((change) => seen.push(change));
+    await delay(100);
+    await rescanning.disconnect('again');
+    await addProject(config, again.dir);
+    await until(() => seen.length > 1);
+    stop();
+    expect(seen).toEqual([
+      { id: 'again', revision: null },
+      { id: 'again', revision: 1 },
+    ]);
   });
 });

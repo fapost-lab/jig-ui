@@ -2,7 +2,13 @@ import { execFile } from 'node:child_process';
 import { OPEN_FILE, writeConfigFile } from './registry/instance.js';
 
 /** The system command that opens a file in the default browser. */
-export function browserCommand(platform: NodeJS.Platform, file: string): { cmd: string; args: string[] } {
+export function browserCommand(
+  platform: NodeJS.Platform,
+  file: string,
+): {
+  cmd: string;
+  args: string[];
+} {
   if (platform === 'darwin') return { cmd: 'open', args: [file] };
   if (platform === 'win32') return { cmd: 'explorer.exe', args: [file] };
   return { cmd: 'xdg-open', args: [file] };

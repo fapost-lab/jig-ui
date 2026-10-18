@@ -18,7 +18,8 @@ While a page is open, the local adapter watches each connected project's `.ai/`
 (`server/watch/watch.ts`), re-reads a changed project through Jig, and signals only when the new
 read differs from what the page was shown. `GET /api/events` streams that signal ("project X
 changed, revision R"); the page re-fetches what it shows (`onChange` in `web/api.ts`), and
-everything after the stream reconnects. While followed, reads are answered from the last read, so
+everything after the stream reconnects. The stream's `open` is also the page's first read: a view
+reads nothing on mount. While followed, reads are answered from the last read, so
 re-fetches and extra tabs run no Jig.
 
 ## Why
@@ -49,6 +50,15 @@ checkout or a hand edit (Jig's `schemas/json.md`). So the files are watched, and
   browsers give one site six connections over HTTP/1.1, and a stream per tab would use them up
   (task `live-updates`, review F1). So with every Jig UI tab hidden, nothing is watched.
 
+- **Read after the stream opens, and signal nothing for the reads that start following** (task
+  `review-fixes`, 2026-10-18). A read made before the server follows a project is read again when
+  following starts, and the first read of a following compared against nothing, so it signalled
+  every project and each signal re-read the page: opening a board ran Jig 8 times, read each
+  project twice and fetched `workspace` three times, LCP 3.66 s. Now the page reads once the stream
+  is open, the adapter signals only a read that differs from one shown before in this following,
+  a project newly connected (here, or by another Jig UI, found by the next sweep) and a
+  disconnect: 4 Jig runs, one read each, LCP 1.47 s. A tab opened hidden reads nothing until shown.
+
 ## Decisions and rejected alternatives
 
 Task `live-updates` (2026-10-17), on adr-20261014-project-source-port-keeps-hosting-open (the
@@ -59,5 +69,7 @@ signal carries no data) and adr-20261014-stack-vue-hono-sse-on-node (SSE, `fs.wa
 - Watch `.ai/runtime/revision/` only, or poll the revision — miss git and hand edits.
 - Watch every project from start — rescans with no page open, and every source built in a test
   would need closing.
+- Read on mount and again on `open` (what was there) — two reads of every project, and the first
+  served from a read the following then threw away.
 - The stream lives in `server/http/` with the other routes, not in a `live/` module of its own:
   it is a dozen lines over `ProjectSource.subscribe`.

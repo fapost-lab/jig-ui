@@ -1,48 +1,39 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
-import { api, type Failure, onChange, type Project } from '@/api';
-import ConnectForm from '@/components/ConnectForm.vue';
-import ProjectCard from '@/components/ProjectCard.vue';
+  import { onUnmounted, ref } from 'vue';
+  import { call, client, onChange, type Project } from '@/api';
+  import ConnectForm from '@/components/ConnectForm.vue';
+  import ProjectCard from '@/components/ProjectCard.vue';
+  import { lastWins } from '@/lib/last-wins';
 
-const projects = ref<Project[]>();
-const path = ref('');
-const refusal = ref<string>();
-const busy = ref(false);
+  const projects = ref<Project[]>();
+  const path = ref('');
+  const refusal = ref<string>();
+  const busy = ref(false);
 
-let latest = 0;
+  const load = lastWins(
+    async () => (await (await call(() => client.api.workspace.$get()))?.json())?.projects,
+    (read) => (projects.value = read),
+  );
 
-async function load(): Promise<void> {
-  const mine = ++latest;
-  const res = await api('/api/workspace');
-  const read = res && ((await res.json()) as { projects: Project[] }).projects;
-  // A newer load may have started meanwhile: an older answer must not overwrite it.
-  if (read && mine === latest) projects.value = read;
-}
-
-async function connect(): Promise<void> {
-  busy.value = true;
-  refusal.value = undefined;
-  const res = await api('/api/projects', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ path: path.value }),
-  });
-  busy.value = false;
-  if (!res) return;
-  if (!res.ok) {
-    refusal.value = ((await res.json()) as Failure).error.message;
-    return;
+  async function connect(): Promise<void> {
+    busy.value = true;
+    refusal.value = undefined;
+    const res = await call(() => client.api.projects.$post({ json: { path: path.value } }));
+    busy.value = false;
+    if (!res) return;
+    if (res.status !== 200 && res.status !== 201) {
+      refusal.value = (await res.json()).error.message;
+      return;
+    }
+    path.value = '';
+    await load();
   }
-  path.value = '';
-  await load();
-}
 
-async function disconnect(id: string): Promise<void> {
-  if (await api(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' })) await load();
-}
+  async function disconnect(id: string): Promise<void> {
+    if (await call(() => client.api.projects[':id'].$delete({ param: { id: encodeURIComponent(id) } }))) await load();
+  }
 
-onMounted(load);
-onUnmounted(onChange(() => void load()));
+  onUnmounted(onChange(() => void load()));
 </script>
 
 <template>

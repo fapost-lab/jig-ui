@@ -21,8 +21,46 @@ native dependencies, Node.js already on the machine.
 - **Page:** Vue 3 with Vite, TypeScript.
 - **Language:** TypeScript on both sides.
 
+## Page: components and styling
+
+- **Components:** shadcn-vue — Reka UI primitives (behaviour, ARIA, focus, keyboard; no styles)
+  styled with Tailwind CSS v4, variants through class-variance-authority, classes merged by
+  `cn()` (clsx + tailwind-merge), icons from `@lucide/vue`. The shadcn-vue CLI copies each
+  component's source into the repository; the code is ours, upgrades are ours too.
+- **Tailwind** comes in through `@tailwindcss/vite` in the existing `vite.config.ts`; no PostCSS
+  or Tailwind config file.
+- **Weight:** everything above is a dev dependency. The package ships the page already built, so
+  what `npx @fapost/jig-ui` installs does not grow.
+- **Themes:** light and dark, following the system, through the CSS variables shadcn-vue
+  defines on `:root` and `.dark`.
+- **Canvas:** a page of the app, `#/canvas`, shows every component in every variant and state,
+  in both themes. It ships in the package as a chunk loaded only when opened, so the maintainer
+  sees it in a `next` release on their own machine; one build, no separate mode. One
+  `Canvas.vue` lists what it shows (maintainer, 2026-10-18).
+- **Routing:** vue-router in hash mode; the addresses `#/projects/<id>` and
+  `#/projects/<id>/tasks/<task>` stay as they are, the canvas is a lazily loaded route
+  (maintainer, 2026-10-18). This replaces the rejection of vue-router in the board's feature
+  knowledge, made for two screens; the page now has four, five with specs.
+- **Look** — base colour, density, type, the colours of the columns — is decided in the task that
+  builds the components, from two or three prototypes on real data, at its human gate
+  (maintainer, 2026-10-18).
+- **Drag and drop** is not covered by Reka UI; its library is chosen by the Phase 2 drag item.
+
 ## Rejected
 
+- Reka UI with hand-written CSS, no Tailwind — three dependencies fewer, but every variant and
+  token by hand and none of shadcn-vue's components to start from (maintainer, 2026-10-18).
+- A styled component library (PrimeVue, Naive UI, Vuetify) — a quick start, but someone else's
+  look, and the canvas would show their components, not ours (maintainer, 2026-10-18).
+- Storybook or Histoire for the canvas — a second build and dozens of dependencies for a page of
+  components the app can render itself.
+- A dev-only canvas — invisible in a released `next` build (maintainer, 2026-10-18).
+- A `.canvas.vue` file beside each component, gathered by `import.meta.glob`, with a test that
+  fails on a component without one — no list to forget, but a file per component
+  (maintainer, 2026-10-18).
+- Keeping the hand-written hash parsing in `App.vue` — no dependency, but a regex and a manual lazy
+  import that grow with every screen (maintainer, 2026-10-18).
+- One theme only — dark added later means touching every component (maintainer, 2026-10-18).
 - React + Vite — more ready-made kanban parts (dnd-kit), but nothing the board needs is missing
   in Vue, and the concept already named Vue.
 - Svelte + Vite — lightest bundle, smallest ecosystem; no reason found to leave the concept's

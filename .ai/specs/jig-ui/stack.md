@@ -25,14 +25,15 @@ native dependencies, Node.js already on the machine.
 
 - **Components:** shadcn-vue — Reka UI primitives (behaviour, ARIA, focus, keyboard; no styles)
   styled with Tailwind CSS v4, variants through class-variance-authority, classes merged by
-  `cn()` (clsx + tailwind-merge), icons from `@lucide/vue`. The shadcn-vue CLI copies each
+  `cn()` from shadcn's `cn` package, icons from `@lucide/vue`. The shadcn-vue CLI copies each
   component's source into the repository; the code is ours, upgrades are ours too.
 - **Tailwind** comes in through `@tailwindcss/vite` in the existing `vite.config.ts`; no PostCSS
   or Tailwind config file.
 - **Weight:** everything above is a dev dependency. The package ships the page already built, so
   what `npx @fapost/jig-ui` installs does not grow.
-- **Themes:** light and dark, following the system, through the CSS variables shadcn-vue
-  defines on `:root` and `.dark`.
+- **Themes:** light and dark through the CSS variables shadcn-vue defines on `:root` and
+  `.dark`; dark by default, with a switch the browser remembers (maintainer, task
+  `design-system`, 2026-10-18 — replaces "following the system").
 - **Canvas:** a page of the app, `#/canvas`, shows every component in every variant and state,
   in both themes. It ships in the package as a chunk loaded only when opened, so the maintainer
   sees it in a `next` release on their own machine; one build, no separate mode. One

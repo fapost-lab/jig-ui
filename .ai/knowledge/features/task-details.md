@@ -4,19 +4,23 @@ type: feature
 status: active
 domains: []
 paths:
-  - web/Task.vue
   - server/board/columns.ts
   - server/source/local.ts
   - server/http/app.ts
   - server/jig/client.ts
+  - web/views/TaskView.vue
+  - web/components/TaskBrief.vue
 summary: What a task's details page shows from Jig's task row, why only offered actions and no paths reach it, and what Jig does not report yet
-reviewed_at: 2026-10-17
+reviewed_at: 2026-10-18
 ---
 # Task details
 
 ## What
 
-The task id on a board card opens `#/projects/<id>/tasks/<task>` (`web/Task.vue`), served by
+A click on a board card expands it into the task's facts and Jig's offered actions; in the
+List, a selected row shows them in a pane (`web/components/TaskBrief.vue`). "Open full details"
+opens `#/projects/<id>/tasks/<task>` (`web/views/TaskView.vue`), the page links land on. All three
+are served by
 `GET /api/projects/:id/tasks/:task` from `ProjectSource.task`: the task's row from Jig's task list
 in full — column (the board's rule), status, class, branch and base, worktree's uncommitted count,
 knowledge decision, dates, gate, autopilot run with its stage and stop question, pull request with

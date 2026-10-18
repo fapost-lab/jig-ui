@@ -25,7 +25,11 @@ describe('columnOf', () => {
     ['a stopped autopilot run', { autopilot: 'stopped' }, 'needs-you'],
     ['a running autopilot', { autopilot: 'on' }, 'in-progress'],
     ['a ready task', { status: 'ready' as const }, 'ready'],
-    ['a ready task with a pull request', { status: 'ready' as const, pullRequest: { url: 'https://x', state: 'open', ci: 'green', fetchedAt: null } }, 'ready'],
+    [
+      'a ready task with a pull request',
+      { status: 'ready' as const, pullRequest: { url: 'https://x', state: 'open', ci: 'green', fetchedAt: null } },
+      'ready',
+    ],
     ['a paused task, whatever else holds', { paused: true, started: false, gate: 'waiting' }, 'paused'],
     ['a task not started with a gate', { started: false, gate: 'waiting' }, 'backlog'],
     ['a ready task whose autopilot stopped', { status: 'ready' as const, autopilot: 'stopped' }, 'needs-you'],
@@ -35,10 +39,10 @@ describe('columnOf', () => {
 });
 
 describe('columns', () => {
-  it('puts every task in exactly one column, the columns in a fixed order, Jig\'s order kept', () => {
+  it("puts every task in exactly one column, the columns in a fixed order, Jig's order kept", () => {
     const tasks = [task({ id: 'b' }), task({ id: 'a', started: false }), task({ id: 'c' }), task({ id: 'd', paused: true })];
     const board = columns(tasks);
-    expect(board.map((c) => c.id)).toEqual(['backlog', 'in-progress', 'needs-you', 'paused', 'ready']);
-    expect(board.map((c) => c.cards.map((t) => t.id))).toEqual([['a'], ['b', 'c'], [], ['d'], []]);
+    expect(board.map((c) => c.id)).toEqual(['needs-you', 'in-progress', 'ready', 'backlog', 'paused']);
+    expect(board.map((c) => c.cards.map((t) => t.id))).toEqual([[], ['b', 'c'], [], ['a'], ['d']]);
   });
 });

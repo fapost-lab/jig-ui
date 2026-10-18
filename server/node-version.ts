@@ -12,7 +12,6 @@ export function checkNodeVersion(version: string): NodeVersionCheck {
   return {
     ok: false,
     message:
-      'Jig UI needs Node.js ' + MINIMUM_NODE_MAJOR + ' or later, but this is ' + version +
-      '. Install a newer Node.js and run it again.',
+      'Jig UI needs Node.js ' + MINIMUM_NODE_MAJOR + ' or later, but this is ' + version + '. Install a newer Node.js and run it again.',
   };
 }

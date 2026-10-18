@@ -1,45 +1,49 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { api, failure } from './api';
-import Board from './Board.vue';
-import TaskView from './Task.vue';
-import Workspace from './Workspace.vue';
+import { useRoute } from 'vue-router';
+import { api, failure, onChange, type Project } from './api';
+import ProjectTabs from './components/ProjectTabs.vue';
+import ThemeToggle from './components/ThemeToggle.vue';
 
+const route = useRoute();
 const version = ref<string>();
-const hash = ref(location.hash);
-const onHash = () => (hash.value = location.hash);
+const projects = ref<Project[]>([]);
+/** The project whose board or task is open; the workspace and the canvas have none. */
+const current = computed(() => (typeof route.params.id === 'string' ? route.params.id : undefined));
 
-/** `#/projects/<id>` opens that project's board, `#/projects/<id>/tasks/<task>` one task; anything else is the workspace. */
-const route = computed(() => {
-  const match = /^#\/projects\/([^/]+)(?:\/tasks\/([^/]+))?$/.exec(hash.value);
-  try {
-    if (!match?.[1]) return undefined;
-    return { project: decodeURIComponent(match[1]), task: match[2] && decodeURIComponent(match[2]) };
-  } catch {
-    return undefined; // a malformed escape: the workspace, not a crash
-  }
-});
+let latest = 0;
+
+async function loadTabs(): Promise<void> {
+  const mine = ++latest;
+  const res = await api('/api/workspace');
+  const read = res && ((await res.json()) as { projects: Project[] }).projects;
+  // A newer load may have started meanwhile: an older answer must not overwrite it.
+  if (read && mine === latest) projects.value = read;
+}
 
 onMounted(async () => {
-  addEventListener('hashchange', onHash);
+  void loadTabs();
   const res = await api('/api/instance');
   if (res) version.value = ((await res.json()) as { version: string }).version;
 });
-onUnmounted(() => removeEventListener('hashchange', onHash));
+onUnmounted(onChange(() => void loadTabs()));
 </script>
 
 <template>
-  <main>
-    <p v-if="failure?.kind === 'registry-unreadable'" role="alert">{{ failure.message }}</p>
-    <p v-else-if="failure?.kind === 'session-ended'" role="alert">
+  <div class="flex h-screen flex-col">
+    <p v-if="failure?.kind === 'registry-unreadable'" role="alert" class="p-4 text-destructive">{{ failure.message }}</p>
+    <p v-else-if="failure?.kind === 'session-ended'" role="alert" class="p-4">
       This page's session has ended. Run <code>npx @fapost/jig-ui</code> again to reopen it.
     </p>
-    <p v-else-if="failure?.kind === 'not-running'" role="alert">Jig UI is not running. Start it with <code>npx @fapost/jig-ui</code>.</p>
+    <p v-else-if="failure?.kind === 'not-running'" role="alert" class="p-4">
+      Jig UI is not running. Start it with <code>npx @fapost/jig-ui</code>.
+    </p>
     <template v-else>
-      <h1>Jig UI {{ version }}</h1>
-      <TaskView v-if="route?.task" :project="route.project" :task="route.task" :key="`${route.project}/${route.task}`" />
-      <Board v-else-if="route" :id="route.project" :key="route.project" />
-      <Workspace v-else />
+      <ProjectTabs :projects="projects" :current="current" :version="version" class="shrink-0"><ThemeToggle /></ProjectTabs>
+      <main class="min-h-0 flex-1 overflow-auto">
+        <!-- Keyed on the address: a view reads once when it mounts, so a new address mounts it again. -->
+        <RouterView :key="route.fullPath" />
+      </main>
     </template>
-  </main>
+  </div>
 </template>

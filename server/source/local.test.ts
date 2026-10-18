@@ -51,7 +51,10 @@ function project(name: string, version: string, answers: { status?: unknown; tas
   mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
   execFileSync('git', ['init', '-q'], { cwd: dir });
   const refused = typeof answers.status === 'string';
-  writeFileSync(join(dir, 'status.json'), refused ? (answers.status as string) : envelope(answers.status ?? { attention: [], housekeeping: null }));
+  writeFileSync(
+    join(dir, 'status.json'),
+    refused ? (answers.status as string) : envelope(answers.status ?? { attention: [], housekeeping: null }),
+  );
   writeFileSync(join(dir, 'tasks.json'), envelope(answers.tasks ?? { tasks: [], hidden: 0, housekeeping: null }));
   writeFileSync(
     join(dir, '.ai', 'scripts', 'jig'),
@@ -138,7 +141,19 @@ describe('localSource', () => {
         tasks: {
           tasks: [
             task('f', 'active', false, { branch: null }),
-            task('g', 'active', false, { gate: { state: 'waiting', by: null }, autopilot: { state: 'stopped', mode: 'attended', repairs: 0, stage: 'implement', stage_at: 'x', stop_reason: 'which?', stop_at: 'x', phase: null } }),
+            task('g', 'active', false, {
+              gate: { state: 'waiting', by: null },
+              autopilot: {
+                state: 'stopped',
+                mode: 'attended',
+                repairs: 0,
+                stage: 'implement',
+                stage_at: 'x',
+                stop_reason: 'which?',
+                stop_at: 'x',
+                phase: null,
+              },
+            }),
             task('h', 'ready', false, { pull_request: { url: 'https://x/pull/1', state: 'merged', ci: null, fetched_at: 'x' } }),
           ],
           hidden: 0,
@@ -150,7 +165,17 @@ describe('localSource', () => {
       state: 'ready',
       finished: 2,
       tasks: [
-        { id: 'a', class: 'T2', status: 'active', goal: 'Goal of a', paused: false, started: true, gate: null, autopilot: null, pullRequest: null },
+        {
+          id: 'a',
+          class: 'T2',
+          status: 'active',
+          goal: 'Goal of a',
+          paused: false,
+          started: true,
+          gate: null,
+          autopilot: null,
+          pullRequest: null,
+        },
         expect.objectContaining({ id: 'b' }),
         expect.objectContaining({ id: 'c', paused: true }),
         expect.objectContaining({ id: 'd', status: 'ready' }),
@@ -169,7 +194,7 @@ describe('localSource', () => {
     expect(await source.tasks('nobody')).toBeUndefined();
   });
 
-  it("reads one live task in full, with what needs the person about it and only what Jig offers", async () => {
+  it('reads one live task in full, with what needs the person about it and only what Jig offers', async () => {
     const read = await source.task('busy', 'b');
     expect(read).toEqual({
       state: 'ready',

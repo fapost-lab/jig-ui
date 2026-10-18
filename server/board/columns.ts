@@ -8,12 +8,13 @@ export interface Column {
   cards: Task[];
 }
 
+/** The board's order: what waits for the person first, then what moves, what is done, what is not begun, what is set aside. */
 const COLUMNS: { id: ColumnId; title: string }[] = [
-  { id: 'backlog', title: 'Backlog' },
-  { id: 'in-progress', title: 'In progress' },
   { id: 'needs-you', title: 'Needs you' },
-  { id: 'paused', title: 'Paused' },
+  { id: 'in-progress', title: 'In progress' },
   { id: 'ready', title: 'Ready' },
+  { id: 'backlog', title: 'Backlog' },
+  { id: 'paused', title: 'Paused' },
 ];
 
 /** Where a task stands, from Jig's state alone; the first rule that fits wins. */

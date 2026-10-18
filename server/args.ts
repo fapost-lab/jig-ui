@@ -3,10 +3,7 @@ import { parseArgs } from 'node:util';
 export const DEFAULT_PORT = 4870;
 
 export type CliCommand =
-  | { kind: 'help' }
-  | { kind: 'version' }
-  | { kind: 'run'; port: number; open: boolean }
-  | { kind: 'error'; message: string };
+  { kind: 'help' } | { kind: 'version' } | { kind: 'run'; port: number; open: boolean } | { kind: 'error'; message: string };
 
 /** Parses the command line (without the node and script entries). Pure: it never exits or prints. */
 export function parseCliArgs(argv: string[]): CliCommand {

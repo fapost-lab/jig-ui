@@ -40,10 +40,16 @@ export function watchTree(dir: string, { ignore, onChange, quietMs = 1_000, maxW
     watcher = undefined;
   };
 
-  // Linux's recursive watch does not throw for a missing directory, macOS's does: ask first.
+  // Node 24.16-24.21 on Linux do not throw for a missing directory (24.0-24.15, 24.22 and macOS do): ask first.
   if (!existsSync(dir)) return { open: false, close };
   try {
     watcher = watch(dir, { recursive: true }, (_event, file) => {
+      // Linux keeps watching a removed directory's inode and never says it is gone: close, so the owner watches it again.
+      if (!existsSync(dir)) {
+        close();
+        onChange();
+        return;
+      }
       // Some systems name no file; that is still a change.
       if (file !== null && ignore(file.replaceAll('\\', '/'))) return;
       clearTimeout(quiet);

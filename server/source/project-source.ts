@@ -1,6 +1,6 @@
-import type { Attention } from '../jig/client.js';
+import type { Attention, Spec, SpecItem, SpecPhase, SpecProgress } from '../jig/client.js';
 
-export type { Attention };
+export type { Attention, Spec, SpecItem, SpecPhase, SpecProgress };
 export { RegistryUnreadable } from '../registry/projects.js';
 
 /** A project's live tasks by where they stand. */
@@ -64,6 +64,9 @@ export type ProjectTasks = { state: 'ready'; tasks: Task[]; finished: number } |
 /** One live task of a project, `null` when the project has no live task of that id; or why the project cannot be read. */
 export type ProjectTask = { state: 'ready'; task: TaskDetails | null } | Exclude<ProjectView, { state: 'ready' }>;
 
+/** A project's specs, in Jig's order, or why the project cannot be read. */
+export type ProjectSpecs = { state: 'ready'; specs: Spec[] } | Exclude<ProjectView, { state: 'ready' }>;
+
 export type Refusal = { code: 'not-a-repository' | 'worktree' | 'no-jig'; message: string };
 
 /** A connected project changed; `revision` is Jig's with the read that saw it, `null` when unreadable. */
@@ -82,6 +85,8 @@ export interface ProjectSource {
   tasks(id: string): Promise<ProjectTasks | undefined>;
   /** One live task of a connected project; `undefined` when no project has that id. */
   task(id: string, taskId: string): Promise<ProjectTask | undefined>;
+  /** A connected project's specs with their roadmaps; `undefined` when no project has that id. */
+  specs(id: string): Promise<ProjectSpecs | undefined>;
   /** False when no project has that id. Nothing in the project is touched. */
   disconnect(id: string): Promise<boolean>;
   /**

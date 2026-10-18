@@ -76,6 +76,12 @@ export function createApp({ port, token, source, version = readPackageVersion(),
     return c.json({ task: { state: 'ready', ...read.task, column: placeOf(read.task) } });
   });
 
+  app.get('/api/projects/:id/specs', async (c) => {
+    const read = await source.specs(c.req.param('id'));
+    if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+    return c.json({ specs: read });
+  });
+
   app.post('/api/projects', async (c) => {
     const body: unknown = await c.req.json().catch(() => undefined);
     const path = absolute((body as { path?: unknown } | undefined)?.path);

@@ -1,5 +1,5 @@
 // Sample data for the canvas: every state a component shows, in the shapes of api.ts.
-import type { Attention, Project, ReadyDetails, Task } from '@/api';
+import type { Attention, Project, ReadyDetails, Spec, SpecItem, Task } from '@/api';
 
 const task = (id: string, more: Partial<Task>): Task => ({
   id,
@@ -166,4 +166,59 @@ export const projects: Project[] = [
   { id: 'new-jig', state: 'incompatible', jigVersion: '1.0.0' },
   { id: 'busy', state: 'unreadable', code: 'locked' },
   { id: 'moved', state: 'unavailable', reason: 'missing' },
+];
+
+export const specItems: SpecItem[] = [
+  { text: '`design-system` — design system and canvas', checked: true, task: 'design-system', fog: false },
+  {
+    text: '`specs-and-epics` — specs and epics (after: project board — `jig spec list`)',
+    checked: false,
+    task: 'specs-and-epics',
+    fog: false,
+  },
+  { text: '`old-task` — a task no longer live', checked: false, task: 'old-task', fog: false },
+  { text: 'invoices from orders, no task filed yet', checked: false, task: null, fog: false },
+  { text: 'fog: registration by `jig init`', checked: false, task: null, fog: true },
+];
+
+export const specs: Spec[] = [
+  {
+    id: 'jig-ui',
+    title: 'Jig UI — a local control center for Jig projects',
+    missingFiles: [],
+    release: null,
+    epic: null,
+    progress: { done: 2, total: 6, filed: 2, fog: 1 },
+    phases: [
+      {
+        phase: 0,
+        title: 'Package and release',
+        done: 1,
+        total: 1,
+        filed: 0,
+        fog: 0,
+        items: [{ ...specItems[0]!, text: 'package and release', task: null }],
+      },
+      { phase: 1, title: 'Read-only UI', done: 1, total: 5, filed: 2, fog: 1, items: specItems },
+    ],
+  },
+  {
+    id: 'billing',
+    title: 'Billing in one place',
+    missingFiles: [],
+    release: 'minor',
+    epic: { branch: 'epic/billing', state: 'open', checkedOut: false, missing: false, fetched: true },
+    progress: { done: 0, total: 1, filed: 0, fog: 0 },
+    phases: [{ phase: null, title: null, done: 0, total: 1, filed: 0, fog: 0, items: [specItems[3]!] }],
+  },
+  {
+    id: 'lost-epic',
+    title: 'An epic whose branch is gone',
+    missingFiles: [],
+    release: 'major',
+    epic: { branch: 'epic/lost', state: 'open', checkedOut: true, missing: true, fetched: false },
+    progress: null,
+    phases: [],
+  },
+  { id: 'half-written', title: null, missingFiles: ['spec.md', 'roadmap.md'], release: null, epic: null, progress: null, phases: [] },
 ];

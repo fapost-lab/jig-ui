@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ChevronDown, ChevronRight, Columns3, Rows3 } from '@lucide/vue';
+import { ChevronDown, ChevronRight, Columns3, Milestone, Rows3 } from '@lucide/vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
-import { api, type Board, describe, onChange, readTask, type ReadyDetails } from '@/api';
+import { api, type Board, describe, onChange, readTask, type ReadyDetails, type Specs } from '@/api';
 import ColumnHeader from '@/components/ColumnHeader.vue';
+import SpecCard from '@/components/SpecCard.vue';
 import TaskBrief from '@/components/TaskBrief.vue';
 import TaskCard from '@/components/TaskCard.vue';
 import TaskRow from '@/components/TaskRow.vue';
@@ -24,18 +25,33 @@ async function load(): Promise<void> {
   if (mine === latest) board.value = read;
 }
 
-/** Board or List, remembered by this browser only; storage that throws leaves the board. */
+const specs = ref<Specs | 'not-connected'>();
+let latestSpecs = 0;
+
+async function loadSpecs(): Promise<void> {
+  const mine = ++latestSpecs;
+  const res = await api(`/api/projects/${encodeURIComponent(props.id)}/specs`);
+  if (!res) return;
+  const read = res.status === 404 ? 'not-connected' : ((await res.json()) as { specs: Specs }).specs;
+  if (mine === latestSpecs) specs.value = read;
+}
+
+/** Board, List or Specs, remembered by this browser only; storage that throws leaves the board. */
 const VIEW = 'jig-ui.board-view';
-function storedView(): 'board' | 'list' {
+const VIEWS = ['board', 'list', 'specs'] as const;
+type View = (typeof VIEWS)[number];
+const isView = (v: unknown): v is View => VIEWS.includes(v as View);
+function storedView(): View {
   try {
-    return localStorage.getItem(VIEW) === 'list' ? 'list' : 'board';
+    const stored = localStorage.getItem(VIEW);
+    return isView(stored) ? stored : 'board';
   } catch {
     return 'board';
   }
 }
 const view = ref(storedView());
 function show(next: unknown): void {
-  if (next !== 'board' && next !== 'list') return; // a press on the pressed item asks for none
+  if (!isView(next)) return; // a press on the pressed item asks for none
   view.value = next;
   try {
     localStorage.setItem(VIEW, next);
@@ -76,11 +92,15 @@ function fold(id: string, open: boolean): void {
   else folded.value.add(id);
 }
 
-onMounted(load);
+onMounted(() => {
+  void load();
+  void loadSpecs();
+});
 onUnmounted(
   onChange((project) => {
     if (project !== undefined && project !== props.id) return;
     void load();
+    void loadSpecs();
     void readSelected();
   }),
 );
@@ -105,6 +125,7 @@ onUnmounted(
       >
         <ToggleGroupItem value="board"><Columns3 />Board</ToggleGroupItem>
         <ToggleGroupItem value="list"><Rows3 />List</ToggleGroupItem>
+        <ToggleGroupItem value="specs"><Milestone />Specs</ToggleGroupItem>
       </ToggleGroup>
     </div>
 
@@ -130,6 +151,18 @@ onUnmounted(
           <li v-if="column.cards.length === 0" class="p-3 text-center text-muted-foreground">— empty —</li>
         </ul>
       </section>
+    </div>
+
+    <div v-else-if="view === 'specs'" class="min-h-0 flex-1 overflow-y-auto">
+      <p v-if="specs === undefined" class="p-3 text-muted-foreground">Reading the specs…</p>
+      <p v-else-if="specs === 'not-connected'" role="alert" class="p-3 text-destructive">No connected project is called {{ id }}.</p>
+      <p v-else-if="specs.state !== 'ready'" class="p-3">{{ describe(specs) }}</p>
+      <p v-else-if="specs.specs.length === 0" class="p-3 text-muted-foreground">
+        No specs in this project. A spec is written with the <code>jig-idea</code> skill and kept in <code>.ai/specs/</code>.
+      </p>
+      <div v-else class="flex flex-col gap-3 p-3">
+        <SpecCard v-for="spec in specs.specs" :key="spec.id" :spec="spec" :project="id" :live="cards.map((t) => t.id)" />
+      </div>
     </div>
 
     <div v-else class="flex min-h-0 flex-1">

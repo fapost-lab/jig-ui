@@ -2,7 +2,17 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { jigVersion, JigRefusal, JigShapeError, MIN_JIG_VERSION, readStatus, readTasks, supports, writtenByReads } from './client.js';
+import {
+  jigVersion,
+  JigRefusal,
+  JigShapeError,
+  MIN_JIG_VERSION,
+  readSpecs,
+  readStatus,
+  readTasks,
+  supports,
+  writtenByReads,
+} from './client.js';
 
 const root = mkdtempSync(join(tmpdir(), 'jig-ui-jig-'));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -201,6 +211,53 @@ describe('readTasks, the list as a whole', () => {
         ),
       ),
     ).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+// spec-list.json is Jig 0.29.0's `spec list --json` for this repository, cut down, with a spec on an
+// open epic and one missing its files added in the shape Jig's producer (lib/spec.sh) prints.
+describe('readSpecs', () => {
+  it("reads each spec with its phases and items, in Jig's order", async () => {
+    const [ui, billing, half] = await readSpecs(answering('specs', 'spec-list.json'));
+    expect(ui).toMatchObject({
+      id: 'jig-ui',
+      title: 'Jig UI — a local control center for Jig projects',
+      missingFiles: [],
+      release: null,
+      epic: null,
+    });
+    expect(ui?.progress).toEqual({ done: 2, total: 5, filed: 1, fog: 1 });
+    expect(ui?.phases.map((p) => [p.phase, p.title, p.done, p.total])).toEqual([
+      [0, 'Package and release', 1, 1],
+      [1, 'Read-only UI', 1, 3],
+      [null, null, 0, 1],
+    ]);
+    expect(ui?.phases[1]?.items[2]).toEqual({
+      text: "fog: registration by `jig init` — needs a hook on Jig's side",
+      checked: false,
+      task: null,
+      fog: true,
+    });
+    expect(billing?.release).toBe('minor');
+    expect(billing?.epic).toEqual({ branch: 'epic/billing', state: 'open', checkedOut: false, missing: false, fetched: true });
+    expect(half).toMatchObject({ title: null, missingFiles: ['spec.md', 'roadmap.md'], progress: null, phases: [] });
+  });
+
+  it('reads a project with no specs', async () => {
+    expect(await readSpecs(answering(`case-${cases++}`, '{"schema":1,"revision":1,"generated_at":"x","data":{"specs":[]}}'))).toEqual([]);
+  });
+
+  it.each([
+    ['without its id', (d: Record<string, any>) => delete d.specs[0].id],
+    ['with an epic in a state Jig UI does not know', (d: Record<string, any>) => (d.specs[1].epic.state = 'merged')],
+    ['with an epic without its branch', (d: Record<string, any>) => delete d.specs[1].epic.branch],
+    ['with progress that is not a count', (d: Record<string, any>) => (d.specs[0].progress.done = -1)],
+    ['with a phase without its items', (d: Record<string, any>) => delete d.specs[0].phases[0].items],
+    ['with a phase number that is text', (d: Record<string, any>) => (d.specs[0].phases[0].phase = 'one')],
+    ['with an item not saying whether it is checked', (d: Record<string, any>) => (d.specs[0].phases[0].items[0].checked = 'yes')],
+    ['with missing files that are not names', (d: Record<string, any>) => (d.specs[2].missing_files = [1])],
+  ])('refuses a spec %s', async (_, change) => {
+    await expect(readSpecs(answering(`case-${cases++}`, changed('spec-list.json', change)))).rejects.toBeInstanceOf(JigShapeError);
   });
 });
 

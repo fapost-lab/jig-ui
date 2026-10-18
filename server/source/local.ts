@@ -4,6 +4,7 @@ import {
   JigShapeError,
   jigVersion,
   MIN_JIG_VERSION,
+  readSpecs,
   readStatus,
   readTasks,
   supports,
@@ -18,6 +19,7 @@ import type {
   Attention,
   Change,
   ProjectSource,
+  ProjectSpecs,
   ProjectTasks,
   ProjectView,
   Refusal,
@@ -60,8 +62,8 @@ function count(tasks: TaskSummary[]): TaskCounts {
 
 type NotReady = Exclude<ProjectView, { state: 'ready' }>;
 
-/** One read of a project: what the workspace, the board and each task's details show, and the revision it came from. */
-type Read = { view: ProjectView; tasks: ProjectTasks; details: TaskDetails[]; revision: number | null };
+/** One read of a project: what the workspace, the board, each task's details and the specs show, and the revision it came from. */
+type Read = { view: ProjectView; tasks: ProjectTasks; details: TaskDetails[]; specs: ProjectSpecs; revision: number | null };
 
 /** A live task as a board's card shows it. */
 const card = (t: TaskSummary & { status: Task['status'] }): Task => ({
@@ -120,11 +122,11 @@ async function reading<T>({ id, path }: Project, read: (root: string, jigVersion
 
 async function readProject(project: Project): Promise<Read> {
   const read = await reading(project, async (root, jigVersion) => {
-    const [status, list] = await Promise.all([readStatus(root), readTasks(root)]);
-    return { status, list, jigVersion };
+    const [status, list, specs] = await Promise.all([readStatus(root), readTasks(root), readSpecs(root)]);
+    return { status, list, specs, jigVersion };
   });
-  if (!('list' in read)) return { view: read, tasks: read, details: [], revision: null };
-  const { status, list, jigVersion } = read;
+  if (!('list' in read)) return { view: read, tasks: read, details: [], specs: read, revision: null };
+  const { status, list, specs, jigVersion } = read;
   // Jig's live list holds active and ready tasks only.
   const live = list.tasks.filter((t): t is TaskSummary & { status: Task['status'] } => t.status === 'active' || t.status === 'ready');
   return {
@@ -138,6 +140,7 @@ async function readProject(project: Project): Promise<Read> {
     },
     tasks: { state: 'ready', tasks: live.map(card), finished: list.hidden },
     details: live.map((t) => details(t, status.attention)),
+    specs: { state: 'ready', specs },
     revision: list.revision,
   };
 }
@@ -150,6 +153,8 @@ interface Entry {
   project: Project;
   /** What the project shows now. */
   shown?: Read;
+  /** The following `shown` was read in; a read from before it, or while not following, is not served from. */
+  readIn?: number;
   /** `shown` was kept over one torn read; the next torn read is believed. */
   held: boolean;
   watch?: Watch;
@@ -174,6 +179,8 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
   const entries = new Map<string, Entry>();
   const listeners = new Set<(change: Change) => void>();
   let rescan: NodeJS.Timeout | undefined;
+  /** Counts the times following started; a read that finishes after a stop belongs to none. */
+  let session = 0;
   const following = (): boolean => rescan !== undefined;
 
   const entryOf = (project: Project): Entry => {
@@ -190,6 +197,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     }
     entry.held = false;
     entry.shown = read;
+    entry.readIn = following() ? session : undefined;
   }
 
   /** Reads the project again — one read at a time — and signals when what it shows changed. */
@@ -218,7 +226,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
   /** What the project shows: from the watch while following, read through Jig otherwise. */
   async function shown(project: Project): Promise<Read> {
     const entry = entryOf(project);
-    if (!(following() && entry.shown)) await (entry.reading ?? refresh(entry));
+    if (!(following() && entry.shown && entry.readIn === session)) await (entry.reading ?? refresh(entry));
     return entry.shown as Read;
   }
 
@@ -254,6 +262,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
   }
 
   function start(): void {
+    session++;
     rescan = setInterval(() => void sweep(), rescanMs);
     rescan.unref();
     void sweep();
@@ -294,6 +303,10 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       const read = await shown(project);
       if (read.tasks.state !== 'ready') return read.tasks;
       return { state: 'ready', task: read.details.find((t) => t.id === taskId) ?? null };
+    },
+    async specs(id) {
+      const project = (await readProjects(configDir)).find((p) => p.id === id);
+      return project && (await shown(project)).specs;
     },
     async disconnect(id) {
       if (!(await removeProject(configDir, id))) return false;

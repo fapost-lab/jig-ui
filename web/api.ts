@@ -70,6 +70,21 @@ export type ReadyDetails = Extract<TaskDetails, { state: 'ready' }>;
 
 export type Board = { id: string; state: 'ready'; columns: { id: string; title: string; cards: Task[] }[]; finished: number } | NotReady;
 
+export type SpecItem = { text: string; checked: boolean; task: string | null; fog: boolean };
+export type SpecProgress = { done: number; total: number; filed: number; fog: number };
+export type SpecPhase = SpecProgress & { phase: number | null; title: string | null; items: SpecItem[] };
+export type Spec = {
+  id: string;
+  title: string | null;
+  missingFiles: string[];
+  release: string | null;
+  epic: { branch: string; state: 'open' | 'finished'; checkedOut: boolean; missing: boolean; fetched: boolean } | null;
+  progress: SpecProgress | null;
+  phases: SpecPhase[];
+};
+
+export type Specs = { state: 'ready'; specs: Spec[] } | NotReady;
+
 export type Failure = { error: { code: string; message: string } };
 
 /** Why the page cannot show anything: the session or the server ended, or the registry cannot be read. */

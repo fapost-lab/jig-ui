@@ -71,7 +71,21 @@ A card shows the task's id, class and goal, and what it waits for. Finished task
 counted above the board. The order inside a column is Jig's (by id) for now.
 
 **Board / List** switches between the columns side by side and a list: the same columns as
-groups of one-line rows, each group folding away. The browser remembers the choice.
+groups of one-line rows, each group folding away; **Specs** shows the project's specs
+([Specs](#specs)). The browser remembers the choice.
+
+## Specs
+
+**Specs** — the third choice beside Board and List — shows the project's specs as Jig's
+`jig spec list` reports them: each with its title, how many roadmap items are done out of all of
+them, and its fog. An epic shows its branch, whether it is open or finished, and whether its
+roadmap was read from the remote branch as it was at the last fetch, or the branch is nowhere;
+the version level its release raises is shown when the roadmap records one.
+
+Each phase folds away (a finished one starts folded) and lists its items: done, open or fog. An
+item that names a live task links to the task's details; its dependencies (`after: …`) are shown
+in grey. A spec missing `spec.md` or `roadmap.md` says so. The specs follow the project like the
+board does; planning them from the page is not here yet.
 
 ## Task details
 

@@ -20,6 +20,9 @@ export const toneRule: Record<Tone, string> = {
 /** Attention as a filled mark, the count on a project's tab. */
 export const attentionFill = 'bg-amber-500 text-black';
 
+/** Done as a filled bar, a roadmap's progress. */
+export const doneFill = 'bg-emerald-500';
+
 /** Each column's accent, by the column ids the board API sends; an id this page does not know gets none. */
 export const columnAccent: Record<string, string> = {
   'needs-you': 'bg-amber-500',

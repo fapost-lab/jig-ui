@@ -31,7 +31,7 @@ Every item updates the pages in `docs/` it changes.
 - [x] `project-board` — project board — columns derived from Jig's task state, never stored; light cards (after: project registry — one board per connected project)
 - [x] `task-details` — task details — status, stage, gate, artifacts, pull request, dependencies, attention, opened from a card (after: project board — a card opens it)
 - [x] `design-system` — design system and canvas — shadcn-vue on Tailwind v4 with light and dark themes and a look chosen from prototypes; vue-router; `#/canvas` showing every component in every variant and state; the Vue conventions written into knowledge; the workspace, the board and task details rebuilt on the components (after: task details — it rebuilds the three screens that exist)
-- [ ] specs and epics — each spec with its phases, progress and epic branch beside the board, from Jig's spec list (after: project board — shown on the project's page; design system and canvas — built on its components)
+- [x] `specs-and-epics` — specs and epics — each spec with its phases, progress and epic branch beside the board, from Jig's spec list (after: project board — shown on the project's page; design system and canvas — built on its components)
 - [ ] fog: registration by `jig init` — needs a hook on Jig's side that keeps the UI optional
 
 ## Phase 2 — Planning from the UI

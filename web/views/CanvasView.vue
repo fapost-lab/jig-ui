@@ -8,7 +8,10 @@ import ColumnHeader from '@/components/ColumnHeader.vue';
 import ConnectForm from '@/components/ConnectForm.vue';
 import CopyCommand from '@/components/CopyCommand.vue';
 import ProjectCard from '@/components/ProjectCard.vue';
+import ProgressBar from '@/components/ProgressBar.vue';
 import ProjectTabs from '@/components/ProjectTabs.vue';
+import SpecCard from '@/components/SpecCard.vue';
+import SpecItemRow from '@/components/SpecItemRow.vue';
 import TaskBrief from '@/components/TaskBrief.vue';
 import TaskCard from '@/components/TaskCard.vue';
 import TaskFacts from '@/components/TaskFacts.vue';
@@ -24,7 +27,7 @@ import { Separator } from '@/components/ui/separator';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { toneRule, toneText } from '@/lib/tones';
 import CanvasSection from './CanvasSection.vue';
-import { actions, attention, columns, details, projects, tasks } from './canvas-samples';
+import { actions, attention, columns, details, projects, specItems, specs, tasks } from './canvas-samples';
 
 const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
 const buttonSizes = ['xs', 'sm', 'default', 'lg'] as const;
@@ -180,6 +183,33 @@ const tones = ['attention', 'good', 'bad', 'quiet'] as const;
         command="jig task autopilot a-task-with-a-rather-long-identifier-that-wraps resume --answer 'a long answer to the question'"
         class="max-w-xs"
       />
+    </CanvasSection>
+
+    <CanvasSection title="ProgressBar" note="none, part, all, an empty roadmap">
+      <ProgressBar
+        v-for="[done, total] in [
+          [0, 4],
+          [3, 9],
+          [5, 5],
+          [0, 0],
+        ]"
+        :key="`${done}/${total}`"
+        :done="done!"
+        :total="total!"
+      />
+    </CanvasSection>
+
+    <CanvasSection title="SpecItemRow" note="done with a live task; open with dependencies; a task no longer live; no task; fog">
+      <ul>
+        <SpecItemRow v-for="(item, i) in specItems" :key="i" :item="item" project="jig-ui" :live="i < 2" />
+      </ul>
+    </CanvasSection>
+
+    <CanvasSection
+      title="SpecCard"
+      note="no epic, a finished phase folded; an open epic as of the last fetch; a lost epic branch; missing files"
+    >
+      <SpecCard v-for="spec in specs" :key="spec.id" :spec="spec" project="jig-ui" :live="['design-system', 'specs-and-epics']" />
     </CanvasSection>
   </div>
 </template>

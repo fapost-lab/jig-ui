@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
+import { z } from 'zod';
 import { writeConfigFile } from './instance.js';
 
 /** A connected project: its id everywhere, the path of its main checkout only here and in the local source. */
@@ -17,8 +18,8 @@ export class RegistryUnreadable extends Error {
   }
 }
 
-const isProject = (p: unknown): p is Project =>
-  typeof p === 'object' && p !== null && typeof (p as Project).id === 'string' && typeof (p as Project).path === 'string';
+// A row keeps the fields it does not know, so a later version's additions survive this one's writes.
+const Registry = z.object({ projects: z.array(z.looseObject({ id: z.string(), path: z.string() })) });
 
 /** The connected projects in the order they were connected; none when there is no registry yet. */
 export async function readProjects(dir: string): Promise<Project[]> {
@@ -29,13 +30,15 @@ export async function readProjects(dir: string): Promise<Project[]> {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
     throw new RegistryUnreadable();
   }
+  let json: unknown;
   try {
-    const { projects } = JSON.parse(text) as { projects?: unknown };
-    if (Array.isArray(projects) && projects.every(isProject)) return projects;
+    json = JSON.parse(text);
   } catch {
-    // falls through
+    throw new RegistryUnreadable();
   }
-  throw new RegistryUnreadable();
+  const registry = Registry.safeParse(json);
+  if (!registry.success) throw new RegistryUnreadable();
+  return registry.data.projects;
 }
 
 /** The id for a checkout: its directory name as a slug, with `-2`, `-3`… when that is taken. */

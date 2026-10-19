@@ -1,14 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { z } from 'zod';
 
 /** What a running instance records so that a second start can find it. */
-export interface InstanceInfo {
-  port: number;
-  token: string;
-  pid: number;
-  version: string;
-}
+const InstanceInfo = z.object({ port: z.int(), token: z.string(), pid: z.int(), version: z.string() });
+export type InstanceInfo = z.output<typeof InstanceInfo>;
 
 const FILE = 'instance.json';
 /** The page that sends the browser on to the instance; it carries the token, so it lives here too. */
@@ -19,9 +16,7 @@ export const cookieName = (port: number): string => `jig-ui-${port}`;
 
 export async function readInstance(dir: string): Promise<InstanceInfo | undefined> {
   try {
-    const info = JSON.parse(await readFile(join(dir, FILE), 'utf8')) as Partial<InstanceInfo>;
-    if (typeof info.port !== 'number' || typeof info.token !== 'string') return undefined;
-    return info as InstanceInfo;
+    return InstanceInfo.safeParse(JSON.parse(await readFile(join(dir, FILE), 'utf8'))).data;
   } catch {
     return undefined;
   }
@@ -71,6 +66,12 @@ export type Connected =
       message: string;
     };
 
+// An instance before 0.2.0 answers a failure it did not foresee in plain text: neither of these.
+const Answer = z.union([
+  z.object({ project: z.object({ id: z.string() }) }),
+  z.object({ error: z.object({ code: z.string(), message: z.string() }) }),
+]);
+
 /** Asks the instance to connect `path`, as the page does: the instance owns the registry, so no second process writes it. */
 export async function connectThrough(info: Pick<InstanceInfo, 'port' | 'token'>, path: string, timeoutMs = 15_000): Promise<Connected> {
   try {
@@ -80,19 +81,9 @@ export async function connectThrough(info: Pick<InstanceInfo, 'port' | 'token'>,
       body: JSON.stringify({ path }),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    // An instance before 0.2.0 answers a failure it did not foresee in plain text.
-    const body = (await res.json().catch(() => ({}))) as {
-      project?: { id: string };
-      error?:
-        | {
-            code: string;
-            message: string;
-          }
-        | string;
-    };
-    if (body.project) return { id: body.project.id, created: res.status === 201 };
-    if (typeof body.error === 'object') return body.error;
-    return { code: 'unexpected', message: `Jig UI answered ${res.status}.` };
+    const body = Answer.safeParse(await res.json().catch(() => undefined)).data;
+    if (body && 'project' in body) return { id: body.project.id, created: res.status === 201 };
+    return body?.error ?? { code: 'unexpected', message: `Jig UI answered ${res.status}.` };
   } catch (error) {
     return { code: 'unreachable', message: error instanceof Error ? error.message : String(error) };
   }

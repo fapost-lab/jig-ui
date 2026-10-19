@@ -52,6 +52,14 @@ describe('registry', () => {
     expect(await readProjects(dir)).toEqual([]);
   });
 
+  it('keeps the fields of a row it does not know through a write', async () => {
+    const dir = fresh();
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'projects.json'), '{"projects":[{"id":"api","path":"/a/api","later":1}]}');
+    await addProject(dir, '/b');
+    expect((await readProjects(dir))[0]).toEqual({ id: 'api', path: '/a/api', later: 1 });
+  });
+
   it.each(['{"projects":', '{"projects":[{"id":1}]}', '[]'])('never overwrites an unreadable file: %s', async (text) => {
     const dir = fresh();
     mkdirSync(dir, { recursive: true });

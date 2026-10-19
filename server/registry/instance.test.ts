@@ -54,6 +54,8 @@ describe('instance file', () => {
     await writeInstance(dir, info);
     writeFileSync(join(dir, 'instance.json'), '{"port":');
     expect(await readInstance(dir)).toBeUndefined();
+    writeFileSync(join(dir, 'instance.json'), JSON.stringify({ ...info, token: undefined }));
+    expect(await readInstance(dir)).toBeUndefined();
   });
 
   it('is removed, with the redirect page, only by the instance that owns it', async () => {

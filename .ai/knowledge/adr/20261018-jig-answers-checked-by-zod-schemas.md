@@ -7,8 +7,10 @@ domains: []
 paths:
   - server/jig/client.ts
   - package.json
-summary: Each shape of Jig's JSON is one zod schema in server/jig/client.ts; its z.output is the exported type; unknown keys dropped
-reviewed_at: 2026-10-18
+  - server/registry/projects.ts
+  - server/registry/instance.ts
+summary: JSON from outside the process (Jig's answers, the registry files, another instance's answer) is checked by zod schemas whose z.output is the type; the page uses none
+reviewed_at: 2026-10-19
 ---
 # Jig's answers are checked by zod schemas
 
@@ -30,6 +32,12 @@ check could drift apart. Task `review-fixes`, decided with the maintainer on 202
 - `z.object` drops keys Jig adds without raising `schema`, so nothing Jig UI does not read — a
   worktree's path among them — reaches past `server/jig/`.
 - `zod` `^4.6.7` is a runtime dependency of the package.
+- Extended by task `registry-zod-schemas` (2026-10-19, "давай"): JSON Jig UI reads from outside
+  its own process outside `server/jig/` — `projects.json` and `instance.json` in the config
+  directory, and the answer of another instance to `connectThrough` — is checked by a zod schema
+  too. A row of `projects.json` is a `z.looseObject`, so fields a later version adds survive this
+  one's writes (adr-20261017-registry-of-connected-projects: the shape grows only by adding
+  fields). The page does not use zod: it reads its own server through the types of Hono RPC.
 
 ## Alternatives
 

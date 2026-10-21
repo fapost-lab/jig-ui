@@ -6,7 +6,8 @@ when that page is not installed.
 
 External dependency: Jig's spec `contract-extensions` (fapost-lab/jig, `.ai/specs/contract-extensions/`).
 Phase 0 reads nothing of Jig and does not wait. No task of Phase 1 here starts before its Phase 1 (machine-readable Jig) is in a Jig release; no
-task of Phase 2 here starts before its Phase 2 (queue and requests) is.
+task of Phase 2 here starts before its Phase 2 (queue and requests) is. That half moved to Jig's
+spec `contract-queue`, released in Jig 0.31.0: Phase 2 here starts on Jig 0.31.0.
 
 ## Phase 0 — Package and release
 
@@ -41,10 +42,10 @@ Goal: the page changes things, only through Jig. Done when a drag, a priority ch
 task all land through Jig commands, and a concurrent change by an agent shows as a conflict
 instead of being overwritten.
 
-- [ ] reorder and prioritise by drag (after: project board; Jig queue — writes go through Jig's queue command with the revision)
-- [ ] pause and resume as a request — a drop on the paused column writes a sticky request through Jig; the card shows "requested" with its age and a cancel until Jig's state changes (after: project board; Jig legal actions and requests — they say when a pause is offered)
-- [ ] file a minimal backlog task from the page (after: project board — through `jig task new` with a short description)
-- [ ] conflict display (after: reorder and prioritise by drag — the refusal of a stale revision is what it shows)
+- [ ] reorder and prioritise by drag (after: project board; Jig queue — writes go through Jig's queue command with the revision: `jig queue move` and `jig queue set --priority` with `--revision <n> --json`, read with `jig queue list --json`)
+- [ ] pause and resume as a request — a drop on the paused column writes a sticky request through Jig; the card shows "requested" with its age and a cancel until Jig's state changes; a drop out of it resumes directly (after: project board; Jig legal actions and requests — they say when a pause is offered: `jig queue request|cancel task:<id> pause`, the task's `pause_request` and the `request-pause` / `cancel-pause-request` / `resume` actions in `jig task list --json`)
+- [ ] file a minimal backlog task from the page (after: project board — through `jig task new <id> --goal <text> --json`, refused as `already-exists` when the id is taken)
+- [ ] conflict display (after: reorder and prioritise by drag — the refusal of a stale revision is what it shows: `error.code` `stale-revision`)
 
 ## Phase 3 — Further
 

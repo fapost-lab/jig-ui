@@ -55,8 +55,9 @@ Findings from checking the concept against Jig 0.26.0:
 - **One clone, one place for its tasks.** A task started in a worktree borrows its task
   directory from the main checkout by link (Jig ADR-0029), so the main checkout lists every task
   of the clone. The registry points at a clone's main checkout, never at a worktree.
-- **Jig has no machine-readable output and no planning fields today.** Everything the UI reads
-  and writes depends on Jig's `contract-extensions` spec landing first.
+- **Jig had no machine-readable output and no planning fields.** Jig 0.29.0 made it readable
+  (`contract-extensions`: `--json` in one envelope with a clone revision); Jig 0.31.0 adds the
+  planning contract (`contract-queue`: the queue, pause requests, `jig task new --json`).
 - **Board state can already be derived** from a task's status, gate, autopilot state, pull
   request and housekeeping flags.
 - **The audience.** Jig itself needs only git, and is aimed partly at non-developers on Windows.
@@ -70,8 +71,9 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
 
 - **Lost updates.** Jig writes `state` last-write-wins (Jig ADR-0008). A UI write and an agent's
   write to the same task race; the loser's change vanishes silently. Holds only if every UI write
-  goes through a Jig command that checks a revision — the queue file of `contract-extensions`
-  does; a write to `state` would not.
+  goes through a Jig command that checks a revision — Jig's queue (`contract-queue`, Jig 0.31.0)
+  does: every `jig queue` write takes `--revision <n>` and refuses a stale one as
+  `stale-revision`; a write to `state` would not.
 - **Windows writes.** `execFile` of `jig.cmd` fails since Node's fix for CVE-2024-27980; fixed in
   `stack.md` by running Jig through Git's bash.
 - **Remote state is not under `.ai/`.** A pull request merged or CI failed on GitHub fires no
@@ -109,6 +111,9 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
   it holds until honoured or cancelled, whatever stage the task reached in between. Which drops
   are offered comes from the legal actions Jig reports for that state. Rejected: a stored board
   column the agent has to keep in step.
+- Resume is not a request (Jig's `contract-queue` decision, 2026-10-19): while a task is paused no
+  agent works on it, so a drop out of the paused column calls `jig task resume` directly, a legal
+  action Jig already offers. Only a pause is written as a request.
 - The UI never runs agents; it reads and writes through Jig's commands (from research.md: running
   agents from the UI is aif-handoff's largest cost).
 - The repository is `fapost-lab/jig-ui` (maintainer, 2026-10-14).
@@ -126,6 +131,8 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
   and development does not start before those contracts are in a Jig release (maintainer,
   2026-10-14). The wait is per phase: Phase 1 here starts once Phase 1 of `contract-extensions`
   (machine-readable Jig) is released, Phase 2 here once its Phase 2 (queue and requests) is.
+  Jig moved that second half into its own spec, `contract-queue`, released in Jig 0.31.0
+  (2026-10-21): Phase 2 here starts on Jig 0.31.0.
   Work that reads nothing of Jig — the package and its release pipeline — does not wait
   (maintainer, 2026-10-14): every merge should reach the maintainer's machine from the start.
 - Every merge to the default branch publishes a prerelease under npm's `next` tag, started with
@@ -156,17 +163,24 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
 
 ## Open questions
 
-The first three are raised in Jig's `contract-extensions` spec (fapost-lab/jig#242).
+The first three were raised in Jig's `contract-extensions` spec (fapost-lab/jig#242) and are
+answered by Jig 0.29.0 and 0.31.0 as noted; they stay here until this spec's next session moves
+them to Decisions.
 
-- For Jig's `contract-extensions`: does reading Jig's JSON stay offline, with pull request and CI
+- Answered (Jig 0.29.0: a `--json` read never touches the network; housekeeping caches pull
+  request and CI state with `fetched_at`). For Jig's `contract-extensions`: does reading Jig's JSON stay offline, with pull request and CI
   state refreshed by housekeeping, so a rescan never calls the network? Decides the rescan
   interval and whether the board can show remote state live.
-- For Jig's `contract-extensions`: a revision per project in every read, which the SSE signal and
+- Answered (Jig 0.29.0: every `--json` envelope carries the clone `revision`; Jig 0.31.0: every
+  queue write checks it). For Jig's `contract-extensions`: a revision per project in every read, which the SSE signal and
   every write carry. Without it the UI has no stale-write guard of its own.
-- For Jig's `contract-extensions`: a reorder is one command that moves one item (sparse position),
+- Answered (Jig 0.31.0: `jig queue move <ref> --before|--after <ref> | --top | --bottom` moves
+  one item and respaces a level inside the same write only when no gap is left). For Jig's
+  `contract-extensions`: a reorder is one command that moves one item (sparse position),
   never a renumbering the UI issues as several commands.
 - How `jig init` registers a project in an installed UI without making the UI a dependency of
-  Jig — needs a small hook on Jig's side, not designed yet.
+  Jig — needs a small hook on Jig's side, not designed yet (on Jig's side a fog item of its
+  `project-hooks` spec since 2026-10-20).
 
 ## Assumptions left untested
 

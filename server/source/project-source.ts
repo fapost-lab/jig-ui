@@ -49,6 +49,12 @@ export interface Task {
   status: 'active' | 'ready';
   goal: string | null;
   paused: boolean;
+  /** A pause asked of the task through Jig and not yet honoured: it pauses at its next stage boundary. */
+  pauseRequest: {
+    requestedAt: string;
+  } | null;
+  /** Jig offers to ask it to pause (its `request-pause` action); a request is taken back while there is one. */
+  pauseRequestable: boolean;
   started: boolean;
   gate: string | null;
   autopilot: string | null;
@@ -171,6 +177,10 @@ export interface ProjectSource {
   move(id: string, taskId: string, place: Place, revision: number): Promise<Written | undefined>;
   /** Sets a live task's priority, `null` for none, as `move` writes. */
   prioritise(id: string, taskId: string, priority: number | null, revision: number): Promise<Written | undefined>;
+  /** Asks a live task to pause at its next stage boundary, as `move` writes. */
+  requestPause(id: string, taskId: string, revision: number): Promise<Written | undefined>;
+  /** Takes back the pause asked of a live task, as `move` writes. */
+  cancelPause(id: string, taskId: string, revision: number): Promise<Written | undefined>;
   /** False when no project has that id. Nothing in the project is touched. */
   disconnect(id: string): Promise<boolean>;
   /**

@@ -7,6 +7,8 @@ const task = (id: string, more: Partial<Task>): Task => ({
   status: 'active',
   goal: null,
   paused: false,
+  pauseRequest: null,
+  pauseRequestable: true,
   started: true,
   gate: null,
   autopilot: null,
@@ -63,15 +65,25 @@ export const tasks: Task[] = [
   }),
   task('live-updates', { status: 'ready', pullRequest: pr('merged', 'none'), goal: 'Follow connected projects without a reload.' }),
   task('no-pr-yet', { class: 'T1', status: 'ready', goal: 'Ready, nothing pushed.' }),
-  task('jig-init-hook', { class: 'T3', paused: true, goal: 'Register a project in an installed Jig UI from jig init.' }),
+  task('jig-init-hook', {
+    class: 'T3',
+    paused: true,
+    pauseRequestable: false,
+    goal: 'Register a project in an installed Jig UI from jig init.',
+  }),
   task('file-backlog-task', { class: null, started: false, goal: 'File a minimal backlog task from the page through jig task new.' }),
   task('a-task-with-a-rather-long-identifier-that-wraps', { goal: null }),
+  task('conflict-display', {
+    pauseRequest: { requestedAt: '2026-10-22T09:00:00Z' },
+    pauseRequestable: false,
+    goal: 'Show what changed when a write was based on a stale read.',
+  }),
 ];
 
 /** The samples placed as the board places them: every column with cards. */
 export const board: Column[] = [
   { id: 'needs-you', title: 'Needs you', cards: tasks.slice(0, 3) },
-  { id: 'in-progress', title: 'In progress', cards: [tasks[3]!, tasks[11]!] },
+  { id: 'in-progress', title: 'In progress', cards: [tasks[3]!, tasks[12]!, tasks[11]!] },
   { id: 'ready', title: 'Ready', cards: tasks.slice(4, 9) },
   { id: 'backlog', title: 'Backlog', cards: [tasks[10]!] },
   { id: 'paused', title: 'Paused', cards: [tasks[9]!] },
@@ -123,6 +135,7 @@ export const actions = [
   { id: 'approve-gate', command: 'jig task gate design-system approved' },
   { id: 'answer-stop', command: 'jig task autopilot pause-request resume --answer <text>' },
   { id: 'pause', command: 'jig task pause design-system' },
+  { id: 'request-pause', command: 'jig queue request task:design-system pause' },
   { id: 'something-new', command: 'jig task something-new design-system' },
 ];
 

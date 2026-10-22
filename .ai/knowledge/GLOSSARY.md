@@ -62,8 +62,8 @@ Use in: source code, documentation.
 
 ## Request
 
-A sticky ask from the page — pause, resume — that Jig holds until it is honoured or cancelled;
-the card shows it with its age.
+A sticky ask from the page that Jig holds until it is honoured or cancelled — today a pause, which
+a task takes at its next stage boundary; the card shows it with its age.
 
 Informal synonyms: pending move.
 Use in: source code, API, documentation.

@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import {
+  cancelPause,
   JigRefusal,
   JigShapeError,
   jigVersion,
@@ -10,6 +11,7 @@ import {
   readSpecs,
   readStatus,
   readTasks,
+  requestPause,
   setPriority,
   supports,
   type TaskSummary,
@@ -85,6 +87,8 @@ const card = (t: Live, q: QueueItem | undefined): Task => ({
   status: t.status,
   goal: t.goal,
   paused: t.paused,
+  pauseRequest: t.pauseRequest,
+  pauseRequestable: t.actions.some((a) => a.id === 'request-pause' && a.offered),
   started: t.branch !== null,
   gate: t.gate?.state ?? null,
   autopilot: t.autopilot?.state ?? null,
@@ -376,6 +380,12 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     },
     prioritise(id, taskId, priority, revision) {
       return writing(id, [taskId], (root) => setPriority(root, taskId, priority, revision));
+    },
+    requestPause(id, taskId, revision) {
+      return writing(id, [taskId], (root) => requestPause(root, taskId, revision));
+    },
+    cancelPause(id, taskId, revision) {
+      return writing(id, [taskId], (root) => cancelPause(root, taskId, revision));
     },
     async disconnect(id) {
       if (!(await removeProject(configDir, id))) return false;

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
+  cancelPause,
   jigVersion,
   JigRefusal,
   JigShapeError,
@@ -12,6 +13,7 @@ import {
   readSpecs,
   readStatus,
   readTasks,
+  requestPause,
   setPriority,
   supports,
   writtenByReads,
@@ -80,8 +82,10 @@ function changed(name: string, change: (data: Record<string, any>) => void): str
 let cases = 0;
 const refusal = (code: string) => expect.objectContaining({ code }) as unknown as JigRefusal;
 
-// Contract tests: the fixtures are what Jig 0.29.0 printed (status-attention.json adds items in the
-// documented shape, an unknown kind included); each read pins the fields Jig UI relies on.
+// Contract tests: the fixtures are what Jig printed — task-list.json is Jig 0.31.0's, the others
+// Jig 0.29.0's: task-list-states.json with the `pause_request` and the two pause-request actions
+// 0.31.0 adds, in the shape its lib/task.sh prints, and status-attention.json with items added in
+// the documented shape, an unknown kind included. Each read pins the fields Jig UI relies on.
 describe('readStatus', () => {
   it("reads what needs the person, in Jig's order, an unknown kind included", async () => {
     const read = await readStatus(answering('status', 'status-attention.json'));
@@ -132,6 +136,7 @@ describe('readTasks', () => {
       goal: null,
       knowledgeConsolidated: false,
       paused: false,
+      pauseRequest: null,
       createdAt: '2026-10-17',
       updatedAt: '2026-10-17',
       branch: null,
@@ -147,6 +152,8 @@ describe('readTasks', () => {
       'start',
       'pause',
       'resume',
+      'request-pause',
+      'cancel-pause-request',
       'approve-gate',
       'answer-stop',
       'set-class',
@@ -162,8 +169,6 @@ describe('readTasks', () => {
       offered: true,
       reason: null,
     });
-    // An action id this Jig UI does not know is ignored, as Jig's contract asks of a consumer.
-    expect(read.tasks[1]?.actions.map((a) => a.id)).not.toContain('request-pause');
     expect(read.tasks[2]?.autopilot).toEqual({
       state: 'stopped',
       mode: 'attended',
@@ -180,6 +185,33 @@ describe('readTasks', () => {
       ci: 'green',
       fetchedAt: '2026-10-17T16:00:00Z',
     });
+  });
+
+  it('reads a pause asked of a task and the actions to ask and take it back', async () => {
+    const read = await readTasks(answering('tasks-requests', 'task-list.json'));
+    const [alpha, beta] = read.tasks;
+    expect(alpha?.pauseRequest).toBeNull();
+    expect(beta?.pauseRequest).toEqual({ requestedAt: '2026-10-22T09:01:58Z' });
+    const offered = (t: typeof alpha) =>
+      t?.actions.filter((a) => a.id === 'request-pause' || a.id === 'cancel-pause-request').map((a) => [a.id, a.offered]);
+    expect(offered(alpha)).toEqual([
+      ['request-pause', true],
+      ['cancel-pause-request', false],
+    ]);
+    expect(offered(beta)).toEqual([
+      ['request-pause', false],
+      ['cancel-pause-request', true],
+    ]);
+  });
+
+  it('ignores an action id this Jig UI does not know, as Jig asks of a consumer', async () => {
+    const read = await readTasks(
+      answering(
+        'tasks-unknown-action',
+        changed('task-list.json', (d) => d.tasks[0].actions.push({ id: 'something-new', command: 'jig x', offered: true, reason: null })),
+      ),
+    );
+    expect(read.tasks[0]?.actions.map((a) => a.id)).not.toContain('something-new');
   });
 
   it("never hands on where a task's worktree is", async () => {
@@ -201,6 +233,8 @@ describe('readTasks', () => {
     ['with a worktree without its count', (d: Record<string, any>) => (d.tasks[0].worktree = { path: '/w' })],
     ['with housekeeping flags that are not text', (d: Record<string, any>) => (d.tasks[0].housekeeping_flags = [1])],
     ['without its base branch', (d: Record<string, any>) => delete d.tasks[0].base_branch],
+    ['without its pause request', (d: Record<string, any>) => delete d.tasks[0].pause_request],
+    ['with a pause request without its time', (d: Record<string, any>) => (d.tasks[0].pause_request = { reason: null })],
   ])('refuses a task %s', async (_, change) => {
     await expect(readTasks(answering(`case-${cases++}`, changed('task-list.json', change)))).rejects.toBeInstanceOf(JigShapeError);
   });
@@ -323,6 +357,29 @@ describe('writing the queue', () => {
       refusal('stale-revision'),
     );
     await expect(setPriority(answering(`case-${cases++}`, 'queue-stale.json', 1), 'beta', 2, 1)).rejects.toEqual(refusal('stale-revision'));
+  });
+});
+
+// queue-request*.json and queue-cancel.json are what Jig 0.31.0 printed in a scratch repository.
+describe('asking a task to pause', () => {
+  it('requests a pause against the revision it was read at', async () => {
+    const dir = logging(`case-${cases++}`, 'queue-request.json');
+    await requestPause(dir, 'beta', 1792656280);
+    expect(args(dir)).toEqual(['queue', 'request', 'task:beta', 'pause', '--revision', '1792656280', '--json']);
+  });
+
+  it('takes a request back', async () => {
+    const dir = logging(`case-${cases++}`, 'queue-cancel.json');
+    await cancelPause(dir, 'beta', 3);
+    expect(args(dir)).toEqual(['queue', 'cancel', 'task:beta', 'pause', '--revision', '3', '--json']);
+  });
+
+  it.each([
+    ['queue-request-exists.json', 'already-exists'],
+    ['queue-request-paused.json', 'failed'],
+    ['queue-stale.json', 'stale-revision'],
+  ])('carries the refusal in %s as %s', async (json, code) => {
+    await expect(requestPause(answering(`case-${cases++}`, json, 1), 'beta', 1)).rejects.toEqual(refusal(code));
   });
 });
 

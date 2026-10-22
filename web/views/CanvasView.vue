@@ -154,10 +154,10 @@
 
     <CanvasSection
       title="QueueMenu"
-      note="press to open: To top, Up, Down, To bottom, Priority — first queued, in the middle, not queued, last, while its change is on its way"
+      note="press to open: To top, Up, Down, To bottom, Priority, the pause — first queued, in the middle, not queued, last, paused (no pause to ask), a pause asked, while its change is on its way"
     >
-      <div class="flex items-center gap-6">
-        <span v-for="t in [tasks[0]!, tasks[1]!, tasks[3]!, tasks[tasks.length - 1]!]" :key="t.id" class="flex items-center gap-1">
+      <div class="flex flex-wrap items-center gap-6">
+        <span v-for="t in [tasks[0]!, tasks[1]!, tasks[3]!, tasks[11]!, tasks[9]!, tasks[12]!]" :key="t.id" class="flex items-center gap-1">
           {{ t.id }}<QueueMenu :task="t" :cards="tasks" />
         </span>
         <span class="flex items-center gap-1">{{ tasks[1]!.id }}<QueueMenu :task="tasks[1]!" :cards="tasks" disabled /></span>

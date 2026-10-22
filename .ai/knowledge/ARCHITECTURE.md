@@ -82,8 +82,8 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
 - **Change.** The page sends a write with the revision of the board it showed; ProjectSource
   runs the matching Jig command for live task ids only and answers after reading the project
   again; Jig's `stale-revision` comes back as 409, the page says so in one line and reads the
-  board again (adr-20261022-writes-carry-the-revision-of-their-read). Built for the queue: order
-  and priority. A full conflict display is still to build.
+  board again (adr-20261022-writes-carry-the-revision-of-their-read). Built for the queue: order,
+  priority and pause requests. A full conflict display is still to build.
 - **Release flow.** A merge to `main` runs the CI matrix, builds `dist/` in a job without
   credentials, and publishes `<version>-next.<run>` under npm's `next` tag; a `v*` tag on a
   commit of `main` publishes `latest`. Details in `RELEASING.md`.

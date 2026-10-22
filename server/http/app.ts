@@ -65,6 +65,12 @@ function place(v: unknown): Place | undefined {
 /** A priority as the page sends it: 0 to 5, or `null` for none. */
 const isPriority = (v: unknown): v is number | null => v === null || (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 5);
 
+/** The body of a write that names only a task: the task and the revision it was read at, `undefined` where invalid. */
+function taskAt(body: unknown) {
+  const [task, revision] = [field(body, 'task'), field(body, 'revision')];
+  return { task: isId(task) ? task : undefined, revision: isRevision(revision) ? revision : undefined };
+}
+
 /** What a write came to, in the API's form. A refusal names no path: only Jig's code goes on. */
 function written(c: Context, w: Written | undefined) {
   if (w === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
@@ -148,6 +154,19 @@ function apiRoutes(source: ProjectSource, version: string) {
           return written(c, await source.prioritise(c.req.param('id'), task, priority, revision));
         },
       )
+
+      // A pause is asked of the task, not made: Jig honours it at the task's next stage boundary.
+      .post('/api/projects/:id/queue/pause', validator('json', taskAt), async (c) => {
+        const { task, revision } = c.req.valid('json');
+        if (task === undefined || revision === undefined) return refuse(c, 422, 'usage', 'Give a task and the revision it was read at.');
+        return written(c, await source.requestPause(c.req.param('id'), task, revision));
+      })
+
+      .post('/api/projects/:id/queue/pause/cancel', validator('json', taskAt), async (c) => {
+        const { task, revision } = c.req.valid('json');
+        if (task === undefined || revision === undefined) return refuse(c, 422, 'usage', 'Give a task and the revision it was read at.');
+        return written(c, await source.cancelPause(c.req.param('id'), task, revision));
+      })
 
       .post(
         '/api/projects',

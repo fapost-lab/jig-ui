@@ -139,6 +139,7 @@ const row = (id: string, more: Record<string, unknown> = {}) => ({
   goal: null,
   knowledge_consolidated: false,
   paused: false,
+  pause_request: null,
   created_at: '2026-10-17',
   updated_at: '2026-10-17',
   branch: `task/${id}`,
@@ -418,6 +419,15 @@ describe('/api/projects/:id/queue', () => {
     }
   });
 
+  it("asks a pause and takes it back through the project's Jig", async () => {
+    await post(app, '/api/projects', { path: queued });
+    for (const kind of ['pause', 'pause/cancel']) {
+      const res = await post(app, `/api/projects/queued/queue/${kind}`, { task: 'a', revision: 1 });
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ written: true });
+    }
+  });
+
   it.each([
     ['move', { place: 'top', revision: 1 }],
     ['move', { task: '', place: 'top', revision: 1 }],
@@ -429,6 +439,8 @@ describe('/api/projects/:id/queue', () => {
     ['priority', { task: 'a', priority: 6, revision: 1 }],
     ['priority', { task: 'a', priority: '1', revision: 1 }],
     ['priority', { task: 'a', revision: 1 }],
+    ['pause', { revision: 1 }],
+    ['pause/cancel', { task: 'a' }],
   ])('refuses a %s of %o as usage', async (kind, body) => {
     const res = await post(app, `/api/projects/queued/queue/${kind}`, body);
     expect(res.status).toBe(422);
@@ -439,17 +451,22 @@ describe('/api/projects/:id/queue', () => {
     ['a stale revision', { state: 'refused', code: 'stale-revision' }, 409, 'stale-revision'],
     ['a task that is not live', { state: 'refused', code: 'not-found' }, 404, 'not-found'],
     ["another refusal of Jig's", { state: 'refused', code: 'usage' }, 422, 'usage'],
+    ['a pause already asked', { state: 'refused', code: 'already-exists' }, 422, 'already-exists'],
     ['a project not connected', undefined, 404, 'not-connected'],
   ] as const)('answers %s', async (_, outcome, status, code) => {
     const source: ProjectSource = {
       ...localSource(join(webRoot, 'fake-config')),
       move: () => Promise.resolve(outcome),
       prioritise: () => Promise.resolve(outcome),
+      requestPause: () => Promise.resolve(outcome),
+      cancelPause: () => Promise.resolve(outcome),
     };
     const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
     for (const [kind, body] of [
       ['move', { task: 'a', place: 'top', revision: 1 }],
       ['priority', { task: 'a', priority: 1, revision: 1 }],
+      ['pause', { task: 'a', revision: 1 }],
+      ['pause/cancel', { task: 'a', revision: 1 }],
     ] as const) {
       const res = await post(fake, `/api/projects/x/queue/${kind}`, body);
       expect(res.status).toBe(status);
@@ -468,6 +485,8 @@ describe('/api/projects/:id/queue', () => {
     expect((await post(app, '/api/projects/queued/queue/move', { task: 'a', place: 'top', revision: 1 }, {})).status).toBe(401);
     const foreign = { cookie: COOKIE, origin: 'https://evil.example' };
     expect((await post(app, '/api/projects/queued/queue/priority', { task: 'a', priority: 1, revision: 1 }, foreign)).status).toBe(403);
+    expect((await post(app, '/api/projects/queued/queue/pause', { task: 'a', revision: 1 }, {})).status).toBe(401);
+    expect((await post(app, '/api/projects/queued/queue/pause/cancel', { task: 'a', revision: 1 }, foreign)).status).toBe(403);
   });
 });
 

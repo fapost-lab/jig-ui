@@ -161,7 +161,20 @@ export async function readStatus(
 }
 
 /** Jig's action ids this Jig UI knows; Jig may add ids without raising `schema`, and a consumer ignores those. */
-const ACTIONS = new Set(['start', 'pause', 'resume', 'approve-gate', 'answer-stop', 'set-class', 'ship', 'close', 'abandon', 'reopen']);
+const ACTIONS = new Set([
+  'start',
+  'pause',
+  'resume',
+  'request-pause',
+  'cancel-pause-request',
+  'approve-gate',
+  'answer-stop',
+  'set-class',
+  'ship',
+  'close',
+  'abandon',
+  'reopen',
+]);
 
 /** What a person may do next with a task, as Jig decides it from the task's state. */
 const TaskAction = z.object({
@@ -184,6 +197,8 @@ const TaskRow = z
     goal: maybe,
     knowledge_consolidated: z.boolean(),
     paused: z.boolean(),
+    /** A pause asked of the task and not yet honoured; its reason is a person's text and not read. */
+    pause_request: z.object({ requested_at: text }).nullable(),
     created_at: maybe,
     updated_at: maybe,
     /** `null` while the task has not been started. */
@@ -207,6 +222,7 @@ const TaskRow = z
     goal: t.goal,
     knowledgeConsolidated: t.knowledge_consolidated,
     paused: t.paused,
+    pauseRequest: t.pause_request && { requestedAt: t.pause_request.requested_at },
     createdAt: t.created_at,
     updatedAt: t.updated_at,
     branch: t.branch,
@@ -369,4 +385,27 @@ export function supports(version: string, minimum: string = MIN_JIG_VERSION): bo
     if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0);
   }
   return true;
+}
+
+/**
+ * Asks a task to pause at its next stage boundary (`jig queue request … pause`); refused as `already-exists` when a
+ * pause is already asked, `failed` when the task is paused or finished, and as `moveInQueue` is.
+ */
+export async function requestPause(
+  root: string,
+  task: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  await readJson(root, ['queue', 'request', `task:${task}`, 'pause', '--revision', String(revision)], platform);
+}
+
+/** Takes back a pause asked of a task (`jig queue cancel … pause`); refused as `not-found` when none is asked. */
+export async function cancelPause(
+  root: string,
+  task: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  await readJson(root, ['queue', 'cancel', `task:${task}`, 'pause', '--revision', String(revision)], platform);
 }

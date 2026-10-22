@@ -3,7 +3,8 @@
   import type { Place, Task } from '@/api';
   import { Badge } from '@/components/ui/badge';
   import { toneText } from '@/lib/tones';
-  import { waits } from '@/lib/waits';
+  import { minute } from '@/lib/clock';
+  import { requested, waits } from '@/lib/waits';
   import QueueMenu from './QueueMenu.vue';
 
   const props = defineProps<{
@@ -11,7 +12,7 @@
     selected: boolean;
     /** The task's column, for its queue menu; without it the row has none. */
     cards?: Task[];
-    /** A change of its place or priority is on its way to Jig. */
+    /** A change of its place, priority or pause is on its way to Jig. */
     busy?: boolean;
   }>();
 
@@ -19,9 +20,11 @@
     select: [];
     move: [place: Place];
     prioritise: [priority: number | null];
+    pause: [ask: boolean];
   }>();
 
   const note = computed(() => waits(props.task));
+  const request = computed(() => requested(props.task, minute.value.getTime()));
 </script>
 
 <template>
@@ -39,8 +42,9 @@
         {{ task.priority === null ? '' : `P${task.priority}` }}
       </span>
       <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ task.goal }}</span>
-      <span v-if="busy" class="shrink-0 text-muted-foreground" role="status">moving…</span>
+      <span v-if="busy" class="shrink-0 text-muted-foreground" role="status">sending to Jig…</span>
       <span v-else-if="note" class="shrink-0" :class="toneText[note.tone]">{{ note.text }}</span>
+      <span v-if="request && !busy" class="shrink-0" :class="toneText.quiet">{{ request }}</span>
     </button>
     <QueueMenu
       v-if="cards"
@@ -49,6 +53,7 @@
       :disabled="busy"
       @move="(place) => $emit('move', place)"
       @prioritise="(p) => $emit('prioritise', p)"
+      @pause="(ask) => $emit('pause', ask)"
     />
   </div>
 </template>

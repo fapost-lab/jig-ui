@@ -31,8 +31,9 @@ Callers (`board/`, and `http/` for task details and the change stream) depend on
 The port is `ProjectSource` in `server/source/project-source.ts` — the workspace, a project's
 live tasks (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), its specs
 (`specs(id)`), connect,
-disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)` and
-`prioritise(id, taskId, priority, revision)`, which answer `written`, `refused` with Jig's code,
+disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,
+`prioritise(id, taskId, priority, revision)`, `requestPause(id, taskId, revision)` and
+`cancelPause(id, taskId, revision)`, which answer `written`, `refused` with Jig's code,
 or the project's state when it is not `ready`; its local adapter
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
 only the path a person types to connect. A read that fails becomes a state of the project, not an

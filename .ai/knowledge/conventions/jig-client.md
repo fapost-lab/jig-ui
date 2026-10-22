@@ -18,7 +18,7 @@ JigClient (server/jig/)
 MAY:      run `jig` in a project's main checkout; parse and validate its JSON; check the
           project's Jig version
 MUST:     use execFile without a shell — on Windows Git's bash running .ai/scripts/jig, never
-          jig.cmd; validate every response against the shape its contract test pins; turn a
+          jig.cmd, with the arguments in the environment, never on its command line; validate every response against the shape its contract test pins; turn a
           refusal into Jig's failure code
 MUST NOT: read or write Jig's files directly (`state`, roadmaps, the queue file); call the
           network; let a shape of Jig's output leak past its own types
@@ -49,6 +49,13 @@ A write — `moveInQueue`, `setPriority`, `requestPause`, `cancelPause` — name
 `stale-revision`, `not-found`, `usage`, `already-exists` and `failed` come back as `JigRefusal`
 codes. Its success answer carries the revision before
 the write, so the caller reads again; a test pins each command's arguments and a refusal.
+`fileTask` (`jig task new <id> --goal <text>`) takes no revision — Jig has none for it — and its
+tests pin that a person's goal reaches Jig as one argument, unglobbed
+(adr-20261022-filing-a-task-carries-no-revision). On Windows the arguments do not go on Git bash's
+command line, which it parses itself: it globbed a one-word goal `out*` that Node left unquoted,
+and with `MSYS=noglob` it read `\"` as a backslash and a quote (both caught by the Windows CI leg).
+They go in the environment as `JIG_UI_ARG_<n>`, and the fixed script
+`exec "$BASH" "$JIG_UI_ARG_0" …` hands them to Jig unparsed.
 
 ## Rationale
 

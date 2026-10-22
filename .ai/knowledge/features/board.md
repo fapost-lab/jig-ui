@@ -7,6 +7,7 @@ paths:
   - "server/board/**"
   - web/views/BoardView.vue
   - "web/components/Board*.vue"
+  - web/components/NewTaskForm.vue
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
 reviewed_at: 2026-10-22
 ---
@@ -55,6 +56,12 @@ done, or moving.
   page (`web/lib/clock.ts`), once a minute, not with reads: an idle project is not read again.
   A drop on any other column does nothing.
 - A paused card names `jig task resume <id>`; the page does not resume a task.
+- "New task" above the board files a task with an id and a one-line goal (`jig task new <id>
+  --goal <goal>`, `POST /api/projects/:id/tasks`); it shows in Backlog once Jig wrote it. No
+  revision: a new id overwrites nothing (adr-20261022-filing-a-task-carries-no-revision). An id
+  Jig has — a finished task's too, which the board does not show — is refused with a line saying
+  so; the button waits while a request is on its way, so a double click files once. Class,
+  domains and a longer description stay with the terminal or the agent that starts the task.
 - The order of the columns is not the order of the rules: what waits for the person comes first
   (maintainer, task `design-system`, 2026-10-18).
 

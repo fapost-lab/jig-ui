@@ -181,6 +181,11 @@ export interface ProjectSource {
   requestPause(id: string, taskId: string, revision: number): Promise<Written | undefined>;
   /** Takes back the pause asked of a live task, as `move` writes. */
   cancelPause(id: string, taskId: string, revision: number): Promise<Written | undefined>;
+  /**
+   * Files a new task with only its goal, then reads the project again. No revision: it writes nothing that exists, and
+   * a taken id is Jig's `already-exists`. `undefined` when no project has that id.
+   */
+  fileTask(id: string, taskId: string, goal: string): Promise<Written | undefined>;
   /** False when no project has that id. Nothing in the project is touched. */
   disconnect(id: string): Promise<boolean>;
   /**

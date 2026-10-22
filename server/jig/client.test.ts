@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   cancelPause,
+  fileTask,
   jigVersion,
   JigRefusal,
   JigShapeError,
@@ -357,6 +358,29 @@ describe('writing the queue', () => {
       refusal('stale-revision'),
     );
     await expect(setPriority(answering(`case-${cases++}`, 'queue-stale.json', 1), 'beta', 2, 1)).rejects.toEqual(refusal('stale-revision'));
+  });
+});
+
+// task-new*.json are what Jig 0.31.0 printed in a scratch repository.
+describe('filing a task', () => {
+  it("files a task with its goal, a person's text kept as one argument", async () => {
+    const dir = logging(`case-${cases++}`, 'task-new.json');
+    await fileTask(dir, 'zeta', 'File it; "quoted" --json $(x)');
+    expect(args(dir)).toEqual(['task', 'new', 'zeta', '--goal', 'File it; "quoted" --json $(x)', '--json']);
+  });
+
+  // Unquoted by Node on Windows, a one-word goal must reach Jig as typed: Git bash globs and unquotes its command line.
+  it.each(['out*', '*.json', "don't", 'a\\b', '"quoted"'])('keeps the one-word goal %s as it was typed', async (goal) => {
+    const dir = logging(`case-${cases++}`, 'task-new.json');
+    await fileTask(dir, 'zeta', goal);
+    expect(args(dir)).toEqual(['task', 'new', 'zeta', '--goal', goal, '--json']);
+  });
+
+  it.each([
+    ['task-new-exists.json', 'already-exists'],
+    ['task-new-usage.json', 'usage'],
+  ])('carries the refusal in %s as %s', async (json, code) => {
+    await expect(fileTask(answering(`case-${cases++}`, json, 1), 'zeta', 'x')).rejects.toEqual(refusal(code));
   });
 });
 

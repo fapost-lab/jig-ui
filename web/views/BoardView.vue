@@ -1,10 +1,13 @@
 <script setup lang="ts">
-  import { Columns3, Milestone, Rows3 } from '@lucide/vue';
+  import { Columns3, Milestone, Plus, Rows3 } from '@lucide/vue';
   import { computed, onUnmounted, ref, watch } from 'vue';
   import { type Board, call, client, describe, onChange, type Place, readTask, type ReadyDetails, type Specs, type Written } from '@/api';
   import BoardColumns from '@/components/BoardColumns.vue';
   import BoardList from '@/components/BoardList.vue';
+  import NewTaskForm from '@/components/NewTaskForm.vue';
   import SpecCard from '@/components/SpecCard.vue';
+  import { Button } from '@/components/ui/button';
+  import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { lastWins } from '@/lib/last-wins';
   import { toneText } from '@/lib/tones';
@@ -119,6 +122,36 @@
           client.api.projects[':id'].queue.pause.cancel.$post({ param, json: { task, revision } }),
         );
 
+  /** The new-task form: open, its request on its way, and why the last one was refused. */
+  const filing = ref(false);
+  const filingBusy = ref(false);
+  const filingRefusal = ref<{
+    code: string;
+    text: string;
+  }>();
+
+  /** Files a task — no revision: it writes nothing that exists — then reads the board, where it shows in Backlog. */
+  async function file(task: string, goal: string): Promise<void> {
+    if (filingBusy.value) return;
+    filingBusy.value = true;
+    filingRefusal.value = undefined;
+    const res = await call(() => client.api.projects[':id'].tasks.$post({ param, json: { task, goal } }));
+    if (res?.status === 200) filing.value = false;
+    else if (res) {
+      const { code } = (await res.json()).error;
+      const text =
+        code === 'already-exists'
+          ? `The project has a task called ${task} already, maybe a finished one. Choose another id.`
+          : code === 'usage'
+            ? 'Jig does not take this id or goal: one line of goal, not starting with #.'
+            : `Jig refused to file ${task} (${code}).`;
+
+      filingRefusal.value = { code, text };
+    }
+    filingBusy.value = false;
+    await load();
+  }
+
   const prioritise = (task: string, priority: number | null) =>
     write(task, 'setting the priority of', (revision) =>
       client.api.projects[':id'].queue.priority.$post({ param, json: { task, priority, revision } }),
@@ -136,26 +169,34 @@
 
 <template>
   <div class="flex h-full flex-col">
-    <div class="flex shrink-0 items-center gap-3 border-b px-3 py-1.5">
-      <h1 class="font-semibold">{{ id }}</h1>
-      <span v-if="typeof board === 'object' && board.state === 'ready' && board.finished > 0" class="text-muted-foreground">
-        {{ board.finished }} finished {{ board.finished === 1 ? 'task is' : 'tasks are' }} not shown
-      </span>
-      <ToggleGroup
-        v-if="typeof board === 'object' && board.state === 'ready'"
-        type="single"
-        variant="outline"
-        size="sm"
-        class="ml-auto"
-        aria-label="View"
-        :model-value="view"
-        @update:model-value="show"
-      >
-        <ToggleGroupItem value="board"><Columns3 />Board</ToggleGroupItem>
-        <ToggleGroupItem value="list"><Rows3 />List</ToggleGroupItem>
-        <ToggleGroupItem value="specs"><Milestone />Specs</ToggleGroupItem>
-      </ToggleGroup>
-    </div>
+    <Collapsible v-model:open="filing" class="shrink-0" @update:open="filingRefusal = undefined">
+      <div class="flex shrink-0 items-center gap-3 border-b px-3 py-1.5">
+        <h1 class="font-semibold">{{ id }}</h1>
+        <span v-if="typeof board === 'object' && board.state === 'ready' && board.finished > 0" class="text-muted-foreground">
+          {{ board.finished }} finished {{ board.finished === 1 ? 'task is' : 'tasks are' }} not shown
+        </span>
+        <ToggleGroup
+          v-if="typeof board === 'object' && board.state === 'ready'"
+          type="single"
+          variant="outline"
+          size="sm"
+          class="ml-auto"
+          aria-label="View"
+          :model-value="view"
+          @update:model-value="show"
+        >
+          <ToggleGroupItem value="board"><Columns3 />Board</ToggleGroupItem>
+          <ToggleGroupItem value="list"><Rows3 />List</ToggleGroupItem>
+          <ToggleGroupItem value="specs"><Milestone />Specs</ToggleGroupItem>
+        </ToggleGroup>
+        <CollapsibleTrigger v-if="typeof board === 'object' && board.state === 'ready'" as-child>
+          <Button variant="outline" size="sm"><Plus />New task</Button>
+        </CollapsibleTrigger>
+      </div>
+      <CollapsibleContent class="border-b px-3 py-2">
+        <NewTaskForm :busy="filingBusy" :refusal="filingRefusal?.text" :taken="filingRefusal?.code === 'already-exists'" @file="file" />
+      </CollapsibleContent>
+    </Collapsible>
 
     <p v-if="notice" role="status" class="flex shrink-0 items-center gap-2 border-b px-3 py-1.5" :class="toneText.attention">
       {{ notice }}

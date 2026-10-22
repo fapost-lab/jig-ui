@@ -65,6 +65,12 @@ function place(v: unknown): Place | undefined {
 /** A priority as the page sends it: 0 to 5, or `null` for none. */
 const isPriority = (v: unknown): v is number | null => v === null || (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 5);
 
+/** A new task's id as Jig takes one (`jig_valid_id`): never empty, never led by `.` or `-`, so never a flag. */
+const isNewId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(v);
+
+/** A goal as `jig task new --goal` takes one: a line of text, at most 500 characters; Jig refuses the rest as `usage`. */
+const isGoal = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '' && v.length <= 500 && !/[\r\n]/.test(v);
+
 /** The body of a write that names only a task: the task and the revision it was read at, `undefined` where invalid. */
 function taskAt(body: unknown) {
   const [task, revision] = [field(body, 'task'), field(body, 'revision')];
@@ -167,6 +173,31 @@ function apiRoutes(source: ProjectSource, version: string) {
         if (task === undefined || revision === undefined) return refuse(c, 422, 'usage', 'Give a task and the revision it was read at.');
         return written(c, await source.cancelPause(c.req.param('id'), task, revision));
       })
+
+      // A new task carries no revision: it writes nothing that exists (adr-20261022-filing-a-task-carries-no-revision).
+      .post(
+        '/api/projects/:id/tasks',
+        validator('json', (body: unknown) => {
+          const [task, goal] = [field(body, 'task'), field(body, 'goal')];
+          return { task: isNewId(task) ? task : undefined, goal: isGoal(goal) ? goal : undefined };
+        }),
+        async (c) => {
+          const { task, goal } = c.req.valid('json');
+          if (task === undefined || goal === undefined) {
+            return refuse(
+              c,
+              422,
+              'usage',
+              'Give an id of letters, digits, ".", "_" or "-", not led by "." or "-", and a goal of one line.',
+            );
+          }
+          const w = await source.fileTask(c.req.param('id'), task, goal);
+          if (w?.state === 'refused' && w.code === 'already-exists') {
+            return refuse(c, 409, w.code, 'The project has a task with this id, maybe a finished one.');
+          }
+          return written(c, w);
+        },
+      )
 
       .post(
         '/api/projects',

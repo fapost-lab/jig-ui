@@ -8,6 +8,7 @@
   import BoardList from '@/components/BoardList.vue';
   import ColumnHeader from '@/components/ColumnHeader.vue';
   import ConnectForm from '@/components/ConnectForm.vue';
+  import NewTaskForm from '@/components/NewTaskForm.vue';
   import CopyCommand from '@/components/CopyCommand.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProgressBar from '@/components/ProgressBar.vue';
@@ -132,6 +133,18 @@
       note="ready with attention and stale housekeeping; nothing needs you; each state it cannot be read in"
     >
       <ProjectCard v-for="project in projects" :key="project.id" :project="project" />
+    </CanvasSection>
+
+    <CanvasSection title="NewTaskForm" note="empty, on its way, the id taken">
+      <NewTaskForm :busy="false" />
+      <NewTaskForm :busy="true" task="fix-login" goal="Log in with the token after a restart." />
+      <NewTaskForm
+        :busy="false"
+        task="queue-reorder"
+        goal="Order the work."
+        refusal="The project has a task called queue-reorder already, maybe a finished one. Choose another id."
+        taken
+      />
     </CanvasSection>
 
     <CanvasSection title="ConnectForm" note="idle, busy, refused">

@@ -490,6 +490,62 @@ describe('/api/projects/:id/queue', () => {
   });
 });
 
+describe('/api/projects/:id/tasks', () => {
+  const app = createApp({ port: PORT, token: TOKEN, source: localSource(join(webRoot, 'filing-config')), webRoot });
+  const post = (target: Hono, body: unknown, headers: Record<string, string> = { cookie: COOKIE }) =>
+    target.request('/api/projects/filing/tasks', {
+      method: 'POST',
+      headers: { host: HOST, 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+
+  it("files a task through the project's Jig", async () => {
+    await app.request('/api/projects', {
+      method: 'POST',
+      headers: { host: HOST, 'content-type': 'application/json', cookie: COOKIE },
+      body: JSON.stringify({ path: project('filing', '0.31.0') }),
+    });
+    const res = await post(app, { task: 'fix-login', goal: 'Log in; "again" --json' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ written: true });
+  });
+
+  it.each([
+    [{ goal: 'g' }],
+    [{ task: '', goal: 'g' }],
+    [{ task: '-x', goal: 'g' }],
+    [{ task: '--json', goal: 'g' }],
+    [{ task: '.hidden', goal: 'g' }],
+    [{ task: 'a b', goal: 'g' }],
+    [{ task: '../a', goal: 'g' }],
+    [{ task: 'a', goal: '' }],
+    [{ task: 'a', goal: '   ' }],
+    [{ task: 'a', goal: 'two\nlines' }],
+    [{ task: 'a', goal: 'x'.repeat(501) }],
+    [{ task: 'a' }],
+  ])('refuses %o as usage without running Jig', async (body) => {
+    const res = await post(app, body);
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('usage');
+  });
+
+  it.each([
+    ['a taken id', { state: 'refused', code: 'already-exists' }, 409, 'already-exists'],
+    ['a goal Jig does not take', { state: 'refused', code: 'usage' }, 422, 'usage'],
+    ['a project not connected', undefined, 404, 'not-connected'],
+  ] as const)('answers %s', async (_, outcome, status, code) => {
+    const source: ProjectSource = { ...localSource(join(webRoot, 'fake-filing')), fileTask: () => Promise.resolve(outcome) };
+    const res = await post(createApp({ port: PORT, token: TOKEN, source, webRoot }), { task: 'a', goal: 'g' });
+    expect(res.status).toBe(status);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);
+  });
+
+  it('is refused without the token and from another origin', async () => {
+    expect((await post(app, { task: 'a', goal: 'g' }, {})).status).toBe(401);
+    expect((await post(app, { task: 'a', goal: 'g' }, { cookie: COOKIE, origin: 'https://evil.example' })).status).toBe(403);
+  });
+});
+
 async function until(done: () => boolean, ms = 2_000): Promise<void> {
   for (let waited = 0; !done() && waited < ms; waited += 10) await new Promise((r) => setTimeout(r, 10));
 }

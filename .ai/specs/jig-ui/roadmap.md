@@ -42,7 +42,7 @@ Goal: the page changes things, only through Jig. Done when a drag, a priority ch
 task all land through Jig commands, and a concurrent change by an agent shows as a conflict
 instead of being overwritten.
 
-- [ ] reorder and prioritise by drag (after: project board; Jig queue — writes go through Jig's queue command with the revision: `jig queue move` and `jig queue set --priority` with `--revision <n> --json`, read with `jig queue list --json`)
+- [ ] `queue-reorder` — reorder and prioritise by drag (after: project board; Jig queue — writes go through Jig's queue command with the revision: `jig queue move` and `jig queue set --priority` with `--revision <n> --json`, read with `jig queue list --json`)
 - [ ] pause and resume as a request — a drop on the paused column writes a sticky request through Jig; the card shows "requested" with its age and a cancel until Jig's state changes; a drop out of it resumes directly (after: project board; Jig legal actions and requests — they say when a pause is offered: `jig queue request|cancel task:<id> pause`, the task's `pause_request` and the `request-pause` / `cancel-pause-request` / `resume` actions in `jig task list --json`)
 - [ ] file a minimal backlog task from the page (after: project board — through `jig task new <id> --goal <text> --json`, refused as `already-exists` when the id is taken)
 - [ ] conflict display (after: reorder and prioritise by drag — the refusal of a stale revision is what it shows: `error.code` `stale-revision`)

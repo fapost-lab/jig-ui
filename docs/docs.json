@@ -10,6 +10,10 @@
       {
         "group": "Get started",
         "pages": ["index", "requirements", "installation", "projects"]
+      },
+      {
+        "group": "Releases",
+        "pages": ["changelog"]
       }
     ]
   }

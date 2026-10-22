@@ -45,5 +45,10 @@ are added as sections of this file.
   comment; Dependabot proposes updates. (spec `jig-ui`, Phase 0. Checked in review.)
 - Code passes `npm run lint` — ESLint for correctness and the layout Prettier leaves open, Prettier for the rest of the layout
   (convention-code-style. Checked by CI and a full `jig verify`.)
-- Work that changes what a user sees or does updates the pages in `docs/` it affects.
-  (spec `jig-ui`, roadmap. Checked in review.)
+- Work that changes what a user sees or does updates the pages in `docs/` it affects and adds a
+  line under **Unreleased** in `docs/changelog.mdx`. (spec `jig-ui`, roadmap. Checked in review.)
+- A release is not cut until `docs/` describes what its tag ships: the version pull request turns
+  **Unreleased** into the version and date and reads every page against the release, as
+  `RELEASING.md` lists. `docs/` is the public documentation, and a user reads it before trying
+  what a release says it does. (The maintainer, 2026-10-22. Checked in review of the version pull
+  request.)

@@ -1,0 +1,28 @@
+---
+title: "Changelog"
+description: "What each release of Jig UI changed."
+---
+
+Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is on the
+[development channel](/installation#development-channel) and comes with the next release.
+
+## Unreleased
+
+- A board opens faster: each project is read once when the page opens, not twice.
+- An error Jig UI did not foresee is reported on the page as an internal error.
+- A `projects.json`, `instance.json` or an answer from another running Jig UI that is not what it
+  should be is refused rather than shown as it is.
+- Every answer of the server carries security headers.
+
+## 0.1.0 — 2026-10-18
+
+The first release.
+
+- `npx @fapost/jig-ui` starts Jig UI on `127.0.0.1:4870` and opens it in the browser; run in a Jig
+  project's folder, it connects that project. A second run opens the running one.
+- [Connect and disconnect projects](/projects); the list is kept in your config directory.
+- Every connected project's tasks on one page, and each project's board, in columns or as a list.
+- Specs with their phases and roadmap progress.
+- A task's details open from its card.
+- The page follows connected projects as they change, without a reload.
+- `--port` and `--no-open`.

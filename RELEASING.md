@@ -16,8 +16,15 @@ publishing (OIDC). There is no npm token in the repository secrets.
 
 1. Open a pull request that sets `version` in `package.json` (and `package-lock.json`, with
    `npm version <x.y.z> --no-git-tag-version`) to the release version.
-2. Merge it.
-3. Tag the merge commit and push the tag:
+2. In the same pull request, bring the public documentation in `docs/` up to what the tag ships.
+   A release is not cut while the docs describe something else:
+   - in `docs/changelog.mdx`, turn **Unreleased** into `## <x.y.z> — <date>` and leave an empty
+     **Unreleased** above it; every user-visible change since the last release has a line there;
+   - read each page against the release: the minimum Jig and Node.js in `docs/requirements.mdx`,
+     options and commands in `docs/installation.mdx`, and any note or warning that says something
+     is not there yet.
+3. Merge it.
+4. Tag the merge commit and push the tag:
 
    ```bash
    git checkout main && git pull

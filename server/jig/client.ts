@@ -409,3 +409,12 @@ export async function cancelPause(
 ): Promise<void> {
   await readJson(root, ['queue', 'cancel', `task:${task}`, 'pause', '--revision', String(revision)], platform);
 }
+
+/**
+ * Files a task with only its goal (`jig task new <id> --goal <text>`); refused as `already-exists` when the id is
+ * taken — by a finished task too — and `usage` for an id or goal Jig does not take. No revision: it writes nothing
+ * that exists (adr-20261022-filing-a-task-carries-no-revision).
+ */
+export async function fileTask(root: string, id: string, goal: string, platform: NodeJS.Platform = process.platform): Promise<void> {
+  await readJson(root, ['task', 'new', id, '--goal', goal], platform);
+}

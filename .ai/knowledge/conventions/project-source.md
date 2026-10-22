@@ -32,8 +32,8 @@ The port is `ProjectSource` in `server/source/project-source.ts` — the workspa
 live tasks (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), its specs
 (`specs(id)`), connect,
 disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,
-`prioritise(id, taskId, priority, revision)`, `requestPause(id, taskId, revision)` and
-`cancelPause(id, taskId, revision)`, which answer `written`, `refused` with Jig's code,
+`prioritise(id, taskId, priority, revision)`, `requestPause(id, taskId, revision)`,
+`cancelPause(id, taskId, revision)` and `fileTask(id, taskId, goal)`, which answer `written`, `refused` with Jig's code,
 or the project's state when it is not `ready`; its local adapter
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
 only the path a person types to connect. A read that fails becomes a state of the project, not an
@@ -57,7 +57,9 @@ finished after the last listener left (task `specs-and-epics`: the next listener
 A write runs Jig only when the task, and a move's anchor, are live in the last read the adapter
 showed — anything else is `refused: not-found` without Jig — and answers after the project is
 read again (adr-20261022-writes-carry-the-revision-of-their-read). A board's `revision` is the
-lowest of its reads' revisions (status, task list, queue).
+lowest of its reads' revisions (status, task list, queue). `fileTask` is the exception: its id is
+new, so it names no live task and carries no revision; `http/` checks the id and the goal against
+Jig's grammar before the port sees them (adr-20261022-filing-a-task-carries-no-revision).
 
 ## Example
 

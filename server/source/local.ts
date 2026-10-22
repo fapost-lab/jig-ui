@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import {
   cancelPause,
+  fileTask,
   JigRefusal,
   JigShapeError,
   jigVersion,
@@ -324,7 +325,8 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
 
   /**
    * Runs a write in a project once every task it names is live in what the project shows — so nothing but an id
-   * Jig itself listed reaches Jig's arguments — then reads the project again, refused or not: the page reads next.
+   * Jig itself listed reaches Jig's arguments; a new task's id names none, and the HTTP boundary checks it against
+   * Jig's grammar instead — then reads the project again, refused or not: the page reads next.
    */
   async function writing(id: string, taskIds: string[], write: (root: string) => Promise<void>): Promise<Written | undefined> {
     const project = (await readProjects(configDir)).find((p) => p.id === id);
@@ -386,6 +388,10 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     },
     cancelPause(id, taskId, revision) {
       return writing(id, [taskId], (root) => cancelPause(root, taskId, revision));
+    },
+    fileTask(id, taskId, goal) {
+      // A new id names no live task: Jig itself refuses a taken one.
+      return writing(id, [], (root) => fileTask(root, taskId, goal));
     },
     async disconnect(id) {
       if (!(await removeProject(configDir, id))) return false;

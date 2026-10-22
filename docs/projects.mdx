@@ -85,6 +85,16 @@ has one, and what it waits for. Finished tasks are only counted above the board.
 groups of one-line rows, each group folding away; **Specs** shows the project's specs
 ([Specs](#specs)). The browser remembers the choice.
 
+## Filing a task
+
+**New task** above the board opens a form: an id and a goal of one line. **File it** runs
+`jig task new <id> --goal <goal>` in the project, and the task appears in **Backlog** once Jig
+has written it. An id is letters, digits, `.`, `_` and `-`, not starting with `.` or `-`. An id the
+project already has is refused — a finished task's too, though the board does not show it.
+
+The rest of a task — its class, domains, a longer description — is set in the terminal, or by
+the agent that starts it.
+
 ## Ordering the work
 
 Inside a column the tasks stand in the order of the project's queue in Jig (`jig queue`): the

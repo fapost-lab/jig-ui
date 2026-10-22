@@ -1,0 +1,1 @@
+{"schema":1,"revision":1792656416,"generated_at":"2026-10-22T10:54:21Z","error":{"code":"usage","message":"task new: --goal cannot start with #: it would read as a heading"}}

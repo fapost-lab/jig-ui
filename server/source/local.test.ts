@@ -88,7 +88,7 @@ case "$*" in
   "task list --json") cat tasks.json ;;
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
-  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*) cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*) cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
 esac
 `,
   );
@@ -316,7 +316,7 @@ describe('localSource', () => {
 describe('localSource, writing the queue', () => {
   const source = localSource(join(root, 'write-config'));
   const tasks = { tasks: [task('a', 'active'), task('b', 'active', false, { branch: null })], hidden: 0, housekeeping: null };
-  const writes = (dir: string) => calls(dir).filter((c) => /^queue (move|set|request|cancel) /.test(c));
+  const writes = (dir: string) => calls(dir).filter((c) => /^(queue (move|set|request|cancel)|task new) /.test(c));
   /** The calls since `from`: what Jig ran for one write. */
   const since = (dir: string, from: number) => calls(dir).slice(from);
 
@@ -343,6 +343,18 @@ describe('localSource, writing the queue', () => {
       'queue set task:a --priority 0 --revision 7 --json',
       'queue set task:a --priority none --revision 7 --json',
     ]);
+  });
+
+  it('files a task by an id no live task has, then reads the project again', async () => {
+    const dir = project('filer', '0.31.0', { tasks });
+    await source.connect(dir);
+    const from = calls(dir).length;
+    expect(await source.fileTask('filer', 'zeta', 'Do the thing')).toEqual({ state: 'written' });
+    const ran = since(dir, from);
+    const filed = ran.indexOf('task new zeta --goal Do the thing --json');
+    expect(filed).toBeGreaterThanOrEqual(0);
+    expect(ran.slice(filed + 1)).toEqual(expect.arrayContaining(['task list --json']));
+    expect(await source.fileTask('nobody', 'zeta', 'x')).toBeUndefined();
   });
 
   it('asks a pause and takes it back', async () => {

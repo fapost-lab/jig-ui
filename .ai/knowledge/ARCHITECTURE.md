@@ -83,7 +83,9 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   runs the matching Jig command for live task ids only and answers after reading the project
   again; Jig's `stale-revision` comes back as 409, the page says so in one line and reads the
   board again (adr-20261022-writes-carry-the-revision-of-their-read). Built for the queue: order,
-  priority and pause requests. A full conflict display is still to build.
+  priority and pause requests. Filing a task is the one write with no revision: it names a new
+  id, which Jig claims or refuses `already-exists` (adr-20261022-filing-a-task-carries-no-revision).
+  A full conflict display is still to build.
 - **Release flow.** A merge to `main` runs the CI matrix, builds `dist/` in a job without
   credentials, and publishes `<version>-next.<run>` under npm's `next` tag; a `v*` tag on a
   commit of `main` publishes `latest`. Details in `RELEASING.md`.

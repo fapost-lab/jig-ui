@@ -22,7 +22,9 @@ type Queue = Api['projects'][':id']['queue'];
 /** Where a move puts a task, as the move route takes it. */
 export type Place = NonNullable<InferRequestType<Queue['move']['$post']>['json']['place']>;
 /** The answer to a write of the queue. */
-export type Written = Awaited<ReturnType<Queue['move']['$post'] | Queue['priority']['$post']>>;
+export type Written = Awaited<
+  ReturnType<Queue['move']['$post'] | Queue['priority']['$post'] | Queue['pause']['$post'] | Queue['pause']['cancel']['$post']>
+>;
 
 /** Why the page cannot show anything: the session or the server ended, the registry cannot be read, or the server failed. */
 export const failure = ref<

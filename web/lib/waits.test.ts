@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Task } from '../api';
-import { waits } from './waits';
+import { requested, waits } from './waits';
 
 const task = (more: Partial<Task> = {}): Task => ({
   id: 't',
@@ -8,6 +8,8 @@ const task = (more: Partial<Task> = {}): Task => ({
   status: 'active',
   goal: null,
   paused: false,
+  pauseRequest: null,
+  pauseRequestable: true,
   started: true,
   gate: null,
   autopilot: null,
@@ -31,7 +33,11 @@ describe('waits', () => {
       { paused: true, autopilot: 'stopped' },
       { text: 'Autopilot stopped with a question', tone: 'attention' },
     ],
-    ['a paused task with a pull request', { paused: true, pullRequest: pr('open', 'green') }, undefined],
+    [
+      'a paused task with a pull request',
+      { paused: true, pullRequest: pr('open', 'green') },
+      { text: 'Paused — jig task resume t', tone: 'quiet' },
+    ],
     [
       'a pull request with CI green',
       { pullRequest: pr('open', 'green') },
@@ -71,5 +77,17 @@ describe('waits', () => {
     ['a running autopilot', { autopilot: 'on' }, { text: 'On autopilot', tone: 'quiet' }],
   ])('%s', (_, more, expected) => {
     expect(waits(task(more))).toEqual(expected);
+  });
+});
+
+describe('requested', () => {
+  const now = Date.parse('2026-10-22T12:00:00Z');
+  it('says nothing without a pause asked', () => {
+    expect(requested(task(), now)).toBeUndefined();
+  });
+  it('says how long ago a pause was asked, whatever else the card says', () => {
+    const asked = { pauseRequest: { requestedAt: '2026-10-22T11:48:00Z' } };
+    expect(requested(task({ ...asked, gate: 'waiting' }), now)).toBe('Pause requested 12 min ago');
+    expect(requested(task({ ...asked, gate: 'waiting' }), now + 60 * 60_000)).toBe('Pause requested 1 h ago');
   });
 });

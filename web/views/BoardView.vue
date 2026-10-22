@@ -112,6 +112,13 @@
   const move = (task: string, place: Place) =>
     write(task, 'moving', (revision) => client.api.projects[':id'].queue.move.$post({ param, json: { task, place, revision } }));
 
+  const pause = (task: string, ask: boolean) =>
+    ask
+      ? write(task, 'asking to pause', (revision) => client.api.projects[':id'].queue.pause.$post({ param, json: { task, revision } }))
+      : write(task, 'taking back the pause request of', (revision) =>
+          client.api.projects[':id'].queue.pause.cancel.$post({ param, json: { task, revision } }),
+        );
+
   const prioritise = (task: string, priority: number | null) =>
     write(task, 'setting the priority of', (revision) =>
       client.api.projects[':id'].queue.priority.$post({ param, json: { task, priority, revision } }),
@@ -169,6 +176,7 @@
       @toggle="(task) => (selected = selected === task ? undefined : task)"
       @move="move"
       @prioritise="prioritise"
+      @pause="pause"
     />
 
     <div v-else-if="view === 'specs'" class="min-h-0 flex-1 overflow-y-auto">
@@ -193,6 +201,7 @@
       @select="(task) => (selected = task)"
       @move="move"
       @prioritise="prioritise"
+      @pause="pause"
     />
   </div>
 </template>

@@ -5,7 +5,8 @@
   import { Badge } from '@/components/ui/badge';
   import { Card } from '@/components/ui/card';
   import { toneRule } from '@/lib/tones';
-  import { waits } from '@/lib/waits';
+  import { minute } from '@/lib/clock';
+  import { requested, waits } from '@/lib/waits';
   import QueueMenu from './QueueMenu.vue';
   import TaskBrief from './TaskBrief.vue';
 
@@ -16,7 +17,7 @@
     details?: ReadyDetails | 'unavailable';
     /** The task's column, for its queue menu; without it the card has none. */
     cards?: Task[];
-    /** A change of its place or priority is on its way to Jig. */
+    /** A change of its place, priority or pause is on its way to Jig. */
     busy?: boolean;
   }>();
 
@@ -24,9 +25,11 @@
     toggle: [];
     move: [place: Place];
     prioritise: [priority: number | null];
+    pause: [ask: boolean];
   }>();
 
   const note = computed(() => waits(props.task));
+  const request = computed(() => requested(props.task, minute.value.getTime()));
 </script>
 
 <template>
@@ -49,9 +52,10 @@
         :disabled="busy"
         @move="(place) => $emit('move', place)"
         @prioritise="(p) => $emit('prioritise', p)"
+        @pause="(ask) => $emit('pause', ask)"
       />
     </div>
-    <p v-if="busy" class="text-muted-foreground" role="status">moving…</p>
+    <p v-if="busy" class="text-muted-foreground" role="status">sending to Jig…</p>
     <p v-if="note" :class="toneRule[note.tone]">
       {{ note.text }}
       <a
@@ -63,6 +67,17 @@
       >
         open<ExternalLink class="size-3" />
       </a>
+    </p>
+    <p v-if="request && !busy" :class="toneRule.quiet">
+      {{ request }}
+      <button
+        type="button"
+        class="underline underline-offset-2"
+        :aria-label="`Cancel the pause request of ${task.id}`"
+        @click="$emit('pause', false)"
+      >
+        cancel
+      </button>
     </p>
     <TaskBrief v-if="open" :project="project" :task="task.id" :details="details" class="mt-1 border-t pt-2" />
   </Card>

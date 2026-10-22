@@ -44,9 +44,10 @@ A task-list read runs Jig's JSON task listing, checks the envelope, then `data` 
 project shows as `incompatible` ("update Jig UI"), never half-parsed. Each read has a contract
 test over a fixture in `server/jig/fixtures/`.
 
-A write — `moveInQueue`, `setPriority` — names a task as `task:<id>`, passes `--revision <n>` and
-`--json`, and goes through the same envelope check: `stale-revision`, `not-found`, `usage` and
-`already-exists` come back as `JigRefusal` codes. Its success answer carries the revision before
+A write — `moveInQueue`, `setPriority`, `requestPause`, `cancelPause` — names a task as
+`task:<id>`, passes `--revision <n>` and `--json`, and goes through the same envelope check:
+`stale-revision`, `not-found`, `usage`, `already-exists` and `failed` come back as `JigRefusal`
+codes. Its success answer carries the revision before
 the write, so the caller reads again; a test pins each command's arguments and a refusal.
 
 ## Rationale

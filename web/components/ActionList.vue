@@ -13,6 +13,8 @@
     start: 'Start it',
     pause: 'Pause it',
     resume: 'Resume it',
+    'request-pause': 'Ask it to pause',
+    'cancel-pause-request': 'Take back the pause request',
     'approve-gate': 'Approve the design',
     'answer-stop': "Answer the autopilot's question",
     'set-class': 'Change its class',

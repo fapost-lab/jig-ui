@@ -8,6 +8,8 @@ const task = (more: Partial<Task> = {}): Task => ({
   status: 'active',
   goal: null,
   paused: false,
+  pauseRequest: null,
+  pauseRequestable: true,
   started: true,
   gate: null,
   autopilot: null,

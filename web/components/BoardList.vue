@@ -25,9 +25,14 @@
     select: [task: string];
     move: [task: string, place: Place];
     prioritise: [task: string, priority: number | null];
+    pause: [task: string, ask: boolean];
   }>();
 
-  const drag = useDrop((task, place) => emit('move', task, place));
+  const drag = useDrop(
+    (task, place) => emit('move', task, place),
+    (task) => emit('pause', task, true),
+  );
+
   const { gap } = drag;
 
   const picked = computed(() => props.columns.flatMap((c) => c.cards).find((t) => t.id === props.selected));
@@ -47,7 +52,10 @@
         v-for="column in columns"
         :key="column.id"
         :open="!folded.has(column.id)"
+        :class="gap?.list === column.id && gap.index < 0 && 'bg-muted'"
         @update:open="(open: boolean) => fold(column.id, open)"
+        @dragover="(e: DragEvent) => drag.over(e, column.id, column.cards)"
+        @drop.prevent="drag.drop(column.id)"
       >
         <h2>
           <CollapsibleTrigger class="flex w-full items-center gap-2 border-b bg-muted/50 px-3 py-1.5">
@@ -56,18 +64,14 @@
             <ColumnHeader :id="column.id" :title="column.title" :count="column.cards.length" />
           </CollapsibleTrigger>
         </h2>
-        <CollapsibleContent
-          class="relative"
-          @dragover="(e: DragEvent) => drag.over(e, column.id, column.cards)"
-          @drop.prevent="drag.drop(column.id)"
-        >
+        <CollapsibleContent class="relative">
           <div
             v-for="(task, i) in column.cards"
             :key="task.id"
             data-card
             :draggable="pending === undefined"
             class="relative"
-            @dragstart="(e) => drag.start(e, column.id, task.id)"
+            @dragstart="(e) => drag.start(e, column.id, task)"
             @dragend="drag.end()"
           >
             <span v-if="gap?.list === column.id && gap.index === i" class="absolute inset-x-0 top-0 h-0.5 bg-primary" aria-hidden="true" />
@@ -79,6 +83,7 @@
               @select="$emit('select', task.id)"
               @move="(place) => $emit('move', task.id, place)"
               @prioritise="(p) => $emit('prioritise', task.id, p)"
+              @pause="(ask) => $emit('pause', task.id, ask)"
             />
             <span
               v-if="gap?.list === column.id && gap.index === column.cards.length && i === column.cards.length - 1"

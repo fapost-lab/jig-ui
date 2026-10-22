@@ -21,6 +21,7 @@ const task = (id: string, status: string, paused = false, more: Record<string, u
   goal: `Goal of ${id}`,
   knowledge_consolidated: false,
   paused,
+  pause_request: null,
   created_at: '2026-10-17',
   updated_at: '2026-10-17',
   branch: `task/${id}`,
@@ -55,7 +56,7 @@ function project(
     tasks?: unknown;
     specs?: unknown;
     queue?: unknown;
-    /** What `queue move` and `queue set` print: an envelope's `data`, or a refusal's code. */
+    /** What `queue move`, `set`, `request` and `cancel` print: an envelope's `data`, or a refusal's code. */
     write?: unknown;
   } = {},
 ): string {
@@ -87,7 +88,7 @@ case "$*" in
   "task list --json") cat tasks.json ;;
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
-  "queue move "*|"queue set "*) cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*) cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
 esac
 `,
   );
@@ -109,8 +110,11 @@ describe('localSource', () => {
     },
     tasks: {
       tasks: [
-        task('a', 'active'),
+        task('a', 'active', false, {
+          actions: [{ id: 'request-pause', command: 'jig queue request task:a pause', offered: true, reason: null }],
+        }),
         task('b', 'active', false, {
+          pause_request: { requested_at: '2026-10-22T09:01:58Z', reason: 'lunch' },
           worktree: { path: '/secret/tree-of-b', uncommitted: 3 },
           actions: [
             { id: 'pause', command: 'jig task pause b', offered: true, reason: null },
@@ -248,6 +252,8 @@ describe('localSource', () => {
           status: 'active',
           goal: 'Goal of a',
           paused: false,
+          pauseRequest: null,
+          pauseRequestable: true,
           started: true,
           gate: null,
           autopilot: null,
@@ -255,7 +261,13 @@ describe('localSource', () => {
           priority: null,
           queue: null,
         },
-        expect.objectContaining({ id: 'b', priority: 2, queue: { level: null, position: 200 } }),
+        expect.objectContaining({
+          id: 'b',
+          pauseRequest: { requestedAt: '2026-10-22T09:01:58Z' },
+          pauseRequestable: false,
+          priority: 2,
+          queue: { level: null, position: 200 },
+        }),
         expect.objectContaining({ id: 'c', paused: true }),
         expect.objectContaining({ id: 'd', status: 'ready' }),
       ],
@@ -287,7 +299,9 @@ describe('localSource', () => {
       }),
     });
     expect(JSON.stringify(read)).not.toContain('/secret/');
-    expect(await source.task('busy', 'a')).toMatchObject({ task: { id: 'a', attention: [], actions: [] } });
+    expect(await source.task('busy', 'a')).toMatchObject({
+      task: { id: 'a', attention: [], actions: [{ id: 'request-pause', command: 'jig queue request task:a pause' }] },
+    });
     expect(await source.task('busy', 'gone-task')).toEqual({ state: 'ready', task: null });
     expect(await source.task('old', 'a')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' });
     expect(await source.task('nobody', 'a')).toBeUndefined();
@@ -302,7 +316,7 @@ describe('localSource', () => {
 describe('localSource, writing the queue', () => {
   const source = localSource(join(root, 'write-config'));
   const tasks = { tasks: [task('a', 'active'), task('b', 'active', false, { branch: null })], hidden: 0, housekeeping: null };
-  const writes = (dir: string) => calls(dir).filter((c) => c.startsWith('queue move') || c.startsWith('queue set'));
+  const writes = (dir: string) => calls(dir).filter((c) => /^queue (move|set|request|cancel) /.test(c));
   /** The calls since `from`: what Jig ran for one write. */
   const since = (dir: string, from: number) => calls(dir).slice(from);
 
@@ -329,6 +343,15 @@ describe('localSource, writing the queue', () => {
       'queue set task:a --priority 0 --revision 7 --json',
       'queue set task:a --priority none --revision 7 --json',
     ]);
+  });
+
+  it('asks a pause and takes it back', async () => {
+    const dir = project('pauser', '0.31.0', { tasks });
+    await source.connect(dir);
+    expect(await source.requestPause('pauser', 'a', 7)).toEqual({ state: 'written' });
+    expect(await source.cancelPause('pauser', 'a', 7)).toEqual({ state: 'written' });
+    expect(await source.requestPause('pauser', 'gone', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(writes(dir)).toEqual(['queue request task:a pause --revision 7 --json', 'queue cancel task:a pause --revision 7 --json']);
   });
 
   it.each([

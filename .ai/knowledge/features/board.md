@@ -44,10 +44,17 @@ done, or moving.
   empty, so a first drag queues one card only.
 - A person changes the order by dragging a card within its column, or with the card's "⋯" menu
   (To top, Up, Down, To bottom, priority P0–P5 or none). A drop is offered only where one
-  `jig queue move` puts it; a drop on another column does nothing yet
-  (adr-20261022-native-drag-and-drop-with-a-card-menu). The card stays where Jig says, marked
-  "moving…", until the board is read again; a stale write is said in one line above the board
-  (adr-20261022-writes-carry-the-revision-of-their-read).
+  `jig queue move` puts it (adr-20261022-native-drag-and-drop-with-a-card-menu). The card stays
+  where Jig says, marked "sending to Jig…", until the board is read again; a stale write is said
+  in one line above the board (adr-20261022-writes-carry-the-revision-of-their-read).
+- A drop on Paused, or "Request pause" in the menu, asks Jig to pause the task at its next stage
+  boundary (`jig queue request … pause`); it is offered only where Jig offers the `request-pause`
+  action. The card stays in its column with "Pause requested <age>" and a cancel
+  (`jig queue cancel`) until Jig pauses it — the drop as a request of
+  adr-20261014-board-columns-are-derived-from-jig-state. The age moves on with a clock of the
+  page (`web/lib/clock.ts`), once a minute, not with reads: an idle project is not read again.
+  A drop on any other column does nothing.
+- A paused card names `jig task resume <id>`; the page does not resume a task.
 - The order of the columns is not the order of the rules: what waits for the person comes first
   (maintainer, task `design-system`, 2026-10-18).
 
@@ -60,6 +67,11 @@ done, or moving.
 - vue-router for the board's address — rejected for two screens in `project-board`; adopted
   with the design system when the page reached four (adr-20261018-page-built-from-shadcn-vue-with-router-and-canvas). The address stays
   `#/projects/<id>`.
+- Resuming from the page by a drop out of Paused (the roadmap's wish) — not built: Jig 0.31.0's
+  `jig task resume` takes no `--revision` and no `--json`, refuses unless the checkout is on the
+  task's branch (never so for a task in its own worktree), and applies a stash into the person's
+  checkout. Raised as fapost-lab/jig#295; the maintainer chose to show the command meanwhile
+  (task `pause-request`, 2026-10-22).
 - Board and List as two addresses — rejected: the switch is a way of looking at one board.
 - The view remembered in Jig UI's settings file — rejected: a preference of one browser need
   not survive it.

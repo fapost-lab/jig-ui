@@ -81,6 +81,10 @@ fits wins:
 A card shows the task's id, class and goal, its priority (`P0`, the most urgent, to `P5`) when it
 has one, and what it waits for. Finished tasks are only counted above the board.
 
+**Board / List** switches between the columns side by side and a list: the same columns as
+groups of one-line rows, each group folding away; **Specs** shows the project's specs
+([Specs](#specs)). The browser remembers the choice.
+
 ## Ordering the work
 
 Inside a column the tasks stand in the order of the project's queue in Jig (`jig queue`): the
@@ -89,7 +93,7 @@ queued tasks first, then the ones not queued yet, in Jig's order. Agents see the
 
 - **Drag a card** up or down within its column, on the board or in the list. Jig UI runs
   `jig queue move` in the project; the card moves once Jig has written it, not before, and says
-  *moving…* meanwhile. A line marks where it will land; where there is none, Jig's order cannot
+  *sending to Jig…* meanwhile. A line marks where it will land; where there is none, Jig's order cannot
   put it there — for example inside the run of tasks on another epic.
 - **The ⋯ menu** on a card or row does the same without a mouse: **To top**, **Up**, **Down**,
   **To bottom**, and **Priority** from P0 to P5, or none (`jig queue set --priority`).
@@ -101,11 +105,20 @@ If anything was written in the project between the moment the board was read and
 an agent working, a `jig` command in a terminal — Jig refuses the change. The page says so above
 the board and reads it again; look at the new order and make the change again.
 
-A drop on another column does nothing yet.
+## Pausing a task
 
-**Board / List** switches between the columns side by side and a list: the same columns as
-groups of one-line rows, each group folding away; **Specs** shows the project's specs
-([Specs](#specs)). The browser remembers the choice.
+**Drag a card onto Paused**, or choose **Request pause** in its ⋯ menu, to ask the task to pause.
+Jig UI runs `jig queue request task:<id> pause`; the task is not paused at once. An agent working
+on it pauses at its next stage boundary, and a task nobody is working on pauses when its next
+stage begins. Until then the card stays in its column and says *Pause requested 12 min ago*, with
+**cancel** to take the request back (`jig queue cancel`, also in the ⋯ menu). Paused is offered
+only where Jig offers the request: not for a task already paused, and not twice.
+
+A paused task says how to resume it: run `jig task resume <id>` in the project. Jig UI does not
+resume a task itself: `jig task resume` can restore a stash into your checkout, and it cannot
+check that the project is still as the board showed it.
+
+A drop on any other column does nothing.
 
 ## Specs
 

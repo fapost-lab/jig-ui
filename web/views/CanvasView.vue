@@ -12,6 +12,7 @@
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProgressBar from '@/components/ProgressBar.vue';
   import ProjectTabs from '@/components/ProjectTabs.vue';
+  import QueueMenu from '@/components/QueueMenu.vue';
   import SpecCard from '@/components/SpecCard.vue';
   import SpecItemRow from '@/components/SpecItemRow.vue';
   import TaskBrief from '@/components/TaskBrief.vue';
@@ -151,24 +152,43 @@
       <ColumnHeader v-for="column in columns" :id="column.id" :key="column.id" :title="column.title" :count="column.count" />
     </CanvasSection>
 
-    <CanvasSection title="TaskCard" note="every note a card carries; open with details, while reading, unreadable">
+    <CanvasSection
+      title="QueueMenu"
+      note="press to open: To top, Up, Down, To bottom, Priority — first queued, in the middle, not queued, last, while its change is on its way"
+    >
+      <div class="flex items-center gap-6">
+        <span v-for="t in [tasks[0]!, tasks[1]!, tasks[3]!, tasks[tasks.length - 1]!]" :key="t.id" class="flex items-center gap-1">
+          {{ t.id }}<QueueMenu :task="t" :cards="tasks" />
+        </span>
+        <span class="flex items-center gap-1">{{ tasks[1]!.id }}<QueueMenu :task="tasks[1]!" :cards="tasks" disabled /></span>
+      </div>
+    </CanvasSection>
+
+    <CanvasSection
+      title="TaskCard"
+      note="every note a card carries, a priority among them; with its queue menu; while its change is on its way; open with details, while reading, unreadable"
+    >
       <div class="grid grid-cols-2 gap-2 xl:grid-cols-3">
         <TaskCard v-for="task in tasks" :key="task.id" project="jig-ui" :task="task" :open="false" />
+        <TaskCard project="jig-ui" :task="tasks[1]!" :open="false" :cards="tasks" />
+        <TaskCard project="jig-ui" :task="tasks[0]!" :open="false" :cards="tasks" busy />
         <TaskCard project="jig-ui" :task="tasks[2]!" :open="true" :details="details[0]" />
         <TaskCard project="jig-ui" :task="tasks[0]!" :open="true" />
         <TaskCard project="jig-ui" :task="tasks[1]!" :open="true" details="unavailable" />
       </div>
     </CanvasSection>
 
-    <CanvasSection title="TaskRow" note="each note; selected">
+    <CanvasSection title="TaskRow" note="each note and priority; selected; with its queue menu; while its change is on its way">
       <div>
         <TaskRow v-for="(task, i) in tasks" :key="task.id" :task="task" :selected="i === 2" />
+        <TaskRow :task="tasks[1]!" :selected="false" :cards="tasks" />
+        <TaskRow :task="tasks[0]!" :selected="false" :cards="tasks" busy />
       </div>
     </CanvasSection>
 
     <CanvasSection title="BoardColumns" note="cards in every column, one open with its details; no live task">
       <div class="flex h-[28rem] flex-col">
-        <BoardColumns project="jig-ui" :columns="board" :selected="tasks[2]!.id" :details="details[0]" />
+        <BoardColumns project="jig-ui" :columns="board" :selected="tasks[2]!.id" :details="details[0]" :pending="tasks[0]!.id" />
       </div>
       <div class="flex h-40 flex-col">
         <BoardColumns project="jig-ui" :columns="emptyBoard" />

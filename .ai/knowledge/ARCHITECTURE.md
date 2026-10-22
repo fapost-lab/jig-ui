@@ -27,12 +27,15 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   token) written atomically, probed by a second start, removed with `open.html` on stop; and the
   registry, `projects.json`, of connected projects by id and main-checkout path
   (adr-20261017-registry-of-connected-projects). It knows neither git nor Jig.
-- `server/jig/` — JigClient: the project's Jig version against `MIN_JIG_VERSION`, and the JSON
-  reads `jig status` (what needs the person), `jig task list` and `jig spec list` (feature-specs),
-  each checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
-  fixtures of Jig 0.29.0 in `server/jig/fixtures/` (convention-jig-client).
+- `server/jig/` — JigClient: the project's Jig version against `MIN_JIG_VERSION`, the JSON
+  reads `jig status` (what needs the person), `jig task list`, `jig queue list` and `jig spec list`
+  (feature-specs), and the writes `jig queue move` and `jig queue set --priority`, each answer
+  checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
+  fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue
+  (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, a project's live
-  tasks, one task in full, connect, disconnect, subscribe to changes) and its local adapter (`local.ts`), which holds the
+  tasks, one task in full, connect, disconnect, subscribe to changes, and the writes `move` and
+  `prioritise`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
   read), `incompatible` (a newer Jig's shape), `unreadable` (Jig refused; its code only) or
@@ -43,7 +46,8 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   (feature-board).
 - `server/http/` also serves `GET /api/workspace`, `GET /api/projects/:id/board`,
   `GET /api/projects/:id/tasks/:task` (feature-task-details), `GET /api/projects/:id/specs`
-  (feature-specs), connect /
+  (feature-specs), `POST /api/projects/:id/queue/move` and `/queue/priority`
+  (adr-20261022-writes-carry-the-revision-of-their-read), connect /
   disconnect under `/api/projects`, and `GET /api/events` — the SSE stream of "project X changed,
   revision R" — through the port only; responses name projects by id.
   Directions: `http/` → `board/`, `source/`; `board/` → `source/` (types); `source/` → `jig/`,
@@ -75,6 +79,11 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   open a change under a project's `.ai/`, debounced, or the minute's rescan makes the local adapter
   re-read through Jig, and only a read that differs — or a project newly connected — sends
   "project X changed, revision R"; the page re-reads, served from that read (feature-live-updates).
+- **Change.** The page sends a write with the revision of the board it showed; ProjectSource
+  runs the matching Jig command for live task ids only and answers after reading the project
+  again; Jig's `stale-revision` comes back as 409, the page says so in one line and reads the
+  board again (adr-20261022-writes-carry-the-revision-of-their-read). Built for the queue: order
+  and priority. A full conflict display is still to build.
 - **Release flow.** A merge to `main` runs the CI matrix, builds `dist/` in a job without
   credentials, and publishes `<version>-next.<run>` under npm's `next` tag; a `v*` tag on a
   commit of `main` publishes `latest`. Details in `RELEASING.md`.
@@ -100,10 +109,9 @@ One npm package with a server and a page
 
 ### Runtime flows
 
-The start flow and read-and-follow are built (see Built above). Still to build:
+The start flow, read-and-follow and change are built (see Built above). Still to build:
 
-1. **Change** (Phase 2). The page sends a command with the revision it saw; ProjectSource runs the
-   matching Jig command; a stale revision comes back as Jig's refusal and is shown as a conflict.
+1. **Conflict display** (Phase 2). A stale write shows what changed instead of one line.
 
 ### System-wide constraints and invariants
 

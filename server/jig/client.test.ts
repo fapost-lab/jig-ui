@@ -7,9 +7,12 @@ import {
   JigRefusal,
   JigShapeError,
   MIN_JIG_VERSION,
+  moveInQueue,
+  readQueue,
   readSpecs,
   readStatus,
   readTasks,
+  setPriority,
   supports,
   writtenByReads,
 } from './client.js';
@@ -44,10 +47,11 @@ describe('jigVersion', () => {
 describe('supports', () => {
   it.each([
     [MIN_JIG_VERSION, true],
-    ['0.29.1', true],
-    ['0.30.0', true],
+    ['0.31.1', true],
+    ['0.32.0', true],
     ['1.0.0', true],
-    ['0.28.9', false],
+    ['0.30.0', false],
+    ['0.29.0', false],
     ['0.9.0', false],
   ])('%s → %s', (version, expected) => {
     expect(supports(version)).toBe(expected);
@@ -260,6 +264,65 @@ describe('readSpecs', () => {
     ['with missing files that are not names', (d: Record<string, any>) => (d.specs[2].missing_files = [1])],
   ])('refuses a spec %s', async (_, change) => {
     await expect(readSpecs(answering(`case-${cases++}`, changed('spec-list.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+// queue-list.json is what Jig 0.31.0 printed for three tasks, two of them queued, with an epic and a task on it
+// added in the documented shape (Jig's docs/reading-jig-as-data.mdx); queue-move.json and queue-stale.json too.
+describe('readQueue', () => {
+  it("reads the queued tasks in Jig's order, without the epics", async () => {
+    expect(await readQueue(answering('queue', 'queue-list.json'))).toEqual({
+      revision: 1792656228,
+      items: [
+        { id: 'beta', level: null, position: 100, priority: null },
+        { id: 'alpha', level: null, position: 200, priority: 1 },
+        { id: 'booking-form', level: 'epic:booking', position: 100, priority: null },
+      ],
+    });
+  });
+
+  it.each([
+    ['a priority above 5', (d: Record<string, any>) => (d.items[1].priority = 6)],
+    ['a position that is no integer', (d: Record<string, any>) => (d.items[0].position = '100')],
+    ['an item without its level, which may only be null', (d: Record<string, any>) => delete d.items[0].level],
+  ])('refuses %s', async (_, change) => {
+    await expect(readQueue(answering(`case-${cases++}`, changed('queue-list.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+/** A checkout whose Jig prints `json` and logs its arguments, one per line, to `args.log`. */
+function logging(name: string, json: string, status = 0): string {
+  const dir = answering(name, json, status);
+  writeFileSync(join(dir, '.ai', 'scripts', 'jig'), `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > args.log\ncat out.json\nexit ${status}\n`);
+  return dir;
+}
+const args = (dir: string) => readFileSync(join(dir, 'args.log'), 'utf8').trim().split('\n');
+
+describe('writing the queue', () => {
+  it.each([
+    [{ after: 'alpha' } as const, ['--after', 'task:alpha']],
+    ['top' as const, ['--top']],
+    ['bottom' as const, ['--bottom']],
+  ])('moves a task %o against the revision it was read at', async (place, where) => {
+    const dir = logging(`case-${cases++}`, 'queue-move.json');
+    await moveInQueue(dir, 'beta', place, 1792656222);
+    expect(args(dir)).toEqual(['queue', 'move', 'task:beta', ...where, '--revision', '1792656222', '--json']);
+  });
+
+  it.each([
+    [1, '1'],
+    [null, 'none'],
+  ])('sets priority %s', async (priority, value) => {
+    const dir = logging(`case-${cases++}`, 'queue-move.json');
+    await setPriority(dir, 'beta', priority, 7);
+    expect(args(dir)).toEqual(['queue', 'set', 'task:beta', '--priority', value, '--revision', '7', '--json']);
+  });
+
+  it('carries a stale revision as its code', async () => {
+    await expect(moveInQueue(answering(`case-${cases++}`, 'queue-stale.json', 1), 'beta', 'top', 1)).rejects.toEqual(
+      refusal('stale-revision'),
+    );
+    await expect(setPriority(answering(`case-${cases++}`, 'queue-stale.json', 1), 'beta', 2, 1)).rejects.toEqual(refusal('stale-revision'));
   });
 });
 

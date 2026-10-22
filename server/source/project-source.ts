@@ -1,6 +1,6 @@
-import type { Attention, Spec, SpecItem, SpecPhase, SpecProgress } from '../jig/client.js';
+import type { Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress } from '../jig/client.js';
 
-export type { Attention, Spec, SpecItem, SpecPhase, SpecProgress };
+export type { Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress };
 export { RegistryUnreadable } from '../registry/projects.js';
 
 /** A project's live tasks by where they stand. */
@@ -58,6 +58,13 @@ export interface Task {
     ci: string | null;
     fetchedAt: string | null;
   } | null;
+  /** 0, the most urgent, to 5, from Jig's queue; `null` unset or not queued. */
+  priority: number | null;
+  /** Where the task is in Jig's queue: its level (`null` the top, `epic:<spec>` an open epic's) and place there; `null` when not queued. */
+  queue: {
+    level: string | null;
+    position: number;
+  } | null;
 }
 
 /** One live task in full, as its details show it; never where its worktree is. */
@@ -90,12 +97,13 @@ export interface TaskDetails extends Task {
   attention: Attention[];
 }
 
-/** A project's live tasks and how many finished ones are left out, or why it cannot be read. */
+/** A project's live tasks, how many finished ones are left out and the revision a write based on them carries, or why it cannot be read. */
 export type ProjectTasks =
   | {
       state: 'ready';
       tasks: Task[];
       finished: number;
+      revision: number;
     }
   | Exclude<ProjectView, { state: 'ready' }>;
 
@@ -119,6 +127,15 @@ export type Refusal = {
   code: 'not-a-repository' | 'worktree' | 'no-jig';
   message: string;
 };
+
+/** What a write came to: done, refused by Jig's failure code (`stale-revision`: the project changed since), or why the project cannot be read. */
+export type Written =
+  | { state: 'written' }
+  | {
+      state: 'refused';
+      code: string;
+    }
+  | Exclude<ProjectView, { state: 'ready' }>;
 
 /** A connected project changed; `revision` is Jig's with the read that saw it, `null` when unreadable. */
 export type Change = {
@@ -147,6 +164,13 @@ export interface ProjectSource {
   task(id: string, taskId: string): Promise<ProjectTask | undefined>;
   /** A connected project's specs with their roadmaps; `undefined` when no project has that id. */
   specs(id: string): Promise<ProjectSpecs | undefined>;
+  /**
+   * Moves a live task in its project's queue, against the revision of the read it was based on; `place.after`
+   * names another live task. `undefined` when no project has that id.
+   */
+  move(id: string, taskId: string, place: Place, revision: number): Promise<Written | undefined>;
+  /** Sets a live task's priority, `null` for none, as `move` writes. */
+  prioritise(id: string, taskId: string, priority: number | null, revision: number): Promise<Written | undefined>;
   /** False when no project has that id. Nothing in the project is touched. */
   disconnect(id: string): Promise<boolean>;
   /**

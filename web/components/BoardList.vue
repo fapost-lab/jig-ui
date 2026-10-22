@@ -1,24 +1,34 @@
 <script setup lang="ts">
   import { ChevronDown, ChevronRight } from '@lucide/vue';
   import { computed, ref } from 'vue';
-  import type { Column, ReadyDetails } from '@/api';
+  import type { Column, Place, ReadyDetails } from '@/api';
   import { Badge } from '@/components/ui/badge';
   import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+  import { useDrop } from '@/lib/drop';
   import ColumnHeader from './ColumnHeader.vue';
   import TaskBrief from './TaskBrief.vue';
   import TaskRow from './TaskRow.vue';
 
-  /** The board as folding groups of rows; `selected` is the row whose `details` the pane shows. */
+  /**
+   * The board as folding groups of rows; `selected` is the row whose `details` the pane shows. A row is moved in Jig's
+   * queue by dragging it within its group, or from its menu; `pending` is the one whose change is on its way.
+   */
   const props = defineProps<{
     project: string;
     columns: Column[];
     selected?: string;
     details?: ReadyDetails | 'unavailable';
+    pending?: string;
   }>();
 
-  defineEmits<{
+  const emit = defineEmits<{
     select: [task: string];
+    move: [task: string, place: Place];
+    prioritise: [task: string, priority: number | null];
   }>();
+
+  const drag = useDrop((task, place) => emit('move', task, place));
+  const { gap } = drag;
 
   const picked = computed(() => props.columns.flatMap((c) => c.cards).find((t) => t.id === props.selected));
 
@@ -46,14 +56,36 @@
             <ColumnHeader :id="column.id" :title="column.title" :count="column.cards.length" />
           </CollapsibleTrigger>
         </h2>
-        <CollapsibleContent>
-          <TaskRow
-            v-for="task in column.cards"
+        <CollapsibleContent
+          class="relative"
+          @dragover="(e: DragEvent) => drag.over(e, column.id, column.cards)"
+          @drop.prevent="drag.drop(column.id)"
+        >
+          <div
+            v-for="(task, i) in column.cards"
             :key="task.id"
-            :task="task"
-            :selected="selected === task.id"
-            @select="$emit('select', task.id)"
-          />
+            data-card
+            :draggable="pending === undefined"
+            class="relative"
+            @dragstart="(e) => drag.start(e, column.id, task.id)"
+            @dragend="drag.end()"
+          >
+            <span v-if="gap?.list === column.id && gap.index === i" class="absolute inset-x-0 top-0 h-0.5 bg-primary" aria-hidden="true" />
+            <TaskRow
+              :task="task"
+              :selected="selected === task.id"
+              :cards="column.cards"
+              :busy="pending === task.id"
+              @select="$emit('select', task.id)"
+              @move="(place) => $emit('move', task.id, place)"
+              @prioritise="(p) => $emit('prioritise', task.id, p)"
+            />
+            <span
+              v-if="gap?.list === column.id && gap.index === column.cards.length && i === column.cards.length - 1"
+              class="absolute inset-x-0 bottom-0 h-0.5 bg-primary"
+              aria-hidden="true"
+            />
+          </div>
           <p v-if="column.cards.length === 0" class="border-b px-3 py-2 text-muted-foreground">— empty —</p>
         </CollapsibleContent>
       </Collapsible>

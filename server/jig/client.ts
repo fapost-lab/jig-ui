@@ -6,8 +6,8 @@ import { z } from 'zod';
 
 const run = promisify(execFile);
 
-/** The oldest Jig whose reads Jig UI understands: 0.29.0 is the first that prints JSON. */
-export const MIN_JIG_VERSION = '0.29.0';
+/** The oldest Jig Jig UI reads and writes: 0.29.0 is the first that prints JSON, 0.31.0 the first with a queue. */
+export const MIN_JIG_VERSION = '0.31.0';
 
 const SCRIPT = join('.ai', 'scripts', 'jig');
 const TIMEOUT_MS = 10_000;
@@ -68,7 +68,7 @@ export class JigRefusal extends Error {
   }
 }
 
-const CODES = new Set(['usage', 'not-a-repository', 'not-initialised', 'failed']);
+const CODES = new Set(['usage', 'not-a-repository', 'not-initialised', 'stale-revision', 'not-found', 'already-exists', 'failed']);
 
 /** Jig answered in a shape this Jig UI does not read: a Jig newer than the contract its tests pin. */
 export class JigShapeError extends Error {
@@ -81,7 +81,7 @@ type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /**
- * Runs a `--json` read and returns its `data` and the clone's revision. Jig's refusal throws
+ * Runs a `--json` command and returns its `data` and the clone's revision — for a write, the one it was checked against. Jig's refusal throws
  * JigRefusal, as does output that is no JSON at all (a crash); an envelope of another shape throws
  * JigShapeError.
  */
@@ -295,6 +295,70 @@ const SpecList = z.object({ specs: z.array(SpecRow) });
 export async function readSpecs(root: string, platform: NodeJS.Platform = process.platform): Promise<Spec[]> {
   const { data } = await readJson(root, ['spec', 'list'], platform);
   return parsed(SpecList, data).specs;
+}
+
+/** A task in Jig's queue: its level (`null` the top, `epic:<spec>` an open epic's), its place there, its priority. */
+const QueueItem = z.object({
+  kind: text,
+  id: text,
+  level: maybe,
+  /** Sparse; compared only within one level. */
+  position: z.int(),
+  /** 0, the most urgent, to 5; `null` unset. A label: the order is `position`'s. */
+  priority: z.int().min(0).max(5).nullable(),
+});
+export type QueueItem = Omit<z.output<typeof QueueItem>, 'kind'>;
+
+const Queue = z.object({ items: z.array(QueueItem) });
+
+/** The tasks in the project's queue (`jig queue list --json`), in Jig's order; a task not queued is not there, nor is an epic. */
+export async function readQueue(
+  root: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<{
+  revision: number;
+  items: QueueItem[];
+}> {
+  const { revision, data } = await readJson(root, ['queue', 'list'], platform);
+  const items = parsed(Queue, data)
+    .items.filter((i) => i.kind === 'task')
+    .map(({ id, level, position, priority }) => ({ id, level, position, priority }));
+  return { revision, items };
+}
+
+/** Where a moved task goes: after a task already in its level of the queue, or to the top or bottom of that level. */
+export type Place =
+  | {
+      after: string;
+    }
+  | 'top'
+  | 'bottom';
+
+/**
+ * Moves a task in the queue (`jig queue move`), adding it when it is not there; refused as `stale-revision`
+ * when anything was written in the clone since `revision`. Ids go to Jig as `task:<id>`, never as a flag.
+ */
+export async function moveInQueue(
+  root: string,
+  task: string,
+  place: Place,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  const where = place === 'top' ? ['--top'] : place === 'bottom' ? ['--bottom'] : ['--after', `task:${place.after}`];
+  await readJson(root, ['queue', 'move', `task:${task}`, ...where, '--revision', String(revision)], platform);
+}
+
+/** Sets a task's priority in the queue (`jig queue set`), `null` for none; refused as `moveInQueue` is. */
+export async function setPriority(
+  root: string,
+  task: string,
+  priority: number | null,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  const value = priority === null ? 'none' : String(priority);
+  await readJson(root, ['queue', 'set', `task:${task}`, '--priority', value, '--revision', String(revision)], platform);
 }
 
 /** True when `version` is at least the minimum Jig UI reads. */

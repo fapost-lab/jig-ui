@@ -1,11 +1,12 @@
 <script setup lang="ts">
   import { ExternalLink } from '@lucide/vue';
   import { computed } from 'vue';
-  import type { ReadyDetails, Task } from '@/api';
+  import type { Place, ReadyDetails, Task } from '@/api';
   import { Badge } from '@/components/ui/badge';
   import { Card } from '@/components/ui/card';
   import { toneRule } from '@/lib/tones';
   import { waits } from '@/lib/waits';
+  import QueueMenu from './QueueMenu.vue';
   import TaskBrief from './TaskBrief.vue';
 
   const props = defineProps<{
@@ -13,24 +14,44 @@
     task: Task;
     open: boolean;
     details?: ReadyDetails | 'unavailable';
+    /** The task's column, for its queue menu; without it the card has none. */
+    cards?: Task[];
+    /** A change of its place or priority is on its way to Jig. */
+    busy?: boolean;
   }>();
 
   defineEmits<{
     toggle: [];
+    move: [place: Place];
+    prioritise: [priority: number | null];
   }>();
 
   const note = computed(() => waits(props.task));
 </script>
 
 <template>
-  <Card class="gap-2 px-3 py-3" :class="open && 'ring-foreground'">
-    <button type="button" class="flex flex-col gap-2 text-left" :aria-expanded="open" @click="$emit('toggle')">
-      <span class="flex w-full items-center gap-2">
-        <span class="font-semibold break-all">{{ task.id }}</span>
-        <Badge v-if="task.class" variant="outline" class="ml-auto">{{ task.class }}</Badge>
-      </span>
-      <span v-if="task.goal" class="text-muted-foreground" :class="!open && 'line-clamp-2'">{{ task.goal }}</span>
-    </button>
+  <Card class="gap-2 px-3 py-3" :class="[open && 'ring-foreground', busy && 'opacity-60']">
+    <div class="flex items-start gap-1">
+      <button type="button" class="flex min-w-0 flex-1 flex-col gap-2 text-left" :aria-expanded="open" @click="$emit('toggle')">
+        <span class="flex w-full items-center gap-2">
+          <span class="font-semibold break-all">{{ task.id }}</span>
+          <Badge v-if="task.priority !== null" variant="secondary" class="ml-auto" :title="`Priority ${task.priority}`">
+            P{{ task.priority }}
+          </Badge>
+          <Badge v-if="task.class" variant="outline" :class="task.priority === null && 'ml-auto'">{{ task.class }}</Badge>
+        </span>
+        <span v-if="task.goal" class="text-muted-foreground" :class="!open && 'line-clamp-2'">{{ task.goal }}</span>
+      </button>
+      <QueueMenu
+        v-if="cards"
+        :task="task"
+        :cards="cards"
+        :disabled="busy"
+        @move="(place) => $emit('move', place)"
+        @prioritise="(p) => $emit('prioritise', p)"
+      />
+    </div>
+    <p v-if="busy" class="text-muted-foreground" role="status">moving…</p>
     <p v-if="note" :class="toneRule[note.tone]">
       {{ note.text }}
       <a

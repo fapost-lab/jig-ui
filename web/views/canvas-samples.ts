@@ -11,6 +11,8 @@ const task = (id: string, more: Partial<Task>): Task => ({
   gate: null,
   autopilot: null,
   pullRequest: null,
+  priority: null,
+  queue: null,
   ...more,
 });
 
@@ -26,9 +28,16 @@ export const tasks: Task[] = [
   task('design-system', {
     class: 'T3',
     gate: 'waiting',
+    priority: 0,
+    queue: { level: null, position: 100 },
     goal: 'shadcn-vue on Tailwind v4 with light and dark themes; #/canvas with every component in every variant; the three screens rebuilt on it.',
   }),
-  task('registry-schema', { gate: 'changed', goal: 'Version the registry file so a newer Jig UI can read an older one.' }),
+  task('registry-schema', {
+    gate: 'changed',
+    priority: 3,
+    queue: { level: null, position: 200 },
+    goal: 'Version the registry file so a newer Jig UI can read an older one.',
+  }),
   task('pause-request', {
     class: 'T3',
     autopilot: 'stopped',
@@ -36,6 +45,7 @@ export const tasks: Task[] = [
   }),
   task('specs-and-epics', {
     autopilot: 'on',
+    queue: { level: null, position: 300 },
     goal: "Show each spec with its phases, progress and epic branch beside the board, from Jig's spec list.",
   }),
   task('task-details', { status: 'ready', pullRequest: pr('open', 'green'), goal: "Open a task's details from its card." }),

@@ -9,7 +9,7 @@ import { secureHeaders } from 'hono/secure-headers';
 import { streamSSE } from 'hono/streaming';
 import { validator } from 'hono/validator';
 import { columns, placeOf } from '../board/columns.js';
-import { type ProjectSource, RegistryUnreadable } from '../source/project-source.js';
+import { type Place, type ProjectSource, RegistryUnreadable, type Written } from '../source/project-source.js';
 import { localOnly, tokenAccess } from './access.js';
 
 /**
@@ -40,7 +40,7 @@ export interface AppOptions {
 /** How often an idle stream sends a comment, so a closed tab is noticed and its subscription ends. */
 const PING_MS = 30_000;
 
-const refuse = <S extends 404 | 422 | 500>(c: Context, status: S, code: string, message: string) =>
+const refuse = <S extends 404 | 409 | 422 | 500>(c: Context, status: S, code: string, message: string) =>
   c.json({ error: { code, message } }, status);
 
 /** The path the person typed, absolute; `~/` stands for their home. */
@@ -48,6 +48,31 @@ function absolute(path: unknown): string | undefined {
   if (typeof path !== 'string') return undefined;
   const expanded = path.trim().replace(/^~(?=$|[\\/])/, homedir());
   return isAbsolute(expanded) ? expanded : undefined;
+}
+
+const isId = (v: unknown): v is string => typeof v === 'string' && v !== '';
+const isRevision = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
+const field = (body: unknown, key: string): unknown =>
+  typeof body === 'object' && body !== null ? (body as Record<string, unknown>)[key] : undefined;
+
+/** Where a drop puts a task: after another, or to the top or bottom of its level; `undefined` for anything else. */
+function place(v: unknown): Place | undefined {
+  if (v === 'top' || v === 'bottom') return v;
+  const after = field(v, 'after');
+  return isId(after) ? { after } : undefined;
+}
+
+/** A priority as the page sends it: 0 to 5, or `null` for none. */
+const isPriority = (v: unknown): v is number | null => v === null || (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 5);
+
+/** What a write came to, in the API's form. A refusal names no path: only Jig's code goes on. */
+function written(c: Context, w: Written | undefined) {
+  if (w === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+  if (w.state === 'written') return c.json({ written: true as const }, 200);
+  if (w.state !== 'refused') return c.json({ project: w }, 200);
+  if (w.code === 'stale-revision') return refuse(c, 409, w.code, 'The project changed since the board was read.');
+  if (w.code === 'not-found') return refuse(c, 404, w.code, 'This project has no live task with this id.');
+  return refuse(c, 422, w.code, 'Jig refused the change.');
 }
 
 /**
@@ -66,7 +91,8 @@ function apiRoutes(source: ProjectSource, version: string) {
         const read = await source.tasks(id);
         if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
         if (read.state !== 'ready') return c.json({ board: read }, 200);
-        return c.json({ board: { id, state: read.state, columns: columns(read.tasks), finished: read.finished } }, 200);
+        const { state, finished, revision } = read;
+        return c.json({ board: { id, state, columns: columns(read.tasks), finished, revision } }, 200);
       })
 
       .get('/api/projects/:id/tasks/:task', async (c) => {
@@ -82,6 +108,46 @@ function apiRoutes(source: ProjectSource, version: string) {
         if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
         return c.json({ specs: read }, 200);
       })
+
+      // A write carries the revision of the board it was based on; Jig refuses it if anything was written since.
+      .post(
+        '/api/projects/:id/queue/move',
+        validator('json', (body: unknown) => {
+          const [task, revision] = [field(body, 'task'), field(body, 'revision')];
+          return {
+            task: isId(task) ? task : undefined,
+            place: place(field(body, 'place')),
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { task, place, revision } = c.req.valid('json');
+          if (task === undefined || place === undefined || revision === undefined) {
+            return refuse(c, 422, 'usage', 'Give a task, where it goes and the revision it was read at.');
+          }
+          return written(c, await source.move(c.req.param('id'), task, place, revision));
+        },
+      )
+
+      .post(
+        '/api/projects/:id/queue/priority',
+        validator('json', (body: unknown) => {
+          const [task, priority, revision] = [field(body, 'task'), field(body, 'priority'), field(body, 'revision')];
+          return {
+            task: isId(task) ? task : undefined,
+            // `undefined` for anything but 0 to 5 or null: a priority left out is no priority of none
+            priority: isPriority(priority) ? priority : undefined,
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { task, priority, revision } = c.req.valid('json');
+          if (task === undefined || priority === undefined || revision === undefined) {
+            return refuse(c, 422, 'usage', 'Give a task, a priority from 0 to 5 or null, and the revision it was read at.');
+          }
+          return written(c, await source.prioritise(c.req.param('id'), task, priority, revision));
+        },
+      )
 
       .post(
         '/api/projects',

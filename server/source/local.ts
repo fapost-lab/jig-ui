@@ -4,9 +4,13 @@ import {
   JigShapeError,
   jigVersion,
   MIN_JIG_VERSION,
+  moveInQueue,
+  type QueueItem,
+  readQueue,
   readSpecs,
   readStatus,
   readTasks,
+  setPriority,
   supports,
   type TaskSummary,
   watchDir,
@@ -26,6 +30,7 @@ import type {
   Task,
   TaskCounts,
   TaskDetails,
+  Written,
 } from './project-source.js';
 
 /** Jig's version in the checkout: `null` when Jig is there but names no version Jig UI can read. */
@@ -71,8 +76,10 @@ type Read = {
   revision: number | null;
 };
 
-/** A live task as a board's card shows it. */
-const card = (t: TaskSummary & { status: Task['status'] }): Task => ({
+type Live = TaskSummary & { status: Task['status'] };
+
+/** A live task as a board's card shows it, with its place in the queue if it has one. */
+const card = (t: Live, q: QueueItem | undefined): Task => ({
   id: t.id,
   class: t.class,
   status: t.status,
@@ -82,11 +89,13 @@ const card = (t: TaskSummary & { status: Task['status'] }): Task => ({
   gate: t.gate?.state ?? null,
   autopilot: t.autopilot?.state ?? null,
   pullRequest: t.pullRequest,
+  priority: q?.priority ?? null,
+  queue: q ? { level: q.level, position: q.position } : null,
 });
 
 /** A live task in full; where its worktree is was never read, and an action Jig refuses is left out. */
-const details = (t: TaskSummary & { status: Task['status'] }, attention: Attention[]): TaskDetails => ({
-  ...card(t),
+const details = (t: Live, q: QueueItem | undefined, attention: Attention[]): TaskDetails => ({
+  ...card(t, q),
   issue: t.issue,
   branch: t.branch,
   baseBranch: t.baseBranch,
@@ -128,13 +137,16 @@ async function reading<T>({ id, path }: Project, read: (root: string, jigVersion
 
 async function readProject(project: Project): Promise<Read> {
   const read = await reading(project, async (root, jigVersion) => {
-    const [status, list, specs] = await Promise.all([readStatus(root), readTasks(root), readSpecs(root)]);
-    return { status, list, specs, jigVersion };
+    const [status, list, queue, specs] = await Promise.all([readStatus(root), readTasks(root), readQueue(root), readSpecs(root)]);
+    return { status, list, queue, specs, jigVersion };
   });
   if (!('list' in read)) return { view: read, tasks: read, details: [], specs: read, revision: null };
-  const { status, list, specs, jigVersion } = read;
+  const { status, list, queue, specs, jigVersion } = read;
   // Jig's live list holds active and ready tasks only.
-  const live = list.tasks.filter((t): t is TaskSummary & { status: Task['status'] } => t.status === 'active' || t.status === 'ready');
+  const live = list.tasks.filter((t): t is Live => t.status === 'active' || t.status === 'ready');
+  const queued = new Map(queue.items.map((q) => [q.id, q]));
+  // The oldest of the reads the board is made of: a write against it is refused if anything was written after any of them.
+  const revision = Math.min(status.revision, list.revision, queue.revision);
   return {
     view: {
       id: project.id,
@@ -144,10 +156,10 @@ async function readProject(project: Project): Promise<Read> {
       attention: status.attention,
       housekeepingStale: status.housekeepingStale,
     },
-    tasks: { state: 'ready', tasks: live.map(card), finished: list.hidden },
-    details: live.map((t) => details(t, status.attention)),
+    tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id))), finished: list.hidden, revision },
+    details: live.map((t) => details(t, queued.get(t.id), status.attention)),
     specs: { state: 'ready', specs },
-    revision: list.revision,
+    revision,
   };
 }
 
@@ -306,6 +318,27 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     }
   }
 
+  /**
+   * Runs a write in a project once every task it names is live in what the project shows — so nothing but an id
+   * Jig itself listed reaches Jig's arguments — then reads the project again, refused or not: the page reads next.
+   */
+  async function writing(id: string, taskIds: string[], write: (root: string) => Promise<void>): Promise<Written | undefined> {
+    const project = (await readProjects(configDir)).find((p) => p.id === id);
+    if (!project) return undefined;
+    const { tasks } = await shown(project);
+    if (tasks.state !== 'ready') return tasks;
+    if (!taskIds.every((t) => tasks.tasks.some((live) => live.id === t))) return { state: 'refused', code: 'not-found' };
+    let written: Written = { state: 'written' };
+    try {
+      await write(project.path);
+    } catch (error) {
+      // Only the code goes on: Jig's message may name a path.
+      written = { state: 'refused', code: error instanceof JigRefusal ? error.code : 'failed' };
+    }
+    await refresh(entryOf(project));
+    return written;
+  }
+
   return {
     async workspace() {
       return Promise.all((await readProjects(configDir)).map(async (p) => (await shown(p)).view));
@@ -336,6 +369,13 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     async specs(id) {
       const project = (await readProjects(configDir)).find((p) => p.id === id);
       return project && (await shown(project)).specs;
+    },
+    move(id, taskId, place, revision) {
+      const named = typeof place === 'object' ? [taskId, place.after] : [taskId];
+      return writing(id, named, (root) => moveInQueue(root, taskId, place, revision));
+    },
+    prioritise(id, taskId, priority, revision) {
+      return writing(id, [taskId], (root) => setPriority(root, taskId, priority, revision));
     },
     async disconnect(id) {
       if (!(await removeProject(configDir, id))) return false;

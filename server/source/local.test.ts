@@ -54,6 +54,9 @@ function project(
     status?: unknown;
     tasks?: unknown;
     specs?: unknown;
+    queue?: unknown;
+    /** What `queue move` and `queue set` print: an envelope's `data`, or a refusal's code. */
+    write?: unknown;
   } = {},
 ): string {
   const dir = join(root, name);
@@ -66,6 +69,14 @@ function project(
   );
   writeFileSync(join(dir, 'tasks.json'), envelope(answers.tasks ?? { tasks: [], hidden: 0, housekeeping: null }));
   writeFileSync(join(dir, 'specs.json'), envelope(answers.specs ?? { specs: [] }));
+  writeFileSync(join(dir, 'queue.json'), envelope(answers.queue ?? { items: [] }));
+  const write = answers.write ?? { ref: 'task:x', item: null };
+  writeFileSync(
+    join(dir, 'write.json'),
+    typeof write === 'string'
+      ? JSON.stringify({ schema: 1, revision: 9, generated_at: 'x', error: { code: write, message: 'refused' } })
+      : envelope(write),
+  );
   writeFileSync(
     join(dir, '.ai', 'scripts', 'jig'),
     `#!/usr/bin/env bash
@@ -75,6 +86,8 @@ case "$*" in
   "status --json") cat status.json; exit ${refused ? 1 : 0} ;;
   "task list --json") cat tasks.json ;;
   "spec list --json") cat specs.json ;;
+  "queue list --json") cat queue.json ;;
+  "queue move "*|"queue set "*) cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
 esac
 `,
   );
@@ -86,8 +99,14 @@ const calls = (dir: string) => readFileSync(join(dir, 'calls.log'), 'utf8').trim
 describe('localSource', () => {
   const source = localSource(join(root, 'config'));
 
-  const busy = project('busy', '0.29.0', {
+  const busy = project('busy', '0.31.0', {
     status: { attention: [attention], housekeeping: { ran_at: 'x', forge: 'github', stale: true } },
+    queue: {
+      items: [
+        { ref: 'epic:e', kind: 'epic', id: 'e', level: null, position: 100, priority: 0, depends_on: [] },
+        { ref: 'task:b', kind: 'task', id: 'b', level: null, position: 200, priority: 2, depends_on: [] },
+      ],
+    },
     tasks: {
       tasks: [
         task('a', 'active'),
@@ -106,7 +125,7 @@ describe('localSource', () => {
     },
   });
   const old = project('old', '0.26.0');
-  const broken = project('broken', '0.29.0', {
+  const broken = project('broken', '0.31.0', {
     status: '{"schema":1,"revision":7,"generated_at":"x","error":{"code":"not-initialised","message":"no Jig in /secret/path"}}',
   });
 
@@ -116,12 +135,12 @@ describe('localSource', () => {
       {
         id: 'busy',
         state: 'ready',
-        jigVersion: '0.29.0',
+        jigVersion: '0.31.0',
         counts: { active: 2, paused: 1, ready: 1 },
         attention: [attention],
         housekeepingStale: true,
       },
-      { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' },
+      { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' },
       { id: 'broken', state: 'unreadable', code: 'not-initialised' },
     ]);
     expect(calls(old)).not.toContain('status --json');
@@ -152,7 +171,7 @@ describe('localSource', () => {
         },
       ],
     };
-    const planned = project('planned', '0.29.0', { specs: { specs: [spec] } });
+    const planned = project('planned', '0.31.0', { specs: { specs: [spec] } });
     await source.connect(planned);
     expect(calls(planned)).toContain('spec list --json');
     expect(await source.specs('planned')).toEqual({
@@ -169,7 +188,7 @@ describe('localSource', () => {
         },
       ],
     });
-    expect(await source.specs('old')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' });
+    expect(await source.specs('old')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' });
     expect(await source.specs('nobody')).toBeUndefined();
     await source.disconnect('planned');
   });
@@ -179,22 +198,22 @@ describe('localSource', () => {
   });
 
   it('shows a project whose directory is gone, without reading it', async () => {
-    const gone = project('gone', '0.29.0');
+    const gone = project('gone', '0.31.0');
     await source.connect(gone);
     rmSync(gone, { recursive: true, force: true });
     expect((await source.workspace()).at(-1)).toEqual({ id: 'gone', state: 'unavailable', reason: 'missing' });
   });
 
   it('shows a project whose Jig answers in a newer shape as incompatible', async () => {
-    const newer = project('newer', '0.30.0', { tasks: { tasks: [task('a', 'parked')], hidden: 0, housekeeping: null } });
+    const newer = project('newer', '0.32.0', { tasks: { tasks: [task('a', 'parked')], hidden: 0, housekeeping: null } });
     await source.connect(newer);
-    expect((await source.workspace()).at(-1)).toEqual({ id: 'newer', state: 'incompatible', jigVersion: '0.30.0' });
+    expect((await source.workspace()).at(-1)).toEqual({ id: 'newer', state: 'incompatible', jigVersion: '0.32.0' });
     await source.disconnect('newer');
   });
 
   it("lists a project's live tasks as a board reads them, with the finished ones counted", async () => {
     await source.connect(
-      project('waiting', '0.29.0', {
+      project('waiting', '0.31.0', {
         tasks: {
           tasks: [
             task('f', 'active', false, { branch: null }),
@@ -221,6 +240,7 @@ describe('localSource', () => {
     expect(await source.tasks('busy')).toEqual({
       state: 'ready',
       finished: 2,
+      revision: 7,
       tasks: [
         {
           id: 'a',
@@ -232,8 +252,10 @@ describe('localSource', () => {
           gate: null,
           autopilot: null,
           pullRequest: null,
+          priority: null,
+          queue: null,
         },
-        expect.objectContaining({ id: 'b' }),
+        expect.objectContaining({ id: 'b', priority: 2, queue: { level: null, position: 200 } }),
         expect.objectContaining({ id: 'c', paused: true }),
         expect.objectContaining({ id: 'd', status: 'ready' }),
       ],
@@ -241,13 +263,14 @@ describe('localSource', () => {
     expect(await source.tasks('waiting')).toEqual({
       state: 'ready',
       finished: 0,
+      revision: 7,
       tasks: [
         expect.objectContaining({ id: 'f', started: false, gate: null, autopilot: null }),
         expect.objectContaining({ id: 'g', started: true, gate: 'waiting', autopilot: 'stopped' }),
         expect.objectContaining({ id: 'h', pullRequest: { url: 'https://x/pull/1', state: 'merged', ci: null, fetchedAt: 'x' } }),
       ],
     });
-    expect(await source.tasks('old')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' });
+    expect(await source.tasks('old')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' });
     expect(await source.tasks('nobody')).toBeUndefined();
   });
 
@@ -266,13 +289,86 @@ describe('localSource', () => {
     expect(JSON.stringify(read)).not.toContain('/secret/');
     expect(await source.task('busy', 'a')).toMatchObject({ task: { id: 'a', attention: [], actions: [] } });
     expect(await source.task('busy', 'gone-task')).toEqual({ state: 'ready', task: null });
-    expect(await source.task('old', 'a')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' });
+    expect(await source.task('old', 'a')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' });
     expect(await source.task('nobody', 'a')).toBeUndefined();
   });
 
   it('disconnects by id', async () => {
     expect(await source.disconnect('gone')).toBe(true);
     expect(await source.disconnect('gone')).toBe(false);
+  });
+});
+
+describe('localSource, writing the queue', () => {
+  const source = localSource(join(root, 'write-config'));
+  const tasks = { tasks: [task('a', 'active'), task('b', 'active', false, { branch: null })], hidden: 0, housekeeping: null };
+  const writes = (dir: string) => calls(dir).filter((c) => c.startsWith('queue move') || c.startsWith('queue set'));
+  /** The calls since `from`: what Jig ran for one write. */
+  const since = (dir: string, from: number) => calls(dir).slice(from);
+
+  it('moves a live task against the revision of the read, then reads the project again', async () => {
+    const dir = project('mover', '0.31.0', { tasks });
+    await source.connect(dir);
+    const from = calls(dir).length;
+    expect(await source.move('mover', 'b', { after: 'a' }, 7)).toEqual({ state: 'written' });
+    const ran = since(dir, from);
+    const moved = ran.indexOf('queue move task:b --after task:a --revision 7 --json');
+    expect(moved).toBeGreaterThanOrEqual(0);
+    expect(ran.slice(moved + 1)).toEqual(expect.arrayContaining(['task list --json', 'queue list --json']));
+    expect(await source.move('mover', 'a', 'top', 7)).toEqual({ state: 'written' });
+    expect(await source.move('mover', 'a', 'bottom', 7)).toEqual({ state: 'written' });
+    expect(writes(dir).slice(1)).toEqual(['queue move task:a --top --revision 7 --json', 'queue move task:a --bottom --revision 7 --json']);
+  });
+
+  it('sets a priority, none as Jig spells it', async () => {
+    const dir = project('ranker', '0.31.0', { tasks });
+    await source.connect(dir);
+    expect(await source.prioritise('ranker', 'a', 0, 7)).toEqual({ state: 'written' });
+    expect(await source.prioritise('ranker', 'a', null, 7)).toEqual({ state: 'written' });
+    expect(writes(dir)).toEqual([
+      'queue set task:a --priority 0 --revision 7 --json',
+      'queue set task:a --priority none --revision 7 --json',
+    ]);
+  });
+
+  it.each([
+    ['a task that is not live', 'gone', 'top' as const],
+    ['an anchor that is not live', 'a', { after: '--top' }],
+  ])('refuses %s without running Jig', async (_, taskId, place) => {
+    const dir = project(`unknown-${taskId}`, '0.31.0', { tasks });
+    await source.connect(dir);
+    expect(await source.move(`unknown-${taskId}`, taskId, place, 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(writes(dir)).toEqual([]);
+  });
+
+  it("carries Jig's refusal by its code and reads the project again", async () => {
+    const dir = project('stale', '0.31.0', { tasks, write: 'stale-revision' });
+    await source.connect(dir);
+    const from = calls(dir).length;
+    expect(await source.move('stale', 'a', 'top', 3)).toEqual({ state: 'refused', code: 'stale-revision' });
+    const ran = since(dir, from);
+    expect(ran.slice(ran.indexOf('queue move task:a --top --revision 3 --json') + 1)).toContain('task list --json');
+  });
+
+  it('bases a write on the oldest of the reads the board is made of', async () => {
+    const dir = project('mixed', '0.31.0', { tasks });
+    writeFileSync(
+      join(dir, 'status.json'),
+      JSON.stringify({ schema: 1, revision: 5, generated_at: 'x', data: { attention: [], housekeeping: null } }),
+    );
+    await source.connect(dir);
+    expect(await source.tasks('mixed')).toMatchObject({ state: 'ready', revision: 5 });
+  });
+
+  it('answers a project it cannot read with its state, and one it does not know with nothing', async () => {
+    await addProject(join(root, 'write-config'), project('dated', '0.30.0'));
+    expect(await source.move('dated', 'a', 'top', 1)).toEqual({
+      id: 'dated',
+      state: 'unsupported',
+      jigVersion: '0.30.0',
+      minimum: '0.31.0',
+    });
+    expect(await source.prioritise('nobody', 'a', 1, 1)).toBeUndefined();
   });
 });
 
@@ -297,10 +393,11 @@ echo "$*" >> calls.log
 mkdir -p .ai/runtime/working && echo "$*" > .ai/runtime/working/session
 [ -f slow ] && sleep 0.4
 case "$*" in
-  --version) echo "jig 0.29.0" ;;
+  --version) echo "jig 0.31.0" ;;
   "status --json") cat status.json; if grep -q '"error"' status.json; then exit 1; fi ;;
   "task list --json") cat tasks.json ;;
   "spec list --json") echo '{"schema":1,"revision":1,"generated_at":"x","data":{"specs":[]}}' ;;
+  "queue list --json") cat queue.json ;;
 esac
 `,
   );
@@ -313,6 +410,7 @@ esac
         : at({ attention: [], housekeeping: null }),
     );
     writeFileSync(join(dir, 'tasks.json'), at({ tasks, hidden: 0, housekeeping: null }));
+    writeFileSync(join(dir, 'queue.json'), at({ items: [] }));
   };
   answer(1, [task('a', 'active')]);
   return { dir, answer };

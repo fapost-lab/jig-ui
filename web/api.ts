@@ -1,7 +1,6 @@
-import { hc, type InferResponseType } from 'hono/client';
+import { hc, type InferRequestType, type InferResponseType } from 'hono/client';
 import { ref } from 'vue';
 import type { AppType } from '../server/http/app';
-
 /** The server's API, typed by its own routes (`AppType`); only its type crosses into the page. */
 export const client = hc<AppType>('/');
 type Api = typeof client.api;
@@ -19,6 +18,11 @@ export type Specs = Ok<Api['projects'][':id']['specs']['$get']>['specs'];
 export type Spec = Extract<Specs, { state: 'ready' }>['specs'][number];
 export type SpecItem = Spec['phases'][number]['items'][number];
 export type Failure = InferResponseType<Api['projects']['$post'], 422>;
+type Queue = Api['projects'][':id']['queue'];
+/** Where a move puts a task, as the move route takes it. */
+export type Place = NonNullable<InferRequestType<Queue['move']['$post']>['json']['place']>;
+/** The answer to a write of the queue. */
+export type Written = Awaited<ReturnType<Queue['move']['$post'] | Queue['priority']['$post']>>;
 
 /** Why the page cannot show anything: the session or the server ended, the registry cannot be read, or the server failed. */
 export const failure = ref<

@@ -44,11 +44,12 @@ instead of being overwritten.
 
 - [x] `queue-reorder` — reorder and prioritise by drag (after: project board; Jig queue — writes go through Jig's queue command with the revision: `jig queue move` and `jig queue set --priority` with `--revision <n> --json`, read with `jig queue list --json`)
 - [x] `pause-request` — pause and resume as a request — a drop on the paused column writes a sticky request through Jig; the card shows "requested" with its age and a cancel until Jig's state changes; a drop out of it resumes directly (after: project board; Jig legal actions and requests — they say when a pause is offered: `jig queue request|cancel task:<id> pause`, the task's `pause_request` and the `request-pause` / `cancel-pause-request` / `resume` actions in `jig task list --json`)
-- [ ] file a minimal backlog task from the page (after: project board — through `jig task new <id> --goal <text> --json`, refused as `already-exists` when the id is taken)
+- [ ] `file-backlog-task` — file a minimal backlog task from the page (after: project board — through `jig task new <id> --goal <text> --json`, refused as `already-exists` when the id is taken)
 - [ ] conflict display (after: reorder and prioritise by drag — the refusal of a stale revision is what it shows: `error.code` `stale-revision`)
 
 ## Phase 3 — Further
 
+- [ ] resume from the page — a drop out of Paused resumes the task; until then a paused card names `jig task resume <id>` (after: pause and resume as a request — its other half; Jig — `jig task resume` with `--revision <n> --json` and refusals as codes, fapost-lab/jig#295)
 - [ ] fog: hosted and self-hosted Jig UI — a connector on the machine with the projects behind the ProjectSource port; first form is a read-only snapshot with a revision; accounts and file access rules are not stated
 - [ ] fog: installation for people without a development environment, Windows first
 - [ ] fog: epic and spec planning from the page
@@ -65,6 +66,7 @@ instead of being overwritten.
 8. connect by running in the project
 9. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
 10. conflict display
+11. resume from the page
 
 <!--
 Rules (jig-idea §8):

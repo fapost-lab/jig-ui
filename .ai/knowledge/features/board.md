@@ -8,7 +8,7 @@ paths:
   - web/views/BoardView.vue
   - "web/components/Board*.vue"
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
-reviewed_at: 2026-10-18
+reviewed_at: 2026-10-22
 ---
 # Board
 
@@ -17,7 +17,7 @@ reviewed_at: 2026-10-18
 A connected project's live tasks in five columns, shown in the order of `COLUMNS` — Needs you,
 In progress, Ready, Backlog, Paused — worked out from Jig's task list on every read by
 `server/board/columns.ts` (`columnOf`, first rule that fits wins: Paused, Backlog, Needs you,
-Ready, In progress) and served by `GET /api/projects/:id/board`. Cards are light: id, class, goal,
+Ready, In progress) and served by `GET /api/projects/:id/board`. Cards are light: id, class, priority, goal,
 and what the task waits for (gate, autopilot run, pull request — `web/lib/waits.ts`). Finished
 tasks are only counted.
 
@@ -39,7 +39,15 @@ done, or moving.
   ProjectSource hands typed tasks and computes no column (convention-project-source).
 - "Needs you" is read from the task's own state — a gate waiting or changed, an autopilot run
   stopped — so a task's column does not depend on the clone's `agent.git` or on housekeeping.
-- Order inside a column is Jig's list order (by id) until Phase 2 brings Jig's queue.
+- Order inside a column is Jig's queue (`jig queue list`): queued tasks first, the top level
+  before epics' levels, by position; then the unqueued in Jig's list order. The queue starts
+  empty, so a first drag queues one card only.
+- A person changes the order by dragging a card within its column, or with the card's "⋯" menu
+  (To top, Up, Down, To bottom, priority P0–P5 or none). A drop is offered only where one
+  `jig queue move` puts it; a drop on another column does nothing yet
+  (adr-20261022-native-drag-and-drop-with-a-card-menu). The card stays where Jig says, marked
+  "moving…", until the board is read again; a stale write is said in one line above the board
+  (adr-20261022-writes-carry-the-revision-of-their-read).
 - The order of the columns is not the order of the rules: what waits for the person comes first
   (maintainer, task `design-system`, 2026-10-18).
 

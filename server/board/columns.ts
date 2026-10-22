@@ -38,7 +38,18 @@ export function placeOf(task: Task): {
   return { id, title: COLUMNS.find((c) => c.id === id)?.title ?? id };
 }
 
-/** The board: every column, in a fixed order, its cards in the order Jig listed them. Computed on every read, never stored. */
+/** Jig's queue order: the top level first, then each open epic's by its name, by position there; a task not queued after them all. */
+function byQueue(a: Task, b: Task): number {
+  if (!a.queue || !b.queue) return a.queue ? -1 : b.queue ? 1 : 0;
+  const [x, y] = [a.queue.level, b.queue.level];
+  if (x !== y) return x === null ? -1 : y === null ? 1 : x < y ? -1 : 1;
+  return a.queue.position - b.queue.position;
+}
+
+/**
+ * The board: every column, in a fixed order, its cards in Jig's queue order and the tasks not queued after them in the
+ * order Jig listed them (the sort is stable). Computed on every read, never stored.
+ */
 export function columns(tasks: Task[]): Column[] {
-  return COLUMNS.map((c) => ({ ...c, cards: tasks.filter((t) => columnOf(t) === c.id) }));
+  return COLUMNS.map((c) => ({ ...c, cards: tasks.filter((t) => columnOf(t) === c.id).sort(byQueue) }));
 }

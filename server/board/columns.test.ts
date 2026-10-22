@@ -12,6 +12,8 @@ const task = (more: Partial<Task> = {}): Task => ({
   gate: null,
   autopilot: null,
   pullRequest: null,
+  priority: null,
+  queue: null,
   ...more,
 });
 
@@ -44,5 +46,18 @@ describe('columns', () => {
     const board = columns(tasks);
     expect(board.map((c) => c.id)).toEqual(['needs-you', 'in-progress', 'ready', 'backlog', 'paused']);
     expect(board.map((c) => c.cards.map((t) => t.id))).toEqual([[], ['b', 'c'], [], ['a'], ['d']]);
+  });
+
+  it("orders a column as Jig's queue does: the top level, then each epic's, then the tasks not queued in Jig's order", () => {
+    const at = (level: string | null, position: number) => ({ queue: { level, position } });
+    const tasks = [
+      task({ id: 'loose-b' }),
+      task({ id: 'epic-z', ...at('epic:zeta', 100) }),
+      task({ id: 'top-2', ...at(null, 200) }),
+      task({ id: 'loose-a' }),
+      task({ id: 'epic-a', ...at('epic:alpha', 300) }),
+      task({ id: 'top-1', ...at(null, 150) }),
+    ];
+    expect(columns(tasks)[1]?.cards.map((t) => t.id)).toEqual(['top-1', 'top-2', 'epic-a', 'epic-z', 'loose-b', 'loose-a']);
   });
 });

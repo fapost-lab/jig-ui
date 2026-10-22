@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Hono } from 'hono';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { localSource } from '../source/local.js';
 import type { Change, ProjectSource } from '../source/project-source.js';
@@ -114,7 +115,7 @@ function project(name: string, version?: string, refuse = false, tasks: unknown[
   mkdirSync(dir, { recursive: true });
   execFileSync('git', ['init', '-q'], { cwd: dir });
   if (version) {
-    const data = `"data":{"attention":[],"housekeeping":null,"tasks":${JSON.stringify(tasks)},"hidden":0,"specs":[]}`;
+    const data = `"data":{"attention":[],"housekeeping":null,"tasks":${JSON.stringify(tasks)},"hidden":0,"specs":[],"items":[]}`;
     const error = `"error":{"code":"failed","message":"cannot read ${dir.replace(/\\/g, '/')}"}`;
     mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
     writeFileSync(
@@ -165,15 +166,15 @@ describe('/api/projects and /api/workspace', () => {
       headers: { host: HOST, cookie: COOKIE, 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-  const ready = project('ready', '0.29.0');
+  const ready = project('ready', '0.31.0');
   const old = project('old', '0.26.0');
-  const broken = project('broken', '0.29.0', true);
+  const broken = project('broken', '0.31.0', true);
   const empty = { counts: { active: 0, paused: 0, ready: 0 }, attention: [], housekeepingStale: false };
 
   it('connects, lists and disconnects a project, by id only', async () => {
     const first = await call('POST', '/api/projects', { path: ready });
     expect(first.status).toBe(201);
-    expect(await first.json()).toEqual({ project: { id: 'ready', state: 'ready', jigVersion: '0.29.0', ...empty } });
+    expect(await first.json()).toEqual({ project: { id: 'ready', state: 'ready', jigVersion: '0.31.0', ...empty } });
     expect((await call('POST', '/api/projects', { path: join(ready, '.ai') })).status).toBe(200);
 
     expect((await call('POST', '/api/projects', { path: old })).status).toBe(201);
@@ -182,8 +183,8 @@ describe('/api/projects and /api/workspace', () => {
     const text = await list.text();
     expect(JSON.parse(text)).toEqual({
       projects: [
-        { id: 'ready', state: 'ready', jigVersion: '0.29.0', ...empty },
-        { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' },
+        { id: 'ready', state: 'ready', jigVersion: '0.31.0', ...empty },
+        { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' },
         { id: 'broken', state: 'unreadable', code: 'failed' },
       ],
     });
@@ -203,6 +204,7 @@ describe('/api/projects and /api/workspace', () => {
         id: 'ready',
         state: 'ready',
         finished: 0,
+        revision: 1,
         columns: ['needs-you', 'in-progress', 'ready', 'backlog', 'paused'].map((id) => expect.objectContaining({ id, cards: [] })),
       },
     });
@@ -225,7 +227,7 @@ describe('/api/projects and /api/workspace', () => {
 
   it('puts the cards of a project in their columns and carries no worktree path', async () => {
     const tree = join(realpathSync.native(webRoot), 'tree-of-busy').replace(/\\/g, '/');
-    const busy = project('busy', '0.29.0', false, [
+    const busy = project('busy', '0.31.0', false, [
       row('a', { branch: null }),
       row('b', { worktree: { path: tree, uncommitted: 1 }, gate: { state: 'waiting', by: null } }),
       row('c', { status: 'ready' }),
@@ -252,7 +254,7 @@ describe('/api/projects and /api/workspace', () => {
 
   it('serves one task in full with its column, never a worktree path or a refusal naming one', async () => {
     const tree = join(realpathSync.native(webRoot), 'tree-of-detailed').replace(/\\/g, '/');
-    const detailed = project('detailed', '0.29.0', false, [
+    const detailed = project('detailed', '0.31.0', false, [
       row('w', {
         worktree: { path: tree, uncommitted: 2 },
         gate: { state: 'waiting', by: null },
@@ -389,6 +391,83 @@ describe('/api/events', () => {
     await reader.cancel();
     await until(() => listeners.size === 0);
     expect(listeners.size).toBe(0);
+  });
+});
+
+describe('/api/projects/:id/queue', () => {
+  const config = join(webRoot, 'queue-config');
+  const app = createApp({ port: PORT, token: TOKEN, source: localSource(config), webRoot });
+  const post = (target: Hono, path: string, body: unknown, headers: Record<string, string> = { cookie: COOKIE }) =>
+    target.request(path, {
+      method: 'POST',
+      headers: { host: HOST, 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+  const queued = project('queued', '0.31.0', false, [row('a'), row('b')]);
+
+  it("writes a move and a priority through the project's Jig", async () => {
+    await post(app, '/api/projects', { path: queued });
+    const move = await post(app, '/api/projects/queued/queue/move', { task: 'b', place: { after: 'a' }, revision: 1 });
+    expect(move.status).toBe(200);
+    expect(await move.json()).toEqual({ written: true });
+    for (const place of ['top', 'bottom']) {
+      expect((await post(app, '/api/projects/queued/queue/move', { task: 'a', place, revision: 1 })).status).toBe(200);
+    }
+    for (const priority of [0, 5, null]) {
+      expect((await post(app, '/api/projects/queued/queue/priority', { task: 'a', priority, revision: 1 })).status).toBe(200);
+    }
+  });
+
+  it.each([
+    ['move', { place: 'top', revision: 1 }],
+    ['move', { task: '', place: 'top', revision: 1 }],
+    ['move', { task: 'a', place: 'middle', revision: 1 }],
+    ['move', { task: 'a', place: { after: '' }, revision: 1 }],
+    ['move', { task: 'a', place: 'top' }],
+    ['move', { task: 'a', place: 'top', revision: -1 }],
+    ['move', { task: 'a', place: 'top', revision: 1.5 }],
+    ['priority', { task: 'a', priority: 6, revision: 1 }],
+    ['priority', { task: 'a', priority: '1', revision: 1 }],
+    ['priority', { task: 'a', revision: 1 }],
+  ])('refuses a %s of %o as usage', async (kind, body) => {
+    const res = await post(app, `/api/projects/queued/queue/${kind}`, body);
+    expect(res.status).toBe(422);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe('usage');
+  });
+
+  it.each([
+    ['a stale revision', { state: 'refused', code: 'stale-revision' }, 409, 'stale-revision'],
+    ['a task that is not live', { state: 'refused', code: 'not-found' }, 404, 'not-found'],
+    ["another refusal of Jig's", { state: 'refused', code: 'usage' }, 422, 'usage'],
+    ['a project not connected', undefined, 404, 'not-connected'],
+  ] as const)('answers %s', async (_, outcome, status, code) => {
+    const source: ProjectSource = {
+      ...localSource(join(webRoot, 'fake-config')),
+      move: () => Promise.resolve(outcome),
+      prioritise: () => Promise.resolve(outcome),
+    };
+    const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
+    for (const [kind, body] of [
+      ['move', { task: 'a', place: 'top', revision: 1 }],
+      ['priority', { task: 'a', priority: 1, revision: 1 }],
+    ] as const) {
+      const res = await post(fake, `/api/projects/x/queue/${kind}`, body);
+      expect(res.status).toBe(status);
+      expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);
+    }
+  });
+
+  it('answers a project it cannot read with its state', async () => {
+    const res = await post(app, '/api/projects', { path: project('dated', '0.26.0') });
+    expect(res.status).toBe(201);
+    const move = await post(app, '/api/projects/dated/queue/move', { task: 'a', place: 'top', revision: 1 });
+    expect(await move.json()).toEqual({ project: { id: 'dated', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' } });
+  });
+
+  it('is refused without the token and from another origin', async () => {
+    expect((await post(app, '/api/projects/queued/queue/move', { task: 'a', place: 'top', revision: 1 }, {})).status).toBe(401);
+    const foreign = { cookie: COOKIE, origin: 'https://evil.example' };
+    expect((await post(app, '/api/projects/queued/queue/priority', { task: 'a', priority: 1, revision: 1 }, foreign)).status).toBe(403);
   });
 });
 

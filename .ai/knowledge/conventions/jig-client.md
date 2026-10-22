@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-10-18
+reviewed_at: 2026-10-22
 ---
 # JigClient — the only module that knows Jig
 
@@ -26,8 +26,8 @@ Why:      a change of Jig's contract must be a change here and in its contract t
           Jig's files are not a contract Jig promised.
 ```
 
-The minimum Jig the package reads is `MIN_JIG_VERSION` in `server/jig/client.ts` — 0.29.0, the
-first Jig that prints JSON. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
+The minimum Jig the package reads is `MIN_JIG_VERSION` in `server/jig/client.ts` — 0.31.0, the
+first Jig with a queue (0.29.0 was the first that prints JSON). `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
 found from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`), never a
 `bash` on PATH, which may be WSL's. It is asked once per process; a failed ask is not kept.
 
@@ -43,6 +43,11 @@ A task-list read runs Jig's JSON task listing, checks the envelope, then `data` 
 (an unknown code is `failed`); an envelope of another shape throws `JigShapeError`, which the
 project shows as `incompatible` ("update Jig UI"), never half-parsed. Each read has a contract
 test over a fixture in `server/jig/fixtures/`.
+
+A write — `moveInQueue`, `setPriority` — names a task as `task:<id>`, passes `--revision <n>` and
+`--json`, and goes through the same envelope check: `stale-revision`, `not-found`, `usage` and
+`already-exists` come back as `JigRefusal` codes. Its success answer carries the revision before
+the write, so the caller reads again; a test pins each command's arguments and a refusal.
 
 ## Rationale
 

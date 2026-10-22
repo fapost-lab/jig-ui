@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-10-18
+reviewed_at: 2026-10-22
 ---
 # ProjectSource — how the server reaches a project
 
@@ -31,7 +31,9 @@ Callers (`board/`, and `http/` for task details and the change stream) depend on
 The port is `ProjectSource` in `server/source/project-source.ts` — the workspace, a project's
 live tasks (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), its specs
 (`specs(id)`), connect,
-disconnect, and `subscribe` to changes; its local adapter
+disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)` and
+`prioritise(id, taskId, priority, revision)`, which answer `written`, `refused` with Jig's code,
+or the project's state when it is not `ready`; its local adapter
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
 only the path a person types to connect. A read that fails becomes a state of the project, not an
 error of the workspace: `unreadable` with Jig's failure code and never its message (it may name a
@@ -50,6 +52,11 @@ needs once its subscription is open, and is told only of changes after that (tas
 those signals made every page read everything two or three times). Meanwhile `workspace()`, `tasks(id)`, `task(id, taskId)` and `specs(id)` answer
 from that last read (feature-live-updates) — a read made in this following, never one that
 finished after the last listener left (task `specs-and-epics`: the next listener was served it).
+
+A write runs Jig only when the task, and a move's anchor, are live in the last read the adapter
+showed — anything else is `refused: not-found` without Jig — and answers after the project is
+read again (adr-20261022-writes-carry-the-revision-of-their-read). A board's `revision` is the
+lowest of its reads' revisions (status, task list, queue).
 
 ## Example
 

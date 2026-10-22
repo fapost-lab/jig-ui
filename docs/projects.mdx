@@ -17,7 +17,7 @@ only starts. Running it again in a connected project changes nothing; it opens t
 page and choose **Connect**. A path inside the project works too; Jig UI connects the project's
 root. `~/` stands for your home folder.
 
-The project needs [Jig 0.29.0 or later](/requirements). Each project gets a short id from its
+The project needs [Jig 0.31.0 or later](/requirements). Each project gets a short id from its
 folder name (`My Project` becomes `my-project`, a second `api` becomes `api-2`); the page names
 it by that id.
 
@@ -56,10 +56,10 @@ project whose state is not readable shows why:
 
 | Shown | Meaning |
 | --- | --- |
-| `Jig 0.29.0` | The project is connected and readable. |
+| `Jig 0.31.0` | The project is connected and readable. |
 | Answers in a form this Jig UI does not read | The project's Jig is newer than this Jig UI understands. Update Jig UI: `npx @fapost/jig-ui@latest`. |
 | Jig could not be read | Jig refused the read — for example while an agent is writing to the project. The code in brackets is Jig's; the next change in the project tries again. |
-| Jig UI needs 0.29.0 or later | The project's Jig is older than Jig UI reads. Run `jig upgrade` in the project; it is shown as readable once the upgrade lands, without connecting it again. |
+| Jig UI needs 0.31.0 or later | The project's Jig is older than Jig UI reads. Run `jig upgrade` in the project; it is shown as readable once the upgrade lands, without connecting it again. |
 | The project directory is not there any more | The folder was moved or deleted. Disconnect it, then connect its new path. |
 | There is no Jig in the project any more | Jig was removed from the project. |
 
@@ -78,8 +78,30 @@ fits wins:
 | Ready | its work is done (`status ready`); the card says whether a pull request is open, its CI, or merged |
 | In progress | anything else that is live |
 
-A card shows the task's id, class and goal, and what it waits for. Finished tasks are only
-counted above the board. The order inside a column is Jig's (by id) for now.
+A card shows the task's id, class and goal, its priority (`P0`, the most urgent, to `P5`) when it
+has one, and what it waits for. Finished tasks are only counted above the board.
+
+## Ordering the work
+
+Inside a column the tasks stand in the order of the project's queue in Jig (`jig queue`): the
+queued tasks first, then the ones not queued yet, in Jig's order. Agents see the same queue in
+`jig status` and `jig context`.
+
+- **Drag a card** up or down within its column, on the board or in the list. Jig UI runs
+  `jig queue move` in the project; the card moves once Jig has written it, not before, and says
+  *moving…* meanwhile. A line marks where it will land; where there is none, Jig's order cannot
+  put it there — for example inside the run of tasks on another epic.
+- **The ⋯ menu** on a card or row does the same without a mouse: **To top**, **Up**, **Down**,
+  **To bottom**, and **Priority** from P0 to P5, or none (`jig queue set --priority`).
+
+A queue starts empty: a task joins it the first time it is moved, so the first card you drag
+goes to the top of the queue or right after the last queued task above it.
+
+If anything was written in the project between the moment the board was read and your change —
+an agent working, a `jig` command in a terminal — Jig refuses the change. The page says so above
+the board and reads it again; look at the new order and make the change again.
+
+A drop on another column does nothing yet.
 
 **Board / List** switches between the columns side by side and a list: the same columns as
 groups of one-line rows, each group folding away; **Specs** shows the project's specs

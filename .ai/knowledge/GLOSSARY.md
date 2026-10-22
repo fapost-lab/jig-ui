@@ -68,6 +68,23 @@ the card shows it with its age.
 Informal synonyms: pending move.
 Use in: source code, API, documentation.
 
+## Queue
+
+Jig's order of a project's work (`jig queue list`): tasks and epics by level — the top level, then
+each open epic's — and position. A task is in it only once something placed it there; the board
+orders each column by it.
+
+Informal synonyms: backlog order, ranking.
+Use in: source code, API, documentation.
+
+## Priority
+
+A task's urgency in Jig's queue, 0 (most) to 5, or none; shown on a card as `P0`…`P5`. Set
+apart from its position: priority does not reorder the queue.
+
+Informal synonyms: severity, importance.
+Use in: source code, API, documentation.
+
 ## Revision
 
 The version of a project's state a read came from; carried by the change signal and sent back

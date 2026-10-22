@@ -1,12 +1,13 @@
 <script setup lang="ts">
   import { Columns3, Milestone, Rows3 } from '@lucide/vue';
   import { computed, onUnmounted, ref, watch } from 'vue';
-  import { type Board, call, client, describe, onChange, readTask, type ReadyDetails, type Specs } from '@/api';
+  import { type Board, call, client, describe, onChange, type Place, readTask, type ReadyDetails, type Specs, type Written } from '@/api';
   import BoardColumns from '@/components/BoardColumns.vue';
   import BoardList from '@/components/BoardList.vue';
   import SpecCard from '@/components/SpecCard.vue';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { lastWins } from '@/lib/last-wins';
+  import { toneText } from '@/lib/tones';
 
   const props = defineProps<{
     id: string;
@@ -83,6 +84,39 @@
 
   const liveIds = computed(() => cards.value.map((t) => t.id));
 
+  /** The task whose change is on its way to Jig, and what the last change came to when Jig refused it. */
+  const pending = ref<string>();
+  const notice = ref<string>();
+
+  /**
+   * Sends one change with the revision of the board it was made on, then reads the board again whatever came of it:
+   * the card moves when Jig's order does, never before.
+   */
+  async function write(task: string, doing: string, send: (revision: number) => Promise<Written>): Promise<void> {
+    const shown = board.value;
+    if (typeof shown !== 'object' || shown.state !== 'ready' || pending.value !== undefined) return;
+    pending.value = task;
+    notice.value = undefined;
+    const res = await call(() => send(shown.revision));
+    if (res && res.status !== 200) {
+      const { code } = (await res.json()).error;
+      notice.value =
+        code === 'stale-revision'
+          ? `The project changed while you were ${doing} ${task}; the board is read again — try again.`
+          : `Jig refused ${doing} ${task} (${code}).`;
+    }
+    await load();
+    pending.value = undefined;
+  }
+
+  const move = (task: string, place: Place) =>
+    write(task, 'moving', (revision) => client.api.projects[':id'].queue.move.$post({ param, json: { task, place, revision } }));
+
+  const prioritise = (task: string, priority: number | null) =>
+    write(task, 'setting the priority of', (revision) =>
+      client.api.projects[':id'].queue.priority.$post({ param, json: { task, priority, revision } }),
+    );
+
   onUnmounted(
     onChange((project) => {
       if (project !== undefined && project !== props.id) return;
@@ -116,6 +150,11 @@
       </ToggleGroup>
     </div>
 
+    <p v-if="notice" role="status" class="flex shrink-0 items-center gap-2 border-b px-3 py-1.5" :class="toneText.attention">
+      {{ notice }}
+      <button type="button" class="ml-auto underline underline-offset-2" @click="notice = undefined">dismiss</button>
+    </p>
+
     <p v-if="board === undefined" class="p-3 text-muted-foreground">Reading the board…</p>
     <p v-else-if="board === 'not-connected'" role="alert" class="p-3 text-destructive">No connected project is called {{ id }}.</p>
     <p v-else-if="board.state !== 'ready'" class="p-3">{{ describe(board) }}</p>
@@ -126,7 +165,10 @@
       :columns="board.columns"
       :selected="selected"
       :details="details"
+      :pending="pending"
       @toggle="(task) => (selected = selected === task ? undefined : task)"
+      @move="move"
+      @prioritise="prioritise"
     />
 
     <div v-else-if="view === 'specs'" class="min-h-0 flex-1 overflow-y-auto">
@@ -147,7 +189,10 @@
       :columns="board.columns"
       :selected="selected"
       :details="details"
+      :pending="pending"
       @select="(task) => (selected = task)"
+      @move="move"
+      @prioritise="prioritise"
     />
   </div>
 </template>

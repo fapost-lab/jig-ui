@@ -12,6 +12,8 @@ const task = (more: Partial<Task> = {}): Task => ({
   gate: null,
   autopilot: null,
   pullRequest: null,
+  priority: null,
+  queue: null,
   ...more,
 });
 

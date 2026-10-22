@@ -44,9 +44,16 @@ async function bash(platform: NodeJS.Platform): Promise<string> {
   return gitBash;
 }
 
+/**
+ * Git bash on Windows expands wildcards in the arguments it starts with — Node leaves a one-word goal such as
+ * `refactor*` unquoted — so `noglob` keeps a person's text as typed (CI, task `file-backlog-task`).
+ */
+const env = (platform: NodeJS.Platform): NodeJS.ProcessEnv | undefined =>
+  platform === 'win32' ? { ...process.env, MSYS: [process.env.MSYS, 'noglob'].filter(Boolean).join(' ') } : undefined;
+
 /** Runs the project's own Jig in its main checkout, without a shell. */
 async function jig(root: string, args: string[], platform: NodeJS.Platform): Promise<string> {
-  const { stdout } = await run(await bash(platform), [SCRIPT, ...args], { cwd: root, timeout: TIMEOUT_MS });
+  const { stdout } = await run(await bash(platform), [SCRIPT, ...args], { cwd: root, timeout: TIMEOUT_MS, env: env(platform) });
   return stdout;
 }
 

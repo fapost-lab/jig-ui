@@ -51,7 +51,9 @@ codes. Its success answer carries the revision before
 the write, so the caller reads again; a test pins each command's arguments and a refusal.
 `fileTask` (`jig task new <id> --goal <text>`) takes no revision — Jig has none for it — and its
 tests pin that a person's goal reaches Jig as one argument, unglobbed
-(adr-20261022-filing-a-task-carries-no-revision).
+(adr-20261022-filing-a-task-carries-no-revision). On Windows Jig runs with `MSYS=noglob`: Git bash
+otherwise expands a wildcard in an argument Node left unquoted, such as a one-word goal `out*` —
+the Windows CI leg caught it.
 
 ## Rationale
 

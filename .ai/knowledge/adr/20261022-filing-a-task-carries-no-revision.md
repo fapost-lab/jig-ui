@@ -32,7 +32,8 @@ the revision of the board it showed, so a change nobody saw is never written ove
   earlier ADR cannot hold for them. They are checked at the API against Jig's own grammar — an
   id of `[A-Za-z0-9._-]` not starting with `.` or `-`, a goal of one non-empty line of at most
   500 characters — and refused `422 usage` without running Jig; JigClient passes them by
-  `execFile`, never through a shell.
+  `execFile`, never through a shell — on Windows in the environment, since Git bash globs and
+  unquotes its own command line (convention-jig-client).
 - HTTP: `POST /api/projects/:id/tasks {task, goal}`; `200 { written: true }` after the re-read,
   `409` for `already-exists`, `422` for `usage`, `404` for `not-connected`.
 - Everything else in the earlier ADR holds: the re-read before the answer, the page waiting for

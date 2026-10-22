@@ -369,8 +369,8 @@ describe('filing a task', () => {
     expect(args(dir)).toEqual(['task', 'new', 'zeta', '--goal', 'File it; "quoted" --json $(x)', '--json']);
   });
 
-  // Unquoted by Node on Windows, a one-word goal must not be globbed by Git bash against the files in the checkout.
-  it.each(['out*', '*.json'])('keeps the one-word goal %s as it was typed', async (goal) => {
+  // Unquoted by Node on Windows, a one-word goal must reach Jig as typed: Git bash globs and unquotes its command line.
+  it.each(['out*', '*.json', "don't", 'a\\b', '"quoted"'])('keeps the one-word goal %s as it was typed', async (goal) => {
     const dir = logging(`case-${cases++}`, 'task-new.json');
     await fileTask(dir, 'zeta', goal);
     expect(args(dir)).toEqual(['task', 'new', 'zeta', '--goal', goal, '--json']);

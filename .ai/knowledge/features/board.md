@@ -8,8 +8,9 @@ paths:
   - web/views/BoardView.vue
   - "web/components/Board*.vue"
   - web/components/NewTaskForm.vue
+  - web/lib/conflict.ts
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
-reviewed_at: 2026-10-22
+reviewed_at: 2026-10-25
 ---
 # Board
 
@@ -56,6 +57,13 @@ done, or moving.
   page (`web/lib/clock.ts`), once a minute, not with reads: an idle project is not read again.
   A drop on any other column does nothing.
 - A paused card names `jig task resume <id>`; the page does not resume a task.
+- A change Jig refuses as `stale-revision` shows the conflict: the page compares the board the
+  change was made on with the read the change itself started (`web/lib/conflict.ts`), marks each
+  card that is new, in another column, moved within its own, or shows other facts — "Changed while
+  you acted" — and says in one line above the board what became of the person's card and how many
+  others changed or left. The marks live as long as that line: dismiss, or the next change, clears
+  both. Jig's revision rises with every write in the clone, so "nothing on the board changed" is a
+  common answer while agents work.
 - "New task" above the board files a task with an id and a one-line goal (`jig task new <id>
   --goal <goal>`, `POST /api/projects/:id/tasks`); it shows in Backlog once Jig wrote it. No
   revision: a new id overwrites nothing (adr-20261022-filing-a-task-carries-no-revision). An id
@@ -79,6 +87,12 @@ done, or moving.
   task's branch (never so for a task in its own worktree), and applies a stash into the person's
   checkout. Raised as fapost-lab/jig#295; the maintainer chose to show the command meanwhile
   (task `pause-request`, 2026-10-22).
+- Conflict display (task `conflict-display`, 2026-10-25, the maintainer's choice of marking the
+  changes over a list of them or the one line as before). A move within a column is the cards
+  outside the longest run that kept its order — of equal runs, the one keeping most cards whose
+  queue position did not change — not a changed index, which marks a whole column after one
+  insert, nor a changed position, which Jig respaces for a whole level when there is no room.
+  Marks that fade after a minute — rejected for a timer that tells nothing the line does not.
 - Board and List as two addresses — rejected: the switch is a way of looking at one board.
 - The view remembered in Jig UI's settings file — rejected: a preference of one browser need
   not survive it.

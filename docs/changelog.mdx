@@ -14,6 +14,9 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 - [Pause a task](/projects#pausing-a-task) from the board: drag it onto Paused, or use its ⋯ menu,
   to ask Jig to pause it at its next stage boundary; the card shows the request with its age and a
   cancel. A paused card names the command that resumes it.
+- A change the project overtook shows the [conflict](/projects#ordering-the-work): the line above
+  the board says what became of your card, and the cards that changed while you acted are marked.
+- A project that cannot be read shows a red `!` on its tab.
 - [File a task](/projects#filing-a-task) from the board: **New task** takes an id and a goal and
   runs `jig task new`; the task appears in Backlog.
 - Jig UI now needs Jig 0.31.0 or later in each project; run `jig upgrade` in an older one.

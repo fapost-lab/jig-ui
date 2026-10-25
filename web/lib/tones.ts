@@ -20,6 +20,9 @@ export const toneRule: Record<Tone, string> = {
 /** Attention as a filled mark, the count on a project's tab. */
 export const attentionFill = 'bg-amber-500 text-black';
 
+/** Wrong as a filled mark, the `!` on the tab of a project that cannot be read. */
+export const badFill = 'bg-red-600 text-white';
+
 /** Done as a filled bar, a roadmap's progress. */
 export const doneFill = 'bg-emerald-500';
 

@@ -179,29 +179,44 @@
 
     <CanvasSection
       title="TaskCard"
-      note="every note a card carries, a priority among them; with its queue menu; while its change is on its way; open with details, while reading, unreadable"
+      note="every note a card carries, a priority among them; with its queue menu; while its change is on its way; changed since a refused change; open with details, while reading, unreadable"
     >
       <div class="grid grid-cols-2 gap-2 xl:grid-cols-3">
         <TaskCard v-for="task in tasks" :key="task.id" project="jig-ui" :task="task" :open="false" />
         <TaskCard project="jig-ui" :task="tasks[1]!" :open="false" :cards="tasks" />
         <TaskCard project="jig-ui" :task="tasks[0]!" :open="false" :cards="tasks" busy />
+        <TaskCard project="jig-ui" :task="tasks[3]!" :open="false" :cards="tasks" changed />
         <TaskCard project="jig-ui" :task="tasks[2]!" :open="true" :details="details[0]" />
         <TaskCard project="jig-ui" :task="tasks[0]!" :open="true" />
         <TaskCard project="jig-ui" :task="tasks[1]!" :open="true" details="unavailable" />
       </div>
     </CanvasSection>
 
-    <CanvasSection title="TaskRow" note="each note and priority; selected; with its queue menu; while its change is on its way">
+    <CanvasSection
+      title="TaskRow"
+      note="each note and priority; selected; with its queue menu; while its change is on its way; changed since a refused change"
+    >
       <div>
         <TaskRow v-for="(task, i) in tasks" :key="task.id" :task="task" :selected="i === 2" />
         <TaskRow :task="tasks[1]!" :selected="false" :cards="tasks" />
         <TaskRow :task="tasks[0]!" :selected="false" :cards="tasks" busy />
+        <TaskRow :task="tasks[3]!" :selected="false" :cards="tasks" changed />
       </div>
     </CanvasSection>
 
-    <CanvasSection title="BoardColumns" note="cards in every column, one open with its details; no live task">
+    <CanvasSection
+      title="BoardColumns"
+      note="cards in every column, one open with its details, two changed since a refused change; no live task"
+    >
       <div class="flex h-[28rem] flex-col">
-        <BoardColumns project="jig-ui" :columns="board" :selected="tasks[2]!.id" :details="details[0]" :pending="tasks[0]!.id" />
+        <BoardColumns
+          project="jig-ui"
+          :columns="board"
+          :selected="tasks[2]!.id"
+          :details="details[0]"
+          :pending="tasks[0]!.id"
+          :changed="[tasks[1]!.id, tasks[3]!.id]"
+        />
       </div>
       <div class="flex h-40 flex-col">
         <BoardColumns project="jig-ui" :columns="emptyBoard" />

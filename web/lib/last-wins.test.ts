@@ -14,7 +14,7 @@ describe('lastWins', () => {
     const second = load();
     answers[1]?.('new');
     answers[0]?.('old');
-    await Promise.all([first, second]);
+    expect(await Promise.all([first, second])).toEqual(['old', 'new']);
     expect(landed).toEqual(['new']);
   });
 

@@ -14,6 +14,7 @@
     selected?: string;
     details?: ReadyDetails | 'unavailable';
     pending?: string;
+    changed?: string[];
   }>();
 
   const emit = defineEmits<{
@@ -62,6 +63,7 @@
             :details="selected === task.id ? details : undefined"
             :cards="column.cards"
             :busy="pending === task.id"
+            :changed="changed?.includes(task.id)"
             @toggle="$emit('toggle', task.id)"
             @move="(place) => $emit('move', task.id, place)"
             @prioritise="(p) => $emit('prioritise', task.id, p)"

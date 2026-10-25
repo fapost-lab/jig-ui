@@ -19,6 +19,8 @@
     cards?: Task[];
     /** A change of its place, priority or pause is on its way to Jig. */
     busy?: boolean;
+    /** It changed between the board a refused change was made on and the board read after it. */
+    changed?: boolean;
   }>();
 
   defineEmits<{
@@ -56,6 +58,7 @@
       />
     </div>
     <p v-if="busy" class="text-muted-foreground" role="status">sending to Jig…</p>
+    <p v-if="changed" :class="toneRule.attention">Changed while you acted</p>
     <p v-if="note" :class="toneRule[note.tone]">
       {{ note.text }}
       <a

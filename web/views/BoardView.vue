@@ -9,6 +9,7 @@
   import { Button } from '@/components/ui/button';
   import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+  import { conflict } from '@/lib/conflict';
   import { lastWins } from '@/lib/last-wins';
   import { toneText } from '@/lib/tones';
 
@@ -87,9 +88,15 @@
 
   const liveIds = computed(() => cards.value.map((t) => t.id));
 
-  /** The task whose change is on its way to Jig, and what the last change came to when Jig refused it. */
+  /**
+   * The task whose change is on its way to Jig, and what the last change came to when Jig refused it — with the cards
+   * that changed since it was made, when the refusal was a stale revision. Dismissing it, or the next change, clears both.
+   */
   const pending = ref<string>();
-  const notice = ref<string>();
+  const notice = ref<{
+    text: string;
+    changed: string[];
+  }>();
 
   /**
    * Sends one change with the revision of the board it was made on, then reads the board again whatever came of it:
@@ -101,14 +108,16 @@
     pending.value = task;
     notice.value = undefined;
     const res = await call(() => send(shown.revision));
-    if (res && res.status !== 200) {
-      const { code } = (await res.json()).error;
-      notice.value =
-        code === 'stale-revision'
-          ? `The project changed while you were ${doing} ${task}; the board is read again — try again.`
-          : `Jig refused ${doing} ${task} (${code}).`;
-    }
-    await load();
+    const code = res && res.status !== 200 ? (await res.json()).error.code : undefined;
+    // The read this change started, not what the board shows: a read started after it may land in its place.
+    const read = await load();
+    if (code === 'stale-revision') {
+      const seen = typeof read === 'object' && read.state === 'ready' ? conflict(shown.columns, read.columns, task) : undefined;
+      notice.value = {
+        text: `The project changed while you were ${doing} ${task}${seen ? ` — ${seen.said}` : ''}. Try again on the board as it is now.`,
+        changed: seen?.changed ?? [],
+      };
+    } else if (code !== undefined) notice.value = { text: `Jig refused ${doing} ${task} (${code}).`, changed: [] };
     pending.value = undefined;
   }
 
@@ -199,7 +208,7 @@
     </Collapsible>
 
     <p v-if="notice" role="status" class="flex shrink-0 items-center gap-2 border-b px-3 py-1.5" :class="toneText.attention">
-      {{ notice }}
+      {{ notice.text }}
       <button type="button" class="ml-auto underline underline-offset-2" @click="notice = undefined">dismiss</button>
     </p>
 
@@ -214,6 +223,7 @@
       :selected="selected"
       :details="details"
       :pending="pending"
+      :changed="notice?.changed"
       @toggle="(task) => (selected = selected === task ? undefined : task)"
       @move="move"
       @prioritise="prioritise"
@@ -239,6 +249,7 @@
       :selected="selected"
       :details="details"
       :pending="pending"
+      :changed="notice?.changed"
       @select="(task) => (selected = task)"
       @move="move"
       @prioritise="prioritise"

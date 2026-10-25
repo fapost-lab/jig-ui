@@ -39,7 +39,7 @@ Connect only projects whose Jig you would run yourself; that includes running
 ## What the page shows
 
 A row of tabs runs along the top: `jig-ui://` for this page, then one tab per connected project
-with how many things need you there (`!` when the project cannot be read). Below, each connected
+with how many things need you there (a red `!` when the project cannot be read). Below, each connected
 project, in the order you connected them. The page is dark; the button at the right end of the tabs
 switches it to light, and the browser remembers the choice. For a readable project:
 
@@ -112,8 +112,18 @@ A queue starts empty: a task joins it the first time it is moved, so the first c
 goes to the top of the queue or right after the last queued task above it.
 
 If anything was written in the project between the moment the board was read and your change —
-an agent working, a `jig` command in a terminal — Jig refuses the change. The page says so above
-the board and reads it again; look at the new order and make the change again.
+an agent working, a `jig` command in a terminal — Jig refuses the change, so nothing written
+meanwhile is overwritten. The page reads the board again and shows the conflict:
+
+- the line above the board says what became of your card — *beta is now in Ready*, *beta moved in
+  Backlog*, *beta is no longer on the board* — and how many other cards changed;
+- each card that changed while you acted says *Changed while you acted* (*changed* in the list):
+  new, in another column, moved within its own, or with other facts, such as its priority. The
+  marks show what changed up to Jig's refusal; the board itself keeps following the project.
+
+Jig counts every write in the project, so the line may say *nothing on the board changed*: an agent
+wrote elsewhere, a document or a stage. Make the change again on the board as it is now;
+**dismiss**, or your next change, clears the marks.
 
 ## Pausing a task
 

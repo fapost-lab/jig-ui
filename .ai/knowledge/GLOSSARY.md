@@ -93,6 +93,12 @@ with every write, so a stale write is refused.
 Informal synonyms: version, etag, hash.
 Use in: source code, API.
 
+## Conflict
+A change from the page that Jig refused as `stale-revision`, shown as what changed on the board
+between the read it was made on and the read after it.
+Informal synonyms: stale write, collision.
+Use in: source code, documentation.
+
 ## ProjectSource
 
 The port through which the server reads and changes a connected project; the local adapter is

@@ -48,13 +48,15 @@ async function bash(platform: NodeJS.Platform): Promise<string> {
  * Runs the project's own Jig in its main checkout, without a shell. Git bash on Windows parses its own command line:
  * it globs an argument Node left unquoted (a one-word goal `out*` became `out.json`), and with `MSYS=noglob` it reads
  * `\"` as a backslash and a quote instead (CI, task `file-backlog-task`). There the arguments go in the environment,
- * and a fixed script hands them to Jig, so nothing parses a person's text.
+ * and a fixed script hands them to Jig, so nothing parses a person's text. The script sources Jig (which finds itself
+ * by `BASH_SOURCE`) rather than `exec` it: Git bash's `exec` starts a second bash and waits for it, and every run took
+ * half as long again (CI, task `conflict-display`).
  */
 async function jig(root: string, args: string[], platform: NodeJS.Platform): Promise<string> {
   const argv = [SCRIPT, ...args];
   const { stdout } =
     platform === 'win32'
-      ? await run(await bash(platform), ['-c', `exec "$BASH" ${argv.map((_, i) => `"$JIG_UI_ARG_${i}"`).join(' ')}`], {
+      ? await run(await bash(platform), ['-c', `. ${argv.map((_, i) => `"$JIG_UI_ARG_${i}"`).join(' ')}`], {
           cwd: root,
           timeout: TIMEOUT_MS,
           env: { ...process.env, ...Object.fromEntries(argv.map((arg, i) => [`JIG_UI_ARG_${i}`, arg])) },

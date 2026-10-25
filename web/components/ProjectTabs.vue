@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import type { Project } from '@/api';
-  import { attentionFill } from '@/lib/tones';
+  import { attentionFill, badFill } from '@/lib/tones';
 
   /** `current` is the project whose page is open, if any; the count on a tab is what needs the person there. The slot goes at the right end. */
   defineProps<{
@@ -37,7 +37,7 @@
       >
         {{ project.attention.length }}
       </span>
-      <span v-else-if="project.state !== 'ready'" class="text-muted-foreground" aria-label="not readable">!</span>
+      <span v-else-if="project.state !== 'ready'" :class="badFill" class="px-1" aria-label="not readable">!</span>
     </RouterLink>
     <div class="ml-auto flex shrink-0 items-center gap-2 px-2">
       <span v-if="version" class="px-2 text-muted-foreground">v{{ version }}</span>

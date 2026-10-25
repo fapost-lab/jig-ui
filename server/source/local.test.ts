@@ -45,7 +45,7 @@ const attention = {
 };
 
 /**
- * A git clone whose Jig answers `--version`, `status --json`, `task list --json` and `spec list --json` from files, and
+ * A git clone whose Jig answers `--version`, `status --json`, `task list --all --json` and `spec list --json` from files, and
  * logs every call to `calls.log`. `status` given as a string is printed as is, with exit 1.
  */
 function project(
@@ -85,7 +85,7 @@ echo "$*" >> calls.log
 case "$*" in
   --version) echo "jig ${version}" ;;
   "status --json") cat status.json; exit ${refused ? 1 : 0} ;;
-  "task list --json") cat tasks.json ;;
+  "task list --all --json") cat tasks.json ;;
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
   "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*) cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
@@ -123,8 +123,13 @@ describe('localSource', () => {
         }),
         task('c', 'active', true),
         task('d', 'ready'),
+        task('closed', 'consolidated', false, {
+          updated_at: '2026-10-24',
+          pull_request: { url: 'https://github.com/o/r/pull/9', state: 'merged', ci: 'green', fetched_at: 'x' },
+        }),
+        task('dropped', 'abandoned', true, { goal: null, branch: null }),
       ],
-      hidden: 2,
+      hidden: 0,
       housekeeping: null,
     },
   });
@@ -148,7 +153,7 @@ describe('localSource', () => {
       { id: 'broken', state: 'unreadable', code: 'not-initialised' },
     ]);
     expect(calls(old)).not.toContain('status --json');
-    expect(calls(old)).not.toContain('task list --json');
+    expect(calls(old)).not.toContain('task list --all --json');
     expect(calls(old)).not.toContain('spec list --json');
   });
 
@@ -215,7 +220,7 @@ describe('localSource', () => {
     await source.disconnect('newer');
   });
 
-  it("lists a project's live tasks as a board reads them, with the finished ones counted", async () => {
+  it("lists a project's live tasks as a board reads them, and the finished ones Jig keeps", async () => {
     await source.connect(
       project('waiting', '0.31.0', {
         tasks: {
@@ -243,7 +248,16 @@ describe('localSource', () => {
     );
     expect(await source.tasks('busy')).toEqual({
       state: 'ready',
-      finished: 2,
+      finished: [
+        {
+          id: 'closed',
+          status: 'consolidated',
+          goal: 'Goal of closed',
+          updatedAt: '2026-10-24',
+          pullRequest: { url: 'https://github.com/o/r/pull/9', state: 'merged' },
+        },
+        { id: 'dropped', status: 'abandoned', goal: null, updatedAt: '2026-10-17', pullRequest: null },
+      ],
       revision: 7,
       tasks: [
         {
@@ -274,7 +288,7 @@ describe('localSource', () => {
     });
     expect(await source.tasks('waiting')).toEqual({
       state: 'ready',
-      finished: 0,
+      finished: [],
       revision: 7,
       tasks: [
         expect.objectContaining({ id: 'f', started: false, gate: null, autopilot: null }),
@@ -303,6 +317,7 @@ describe('localSource', () => {
       task: { id: 'a', attention: [], actions: [{ id: 'request-pause', command: 'jig queue request task:a pause' }] },
     });
     expect(await source.task('busy', 'gone-task')).toEqual({ state: 'ready', task: null });
+    expect(await source.task('busy', 'closed')).toEqual({ state: 'ready', task: null });
     expect(await source.task('old', 'a')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' });
     expect(await source.task('nobody', 'a')).toBeUndefined();
   });
@@ -315,7 +330,11 @@ describe('localSource', () => {
 
 describe('localSource, writing the queue', () => {
   const source = localSource(join(root, 'write-config'));
-  const tasks = { tasks: [task('a', 'active'), task('b', 'active', false, { branch: null })], hidden: 0, housekeeping: null };
+  const tasks = {
+    tasks: [task('a', 'active'), task('b', 'active', false, { branch: null }), task('done', 'consolidated')],
+    hidden: 0,
+    housekeeping: null,
+  };
   const writes = (dir: string) => calls(dir).filter((c) => /^(queue (move|set|request|cancel)|task new) /.test(c));
   /** The calls since `from`: what Jig ran for one write. */
   const since = (dir: string, from: number) => calls(dir).slice(from);
@@ -328,7 +347,7 @@ describe('localSource, writing the queue', () => {
     const ran = since(dir, from);
     const moved = ran.indexOf('queue move task:b --after task:a --revision 7 --json');
     expect(moved).toBeGreaterThanOrEqual(0);
-    expect(ran.slice(moved + 1)).toEqual(expect.arrayContaining(['task list --json', 'queue list --json']));
+    expect(ran.slice(moved + 1)).toEqual(expect.arrayContaining(['task list --all --json', 'queue list --json']));
     expect(await source.move('mover', 'a', 'top', 7)).toEqual({ state: 'written' });
     expect(await source.move('mover', 'a', 'bottom', 7)).toEqual({ state: 'written' });
     expect(writes(dir).slice(1)).toEqual(['queue move task:a --top --revision 7 --json', 'queue move task:a --bottom --revision 7 --json']);
@@ -353,7 +372,7 @@ describe('localSource, writing the queue', () => {
     const ran = since(dir, from);
     const filed = ran.indexOf('task new zeta --goal Do the thing --json');
     expect(filed).toBeGreaterThanOrEqual(0);
-    expect(ran.slice(filed + 1)).toEqual(expect.arrayContaining(['task list --json']));
+    expect(ran.slice(filed + 1)).toEqual(expect.arrayContaining(['task list --all --json']));
     expect(await source.fileTask('nobody', 'zeta', 'x')).toBeUndefined();
   });
 
@@ -367,12 +386,14 @@ describe('localSource, writing the queue', () => {
   });
 
   it.each([
-    ['a task that is not live', 'gone', 'top' as const],
-    ['an anchor that is not live', 'a', { after: '--top' }],
-  ])('refuses %s without running Jig', async (_, taskId, place) => {
-    const dir = project(`unknown-${taskId}`, '0.31.0', { tasks });
+    ['a task that is not live', 'unknown-task', 'gone', 'top' as const],
+    ['an anchor that is not live', 'unknown-anchor', 'a', { after: '--top' }],
+    ['a finished task, which Jig still lists', 'finished-task', 'done', 'top' as const],
+    ['a finished anchor', 'finished-anchor', 'a', { after: 'done' }],
+  ])('refuses %s without running Jig', async (_, name, taskId, place) => {
+    const dir = project(name, '0.31.0', { tasks });
     await source.connect(dir);
-    expect(await source.move(`unknown-${taskId}`, taskId, place, 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.move(name, taskId, place, 7)).toEqual({ state: 'refused', code: 'not-found' });
     expect(writes(dir)).toEqual([]);
   });
 
@@ -382,7 +403,7 @@ describe('localSource, writing the queue', () => {
     const from = calls(dir).length;
     expect(await source.move('stale', 'a', 'top', 3)).toEqual({ state: 'refused', code: 'stale-revision' });
     const ran = since(dir, from);
-    expect(ran.slice(ran.indexOf('queue move task:a --top --revision 3 --json') + 1)).toContain('task list --json');
+    expect(ran.slice(ran.indexOf('queue move task:a --top --revision 3 --json') + 1)).toContain('task list --all --json');
   });
 
   it('bases a write on the oldest of the reads the board is made of', async () => {
@@ -430,7 +451,7 @@ mkdir -p .ai/runtime/working && echo "$*" > .ai/runtime/working/session
 case "$*" in
   --version) echo "jig 0.31.0" ;;
   "status --json") cat status.json; if grep -q '"error"' status.json; then exit 1; fi ;;
-  "task list --json") cat tasks.json ;;
+  "task list --all --json") cat tasks.json ;;
   "spec list --json") echo '{"schema":1,"revision":1,"generated_at":"x","data":{"specs":[]}}' ;;
   "queue list --json") cat queue.json ;;
 esac

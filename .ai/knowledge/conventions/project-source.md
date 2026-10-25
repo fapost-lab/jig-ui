@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-10-22
+reviewed_at: 2026-10-25
 ---
 # ProjectSource — how the server reaches a project
 
@@ -29,7 +29,7 @@ Why:      a later remote adapter (a connector on the projects' machine) must fit
 Callers (`board/`, and `http/` for task details and the change stream) depend on the port, never on `jig/` or `watch/` directly.
 
 The port is `ProjectSource` in `server/source/project-source.ts` — the workspace, a project's
-live tasks (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), its specs
+live tasks and the finished ones Jig still keeps (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), its specs
 (`specs(id)`), connect,
 disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,
 `prioritise(id, taskId, priority, revision)`, `requestPause(id, taskId, revision)`,

@@ -103,12 +103,25 @@ export interface TaskDetails extends Task {
   attention: Attention[];
 }
 
-/** A project's live tasks, how many finished ones are left out and the revision a write based on them carries, or why it cannot be read. */
+/** A task that is closed or abandoned, as long as Jig keeps its workspace: housekeeping moves a closed one's to trash once it sees it merged, an abandoned one's after a while. */
+export interface FinishedTask {
+  id: string;
+  status: 'consolidated' | 'abandoned';
+  goal: string | null;
+  /** The day Jig last changed the task, which for a finished one is the day it finished. */
+  updatedAt: string | null;
+  pullRequest: {
+    url: string;
+    state: string | null;
+  } | null;
+}
+
+/** A project's live tasks, the finished ones Jig still keeps and the revision a write based on them carries, or why it cannot be read. */
 export type ProjectTasks =
   | {
       state: 'ready';
       tasks: Task[];
-      finished: number;
+      finished: FinishedTask[];
       revision: number;
     }
   | Exclude<ProjectView, { state: 'ready' }>;

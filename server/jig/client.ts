@@ -202,7 +202,7 @@ const TaskAction = z.object({
 });
 export type TaskAction = z.output<typeof TaskAction>;
 
-/** A task as `jig task list --json` reports it, as far as Jig UI reads it; the statuses are Jig's (schemas/state.md). */
+/** A task as `jig task list --all --json` reports it, as far as Jig UI reads it; the statuses are Jig's (schemas/state.md). */
 const TaskRow = z
   .object({
     id: text,
@@ -259,18 +259,17 @@ const TaskRow = z
   }));
 export type TaskSummary = z.output<typeof TaskRow>;
 
-const TaskList = z.object({ tasks: z.array(TaskRow), hidden: z.number() });
+const TaskList = z.object({ tasks: z.array(TaskRow) });
 
-/** The project's live tasks (`jig task list --json`) and how many finished ones it left out. */
+/** The project's tasks, the finished ones too while Jig keeps their workspace (`jig task list --all --json`). */
 export async function readTasks(
   root: string,
   platform: NodeJS.Platform = process.platform,
 ): Promise<{
   revision: number;
   tasks: TaskSummary[];
-  hidden: number;
 }> {
-  const { revision, data } = await readJson(root, ['task', 'list'], platform);
+  const { revision, data } = await readJson(root, ['task', 'list', '--all'], platform);
   return { revision, ...parsed(TaskList, data) };
 }
 

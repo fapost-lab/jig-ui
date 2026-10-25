@@ -1,5 +1,6 @@
 // Sample data for the canvas: every state a component shows, in the shapes of api.ts.
 import type { Attention, Column, Project, ReadyDetails, Spec, SpecItem, Task } from '@/api';
+import type { FinishedTask } from '@/lib/finished';
 
 const task = (id: string, more: Partial<Task>): Task => ({
   id,
@@ -91,6 +92,19 @@ export const board: Column[] = [
 
 /** A board with no live task. */
 export const emptyBoard: Column[] = board.map((c) => ({ ...c, cards: [] }));
+
+/** Closed with its pull request merged, abandoned with none, and one without a goal. */
+export const finished: FinishedTask[] = [
+  {
+    id: 'file-backlog-task',
+    status: 'consolidated',
+    goal: 'File a minimal backlog task from the page.',
+    updatedAt: '2026-10-25',
+    pullRequest: { url: 'https://github.com/fapost-lab/jig-ui/pull/40', state: 'merged' },
+  },
+  { id: 'pr-template', status: 'abandoned', goal: 'A pull request template.', updatedAt: '2026-10-17', pullRequest: null },
+  { id: 'old-spike', status: 'abandoned', goal: null, updatedAt: '2026-10-12', pullRequest: null },
+];
 
 export const columns = [
   { id: 'needs-you', title: 'Needs you', count: 3 },

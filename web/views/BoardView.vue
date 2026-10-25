@@ -4,10 +4,12 @@
   import { type Board, call, client, describe, onChange, type Place, readTask, type ReadyDetails, type Specs, type Written } from '@/api';
   import BoardColumns from '@/components/BoardColumns.vue';
   import BoardList from '@/components/BoardList.vue';
+  import FinishedList from '@/components/FinishedList.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
   import SpecCard from '@/components/SpecCard.vue';
   import { Button } from '@/components/ui/button';
   import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+  import { Toggle } from '@/components/ui/toggle';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { conflict } from '@/lib/conflict';
   import { lastWins } from '@/lib/last-wins';
@@ -20,6 +22,15 @@
   const board = ref<Board | 'not-connected'>();
 
   const param = { id: encodeURIComponent(props.id) };
+
+  /** The finished tasks Jig still keeps, shown under the header only when the person asks; hidden on every visit. */
+  const finished = computed(() => (typeof board.value === 'object' && board.value.state === 'ready' ? board.value.finished : []));
+  const showFinished = ref(false);
+  // With the last one gone the toggle goes too; the next one to finish is not shown unasked.
+  watch(
+    () => finished.value.length === 0,
+    (none) => none && (showFinished.value = false),
+  );
 
   const load = lastWins(
     async () => {
@@ -181,9 +192,9 @@
     <Collapsible v-model:open="filing" class="shrink-0" @update:open="filingRefusal = undefined">
       <div class="flex shrink-0 items-center gap-3 border-b px-3 py-1.5">
         <h1 class="font-semibold">{{ id }}</h1>
-        <span v-if="typeof board === 'object' && board.state === 'ready' && board.finished > 0" class="text-muted-foreground">
-          {{ board.finished }} finished {{ board.finished === 1 ? 'task is' : 'tasks are' }} not shown
-        </span>
+        <Toggle v-if="finished.length > 0" v-model="showFinished" variant="outline" size="sm">
+          {{ finished.length }} finished {{ finished.length === 1 ? 'task' : 'tasks' }}
+        </Toggle>
         <ToggleGroup
           v-if="typeof board === 'object' && board.state === 'ready'"
           type="single"
@@ -206,6 +217,8 @@
         <NewTaskForm :busy="filingBusy" :refusal="filingRefusal?.text" :taken="filingRefusal?.code === 'already-exists'" @file="file" />
       </CollapsibleContent>
     </Collapsible>
+
+    <FinishedList v-if="showFinished && finished.length > 0" :tasks="finished" class="max-h-48 shrink-0 overflow-y-auto border-b" />
 
     <p v-if="notice" role="status" class="flex shrink-0 items-center gap-2 border-b px-3 py-1.5" :class="toneText.attention">
       {{ notice.text }}

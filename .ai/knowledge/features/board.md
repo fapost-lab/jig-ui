@@ -9,6 +9,8 @@ paths:
   - "web/components/Board*.vue"
   - web/components/NewTaskForm.vue
   - web/lib/conflict.ts
+  - web/components/FinishedList.vue
+  - web/lib/finished.ts
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
 reviewed_at: 2026-10-25
 ---
@@ -21,7 +23,8 @@ In progress, Ready, Backlog, Paused — worked out from Jig's task list on every
 `server/board/columns.ts` (`columnOf`, first rule that fits wins: Paused, Backlog, Needs you,
 Ready, In progress) and served by `GET /api/projects/:id/board`. Cards are light: id, class, priority, goal,
 and what the task waits for (gate, autopilot run, pull request — `web/lib/waits.ts`). Finished
-tasks are only counted.
+tasks are not on the board: a toggle above it with their count opens the list of those Jig still
+keeps (`web/components/FinishedList.vue`, its words from `web/lib/finished.ts`).
 
 `web/views/BoardView.vue` reads the board and shows it two ways, switched by the person and
 remembered by the browser (`localStorage` `jig-ui.board-view`): Board (`BoardColumns`), the
@@ -67,11 +70,18 @@ done, or moving.
 - "New task" above the board files a task with an id and a one-line goal (`jig task new <id>
   --goal <goal>`, `POST /api/projects/:id/tasks`); it shows in Backlog once Jig wrote it. No
   revision: a new id overwrites nothing (adr-20261022-filing-a-task-carries-no-revision). An id
-  Jig has — a finished task's too, which the board does not show — is refused with a line saying
+  Jig has — a finished task's too, which only the list of finished tasks shows — is refused with a line saying
   so; the button waits while a request is on its way, so a double click files once. Class,
   domains and a longer description stay with the terminal or the agent that starts the task.
 - The order of the columns is not the order of the rules: what waits for the person comes first
   (maintainer, task `design-system`, 2026-10-18).
+- The finished list holds what `jig task list --all` returns, read with the live tasks in one Jig
+  run: a closed task until housekeeping sees its branch merged — a task of an epic, the epic on
+  the default branch — and moves its workspace to trash (one with no branch, or none seen merged,
+  stays), an abandoned one for `housekeeping.abandoned_ttl` (14 days by default). Each row is the
+  id, closed or abandoned, the goal, the pull request and the day Jig last changed the task, the
+  latest first; a finished task has no details and no actions. The list starts hidden on every
+  visit, and closes when the last finished task leaves; nothing remembers it.
 
 ## Decisions and rejected alternatives
 
@@ -93,6 +103,18 @@ done, or moving.
   queue position did not change — not a changed index, which marks a whole column after one
   insert, nor a changed position, which Jig respaces for a whole level when there is no room.
   Marks that fade after a minute — rejected for a timer that tells nothing the line does not.
+- Finished tasks (task `finished-list`, 2026-10-25). A Finished column — the maintainer's first
+  wish, hidden by default — rejected for a toggle on the count that opens a list (the maintainer's
+  choice): Jig forgets a closed task once housekeeping sees it merged (an epic's, once the epic
+  lands), so a column would hold the latest closed tasks and the abandoned ones, which is no
+  history; the merged pull requests are. Reading
+  them on demand, through a route of their own — rejected for `--all` in the board's read: no new
+  route and no Jig run of its own. Each task Jig keeps adds about 0.06 s to the task list (0.26 s
+  live only, 0.45 s with three finished, measured 2026-10-25), hidden while `jig status`, read
+  beside it, takes longer (0.84 s): from about ten kept tasks — an epic's, kept until it lands — the
+  board waits on the list, and the finished ones are worth a read of their own, on demand. A Collapsible
+  for the list — rejected: the header already sits in the New task form's Collapsible, and a
+  trigger binds to the nearest one.
 - Board and List as two addresses — rejected: the switch is a way of looking at one board.
 - The view remembered in Jig UI's settings file — rejected: a preference of one browser need
   not survive it.

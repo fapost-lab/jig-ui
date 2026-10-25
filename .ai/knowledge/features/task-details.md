@@ -11,7 +11,7 @@ paths:
   - web/views/TaskView.vue
   - web/components/TaskBrief.vue
 summary: What a task's details page shows from Jig's task row, why only offered actions and no paths reach it, and what Jig does not report yet
-reviewed_at: 2026-10-18
+reviewed_at: 2026-10-25
 ---
 # Task details
 
@@ -39,11 +39,11 @@ so the page never decides what is allowed.
   text word for word and can name a checkout or worktree path; no path reaches `web/` (RULES.md).
   For the same reason the worktree is only its `uncommitted` count — JigClient drops the path.
 - **Jig UI runs no action** in Phase 1: the page shows the command to run in the project.
-- **Not shown — gaps in Jig's contract, not choices:** which task documents exist (Jig 0.29.0's
+- **Not shown:** which task documents exist — a gap in Jig's contract, not a choice (Jig 0.29.0's
   JSON carries none, and reading Jig's files is ruled out by
-  adr-20261014-jig-ui-is-an-optional-layer-over-jig — to raise in Jig's contract), and
-  dependencies (they arrive with Jig's contract-queue, Phase 2 here). Maintainer's decision,
-  2026-10-17, task `task-details`.
+  adr-20261014-jig-ui-is-an-optional-layer-over-jig — to raise in Jig's contract; maintainer's
+  decision, 2026-10-17, task `task-details`); and dependencies, which Jig's queue holds since
+  0.31.0 (`depends_on` in `jig queue list`) but no item of Phase 2 showed and none is filed yet.
 - Details cost no extra Jig run: the local adapter keeps one detail per live task in the same read
   as the board's rows (feature-live-updates). A finished task has none; its link says so.
 - An action id this Jig UI does not know is ignored in `server/jig/client.ts`, as Jig's contract

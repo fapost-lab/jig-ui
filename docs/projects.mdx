@@ -183,8 +183,8 @@ keep. The details are:
   button. Jig UI runs none of them; the page follows the change once you do.
 
 Two things are not shown yet: which of the task's documents exist (Jig does not report them in a
-form Jig UI reads) and dependencies between tasks (they come with Jig's task queue). A finished
-task has no details page; its link says so.
+form Jig UI reads) and dependencies between tasks (Jig's queue holds them; Jig UI does not show
+them yet). A finished task has no details page; its link says so.
 
 ## Staying current
 
@@ -196,7 +196,7 @@ project is also read again, for a change the system did not report.
 A read that fails while an agent is in the middle of writing does not blank the page: the last
 good read stays until the next one. A project that keeps failing shows why, as in the table above.
 
-Watching stops when the last page closes; nothing is written in the project. If the page says its
+Watching stops when the last page closes; watching writes nothing in the project. If the page says its
 session has ended, Jig UI was restarted: run `npx @fapost/jig-ui` again to reopen it.
 
 ## Disconnect a project

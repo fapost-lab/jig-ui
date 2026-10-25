@@ -50,6 +50,8 @@ instead of being overwritten.
 ## Phase 3 — Further
 
 - [ ] resume from the page — a drop out of Paused resumes the task; until then a paused card names `jig task resume <id>` (after: pause and resume as a request — its other half; Jig — `jig task resume` with `--revision <n> --json` and refusals as codes, fapost-lab/jig#295)
+- [ ] projects to upgrade — the workspace marks each connected project whose installed Jig is older than the machine's, with both versions, and counts them (after: workspace dashboard — it is one more thing a project needs from the person; Jig — an `upgrade-available` attention item in `jig status --json`, task `status-json-upgrade-available` in fapost-lab/jig)
+- [ ] upgrade from the page — for one project or every marked one: run the upgrade through Jig (`jig upgrade --json`) and show its outcome — the branch and pull request it made, merged or not by the project's `agent.git`, or why it stopped and what to do; or copy the request for an agent ("Upgrade Jig in <project>"), for a release whose upgrade asks for steps by hand (after: projects to upgrade — it acts on the marked projects; Jig — `jig upgrade --json`, task `upgrade-json`, and the agent's upgrade path, task `agent-runs-the-upgrade`, in fapost-lab/jig)
 - [ ] fog: hosted and self-hosted Jig UI — a connector on the machine with the projects behind the ProjectSource port; first form is a read-only snapshot with a revision; accounts and file access rules are not stated
 - [ ] fog: installation for people without a development environment, Windows first
 - [ ] fog: epic and spec planning from the page
@@ -67,6 +69,8 @@ instead of being overwritten.
 9. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
 10. conflict display
 11. resume from the page
+12. projects to upgrade
+13. upgrade from the page
 
 <!--
 Rules (jig-idea §8):

@@ -182,6 +182,16 @@ them to Decisions.
   Jig — needs a small hook on Jig's side, not designed yet (on Jig's side a fog item of its
   `project-hooks` spec since 2026-10-20).
 
+- Raised by Jig's maintainer (2026-10-25): a person with many projects does not follow each Jig
+  upgrade by hand. Should the workspace show which projects run an older Jig than the machine's,
+  and offer the upgrade — run through `jig upgrade --json`, or handed to an agent as a request to
+  copy, since running agents from the UI is a non-goal? Jig's side is filed as three tasks in
+  fapost-lab/jig: `status-json-upgrade-available` (the attention item), `upgrade-json` (the
+  command's result as JSON) and `agent-runs-the-upgrade` (the agent's path, including the steps a
+  release asks for by hand). The two roadmap items in Phase 3 wait for them. Open for this
+  spec's maintainer: whether a batch "upgrade every marked project" belongs in the first form,
+  and whether an upgrade that stopped is shown as attention or only in the result.
+
 ## Assumptions left untested
 
 - That a file watcher over many repositories, and a `jig` run per change, stay cheap in one

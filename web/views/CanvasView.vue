@@ -8,6 +8,7 @@
   import BoardList from '@/components/BoardList.vue';
   import ColumnHeader from '@/components/ColumnHeader.vue';
   import ConnectForm from '@/components/ConnectForm.vue';
+  import FinishedList from '@/components/FinishedList.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
   import CopyCommand from '@/components/CopyCommand.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
@@ -28,10 +29,11 @@
   import { Input } from '@/components/ui/input';
   import { Label } from '@/components/ui/label';
   import { Separator } from '@/components/ui/separator';
+  import { Toggle } from '@/components/ui/toggle';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { toneRule, toneText } from '@/lib/tones';
   import CanvasSection from './CanvasSection.vue';
-  import { actions, attention, board, columns, details, emptyBoard, projects, specItems, specs, tasks } from './canvas-samples';
+  import { actions, attention, board, columns, details, emptyBoard, finished, projects, specItems, specs, tasks } from './canvas-samples';
 
   const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
   const buttonSizes = ['xs', 'sm', 'default', 'lg'] as const;
@@ -105,6 +107,13 @@
         <ToggleGroupItem value="board">Board</ToggleGroupItem>
         <ToggleGroupItem value="list">List</ToggleGroupItem>
       </ToggleGroup>
+    </CanvasSection>
+
+    <CanvasSection title="Toggle" note="the board's finished tasks: off, on">
+      <div class="flex gap-2">
+        <Toggle variant="outline" size="sm" :model-value="false">3 finished tasks</Toggle>
+        <Toggle variant="outline" size="sm" :model-value="true">3 finished tasks</Toggle>
+      </div>
     </CanvasSection>
 
     <CanvasSection title="Collapsible" note="open and folded">
@@ -233,6 +242,10 @@
       <div class="flex h-64 flex-col">
         <BoardList project="jig-ui" :columns="emptyBoard" />
       </div>
+    </CanvasSection>
+
+    <CanvasSection title="FinishedList" note="closed with its pull request merged; abandoned; one without a goal">
+      <FinishedList :tasks="finished" class="border" />
     </CanvasSection>
 
     <CanvasSection title="TaskFacts" note="everything a task can carry; a task not started">

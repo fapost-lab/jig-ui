@@ -25,6 +25,7 @@ import { mainCheckout } from './checkout.js';
 import type {
   Attention,
   Change,
+  FinishedTask,
   ProjectSource,
   ProjectSpecs,
   ProjectTasks,
@@ -80,6 +81,16 @@ type Read = {
 };
 
 type Live = TaskSummary & { status: Task['status'] };
+type Finished = TaskSummary & { status: FinishedTask['status'] };
+
+/** A finished task as the board's list of them shows it. */
+const gone = (t: Finished): FinishedTask => ({
+  id: t.id,
+  status: t.status,
+  goal: t.goal,
+  updatedAt: t.updatedAt,
+  pullRequest: t.pullRequest && { url: t.pullRequest.url, state: t.pullRequest.state },
+});
 
 /** A live task as a board's card shows it, with its place in the queue if it has one. */
 const card = (t: Live, q: QueueItem | undefined): Task => ({
@@ -147,8 +158,9 @@ async function readProject(project: Project): Promise<Read> {
   });
   if (!('list' in read)) return { view: read, tasks: read, details: [], specs: read, revision: null };
   const { status, list, queue, specs, jigVersion } = read;
-  // Jig's live list holds active and ready tasks only.
+  // Live: active and ready; the rest are finished.
   const live = list.tasks.filter((t): t is Live => t.status === 'active' || t.status === 'ready');
+  const finished = list.tasks.filter((t): t is Finished => t.status === 'consolidated' || t.status === 'abandoned');
   const queued = new Map(queue.items.map((q) => [q.id, q]));
   // The oldest of the reads the board is made of: a write against it is refused if anything was written after any of them.
   const revision = Math.min(status.revision, list.revision, queue.revision);
@@ -157,11 +169,11 @@ async function readProject(project: Project): Promise<Read> {
       id: project.id,
       state: 'ready',
       jigVersion,
-      counts: count(list.tasks),
+      counts: count(live),
       attention: status.attention,
       housekeepingStale: status.housekeepingStale,
     },
-    tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id))), finished: list.hidden, revision },
+    tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id))), finished: finished.map(gone), revision },
     details: live.map((t) => details(t, queued.get(t.id), status.attention)),
     specs: { state: 'ready', specs },
     revision,

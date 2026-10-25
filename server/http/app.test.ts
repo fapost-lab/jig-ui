@@ -204,7 +204,7 @@ describe('/api/projects and /api/workspace', () => {
       board: {
         id: 'ready',
         state: 'ready',
-        finished: 0,
+        finished: [],
         revision: 1,
         columns: ['needs-you', 'in-progress', 'ready', 'backlog', 'paused'].map((id) => expect.objectContaining({ id, cards: [] })),
       },

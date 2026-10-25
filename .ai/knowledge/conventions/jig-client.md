@@ -38,7 +38,7 @@ dropped by `z.object`, so nothing Jig UI does not read gets past `server/jig/`.
 
 ## Example
 
-A task-list read runs Jig's JSON task listing, checks the envelope, then `data` through the
+A task-list read runs Jig's JSON task listing with `--all`, finished tasks included, checks the envelope, then `data` through the
 `TaskList` schema — the status among Jig's own words — and returns typed tasks. Jig's refusal throws `JigRefusal` with its code
 (an unknown code is `failed`); an envelope of another shape throws `JigShapeError`, which the
 project shows as `incompatible` ("update Jig UI"), never half-parsed. Each read has a contract

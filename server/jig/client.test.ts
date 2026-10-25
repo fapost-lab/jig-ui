@@ -83,7 +83,7 @@ function changed(name: string, change: (data: Record<string, any>) => void): str
 let cases = 0;
 const refusal = (code: string) => expect.objectContaining({ code }) as unknown as JigRefusal;
 
-// Contract tests: the fixtures are what Jig printed — task-list.json is Jig 0.31.0's, the others
+// Contract tests: the fixtures are what Jig printed — task-list.json and task-list-all.json are Jig 0.31.0's, the others
 // Jig 0.29.0's: task-list-states.json with the `pause_request` and the two pause-request actions
 // 0.31.0 adds, in the shape its lib/task.sh prints, and status-attention.json with items added in
 // the documented shape, an unknown kind included. Each read pins the fields Jig UI relies on.
@@ -127,7 +127,6 @@ describe('readTasks', () => {
 
   it('reads what a board and a task show: start, gate, autopilot run, pull request, flags, actions', async () => {
     const read = await readTasks(answering('tasks-states', 'task-list-states.json'));
-    expect(read.hidden).toBe(3);
     expect(read.tasks.map((t) => t.id)).toEqual(['backlog-item', 'design-waits', 'run-stopped', 'set-aside', 'shipped']);
     expect(read.tasks[0]).toEqual({
       id: 'backlog-item',
@@ -188,6 +187,17 @@ describe('readTasks', () => {
     });
   });
 
+  it('asks for the finished tasks too, and reads them as Jig keeps them', async () => {
+    const dir = logging('tasks-all', 'task-list-all.json');
+    const read = await readTasks(dir);
+    expect(args(dir)).toEqual(['task', 'list', '--all', '--json']);
+    expect(read.tasks.map((t) => [t.id, t.status])).toEqual([
+      ['fix-typo', 'consolidated'],
+      ['live-one', 'active'],
+      ['old-idea', 'abandoned'],
+    ]);
+  });
+
   it('reads a pause asked of a task and the actions to ask and take it back', async () => {
     const read = await readTasks(answering('tasks-requests', 'task-list.json'));
     const [alpha, beta] = read.tasks;
@@ -242,12 +252,12 @@ describe('readTasks', () => {
 });
 
 describe('readTasks, the list as a whole', () => {
-  it('refuses a list without its count of hidden tasks', async () => {
+  it('refuses a list without its tasks', async () => {
     await expect(
       readTasks(
         answering(
           `case-${cases++}`,
-          changed('task-list.json', (d) => delete d.hidden),
+          changed('task-list.json', (d) => delete d.tasks),
         ),
       ),
     ).rejects.toBeInstanceOf(JigShapeError);

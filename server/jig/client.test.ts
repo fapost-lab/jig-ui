@@ -102,7 +102,16 @@ describe('readStatus', () => {
       detail: null,
       todo: 'Review and merge the pull request.',
       url: 'https://github.com/fapost-lab/jig-ui/pull/14',
+      versions: null,
     });
+  });
+
+  // status-upgrade.json is what Jig 0.35.0 printed in a scratch repository whose manifest says 0.33.0.
+  it("reads the project's Jig and the machine's from an upgrade item", async () => {
+    const read = await readStatus(answering('status-upgrade', 'status-upgrade.json'));
+    expect(read.attention).toEqual([
+      expect.objectContaining({ kind: 'upgrade-available', todo: 'jig upgrade', versions: { from: '0.33.0', to: '0.35.0' } }),
+    ]);
   });
 
   it('reads a project where nothing needs the person and housekeeping never ran', async () => {
@@ -114,8 +123,14 @@ describe('readStatus', () => {
     ['an item without its url, which may only be null', (d: Record<string, any>) => delete d.attention[0].url],
     ['attention that is not a list', (d: Record<string, any>) => (d.attention = {})],
     ['housekeeping without stale', (d: Record<string, any>) => (d.housekeeping = { ran_at: 'x' })],
+    ['versions without the machine’s', (d: Record<string, any>) => (d.attention[0].versions = { from: '0.33.0' })],
   ])('refuses %s', async (_, change) => {
     await expect(readStatus(answering(`case-${cases++}`, changed('status-attention.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+
+  it('refuses an upgrade item without its versions', async () => {
+    const answer = changed('status-upgrade.json', (d) => delete d.attention[0].versions);
+    await expect(readStatus(answering(`case-${cases++}`, answer))).rejects.toBeInstanceOf(JigShapeError);
   });
 });
 

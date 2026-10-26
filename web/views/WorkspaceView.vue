@@ -1,14 +1,17 @@
 <script setup lang="ts">
-  import { onUnmounted, ref } from 'vue';
+  import { computed, onUnmounted, ref } from 'vue';
   import { call, client, onChange, type Project } from '@/api';
   import ConnectForm from '@/components/ConnectForm.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
   import { lastWins } from '@/lib/last-wins';
+  import { toneText } from '@/lib/tones';
+  import { upgradeLine } from '@/lib/upgrade';
 
   const projects = ref<Project[]>();
   const path = ref('');
   const refusal = ref<string>();
   const busy = ref(false);
+  const upgrades = computed(() => projects.value && upgradeLine(projects.value));
 
   const load = lastWins(
     async () => (await (await call(() => client.api.workspace.$get()))?.json())?.projects,
@@ -39,6 +42,7 @@
 <template>
   <div class="mx-auto flex max-w-4xl flex-col gap-4 p-4">
     <h1 class="font-semibold tracking-wider uppercase">Projects</h1>
+    <p v-if="upgrades" :class="toneText.attention">{{ upgrades }}</p>
     <p v-if="projects === undefined" class="text-muted-foreground">Reading projects…</p>
     <p v-else-if="projects.length === 0" class="text-muted-foreground">
       No projects yet. Paste the path of a project's main checkout below.

@@ -139,7 +139,7 @@
 
     <CanvasSection
       title="ProjectCard"
-      note="ready with attention and stale housekeeping; nothing needs you; each state it cannot be read in"
+      note="ready with attention and stale housekeeping; nothing needs you; its Jig older than the machine's; each state it cannot be read in"
     >
       <ProjectCard v-for="project in projects" :key="project.id" :project="project" />
     </CanvasSection>

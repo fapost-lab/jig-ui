@@ -6,7 +6,7 @@ import type { Tone } from './tones';
  * What a card says about where its task waits — the gate, the autopilot run, a pause, the pull
  * request — how loud, and the pull request's link when the note is about it. The first rule that fits wins.
  */
-export function waits(task: Task):
+export function waits(task: Omit<Task, 'resumesTo'>):
   | {
       text: string;
       tone: Tone;
@@ -16,8 +16,8 @@ export function waits(task: Task):
   if (task.gate === 'waiting') return { text: 'Design waits at its gate', tone: 'attention' };
   if (task.gate === 'changed') return { text: 'Design changed after approval', tone: 'attention' };
   if (task.autopilot === 'stopped') return { text: 'Autopilot stopped with a question', tone: 'attention' };
-  // The page asks a pause and never resumes: `jig task resume` has no revision to write against (fapost-lab/jig#295).
-  if (task.paused) return { text: `Paused — jig task resume ${task.id}`, tone: 'quiet' };
+  // Below Jig 0.35.0 `jig task resume` takes no revision to write against (fapost-lab/jig#295): the page names the command.
+  if (task.paused) return { text: task.resumable ? 'Paused' : `Paused — jig task resume ${task.id}`, tone: 'quiet' };
   const pr = task.pullRequest;
   if (pr) {
     const ci = pr.ci && pr.ci !== 'none' ? `, CI ${pr.ci}` : '';

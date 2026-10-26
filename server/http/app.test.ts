@@ -428,6 +428,17 @@ describe('/api/projects/:id/queue', () => {
     }
   });
 
+  it("resumes a task through the project's Jig, the revision required", async () => {
+    await post(app, '/api/projects', { path: queued });
+    const res = await post(app, '/api/projects/queued/tasks/resume', { task: 'a', revision: 1 });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ written: true });
+    const usage = await post(app, '/api/projects/queued/tasks/resume', { task: 'a' });
+    expect(usage.status).toBe(422);
+    expect(((await usage.json()) as { error: { code: string } }).error.code).toBe('usage');
+    expect((await post(app, '/api/projects/queued/tasks/resume', { task: 'a', revision: 1 }, {})).status).toBe(401);
+  });
+
   it.each([
     ['move', { place: 'top', revision: 1 }],
     ['move', { task: '', place: 'top', revision: 1 }],
@@ -452,6 +463,7 @@ describe('/api/projects/:id/queue', () => {
     ['a task that is not live', { state: 'refused', code: 'not-found' }, 404, 'not-found'],
     ["another refusal of Jig's", { state: 'refused', code: 'usage' }, 422, 'usage'],
     ['a pause already asked', { state: 'refused', code: 'already-exists' }, 422, 'already-exists'],
+    ['a stash that did not apply', { state: 'refused', code: 'stash-conflict' }, 422, 'stash-conflict'],
     ['a project not connected', undefined, 404, 'not-connected'],
   ] as const)('answers %s', async (_, outcome, status, code) => {
     const source: ProjectSource = {
@@ -460,6 +472,7 @@ describe('/api/projects/:id/queue', () => {
       prioritise: () => Promise.resolve(outcome),
       requestPause: () => Promise.resolve(outcome),
       cancelPause: () => Promise.resolve(outcome),
+      resume: () => Promise.resolve(outcome),
     };
     const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
     for (const [kind, body] of [
@@ -472,6 +485,9 @@ describe('/api/projects/:id/queue', () => {
       expect(res.status).toBe(status);
       expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);
     }
+    const resumed = await post(fake, '/api/projects/x/tasks/resume', { task: 'a', revision: 1 });
+    expect(resumed.status).toBe(status);
+    expect(((await resumed.json()) as { error: { code: string } }).error.code).toBe(code);
   });
 
   it('answers a project it cannot read with its state', async () => {

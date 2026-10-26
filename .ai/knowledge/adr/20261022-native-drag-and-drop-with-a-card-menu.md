@@ -10,7 +10,7 @@ paths:
   - web/components/QueueMenu.vue
   - server/board/columns.ts
 summary: Queue order by native HTML5 drag and drop, drops only where one jig queue move lands, and a card menu as the one-press alternative; the page copies Jig's level order
-reviewed_at: 2026-10-22
+reviewed_at: 2026-10-26
 ---
 # The page drags with the browser's own drag and drop, and a card menu is its one-press alternative
 
@@ -27,10 +27,15 @@ single-pointer alternative to every drag. Decided at the design gate, 2026-10-22
   both are vertical lists of cards.
 - A drop is allowed only where one `jig queue move` can put the card (`web/lib/placement.ts`):
   after the nearest queued card of the same level above the gap, `top` with none queued above,
-  `bottom` among unqueued cards; never inside another level's run. A drop on another column does
-  nothing until pause requests are built.
+  `bottom` among unqueued cards; never inside another level's run. On another column a drop is
+  one Jig command too: on Paused it asks a pause (`jig queue request`), and out of Paused it
+  resumes the task on the one column it will be in (`jig task resume`,
+  adr-20261026-a-drop-out-of-paused-resumes-at-once); any other drop on another column does
+  nothing. *(This sentence amended by task `resume-from-page`, 2026-10-26, the maintainer's choice;
+  it read "A drop on another column does nothing until pause requests are built.")*
 - Every card has a "⋯" menu (Reka `DropdownMenu`): To top, Up, Down, To bottom, and the priority
-  P0–P5 or none. Up and Down are computed by the same placement rule.
+  P0–P5 or none. Up and Down are computed by the same placement rule. The menu also asks or
+  takes back a pause, and resumes a paused task (tasks `pause-request`, `resume-from-page`).
 
 ## Alternatives
 

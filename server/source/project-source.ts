@@ -55,6 +55,8 @@ export interface Task {
   } | null;
   /** Jig offers to ask it to pause (its `request-pause` action); a request is taken back while there is one. */
   pauseRequestable: boolean;
+  /** Paused, and resumable from the page: Jig offers its `resume` action and takes `task resume --revision` (0.35.0). */
+  resumable: boolean;
   started: boolean;
   gate: string | null;
   autopilot: string | null;
@@ -194,6 +196,8 @@ export interface ProjectSource {
   requestPause(id: string, taskId: string, revision: number): Promise<Written | undefined>;
   /** Takes back the pause asked of a live task, as `move` writes. */
   cancelPause(id: string, taskId: string, revision: number): Promise<Written | undefined>;
+  /** Resumes a paused live task in the project's main checkout, as `move` writes; a stash its pause kept is applied there. */
+  resume(id: string, taskId: string, revision: number): Promise<Written | undefined>;
   /**
    * Files a new task with only its goal, then reads the project again. No revision: it writes nothing that exists, and
    * a taken id is Jig's `already-exists`. `undefined` when no project has that id.

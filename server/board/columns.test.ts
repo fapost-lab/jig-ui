@@ -10,6 +10,7 @@ const task = (more: Partial<Task> = {}): Task => ({
   paused: false,
   pauseRequest: null,
   pauseRequestable: true,
+  resumable: false,
   started: true,
   gate: null,
   autopilot: null,
@@ -61,5 +62,23 @@ describe('columns', () => {
       task({ id: 'top-1', ...at(null, 150) }),
     ];
     expect(columns(tasks)[1]?.cards.map((t) => t.id)).toEqual(['top-1', 'top-2', 'epic-a', 'epic-z', 'loose-b', 'loose-a']);
+  });
+
+  it('names the column a resumable task lands in once resumed, and none for the rest', () => {
+    const tasks = [
+      task({ id: 'moving', paused: true, resumable: true }),
+      task({ id: 'unbegun', paused: true, resumable: true, started: false }),
+      task({ id: 'gated', paused: true, resumable: true, gate: 'waiting' }),
+      task({ id: 'old-jig', paused: true }),
+      task({ id: 'live' }),
+    ];
+    const cards = columns(tasks).flatMap((c) => c.cards);
+    expect(Object.fromEntries(cards.map((t) => [t.id, t.resumesTo]))).toEqual({
+      moving: 'in-progress',
+      unbegun: 'backlog',
+      gated: 'needs-you',
+      'old-jig': null,
+      live: null,
+    });
   });
 });

@@ -10,6 +10,8 @@ const task = (more: Partial<Task> = {}): Task => ({
   paused: false,
   pauseRequest: null,
   pauseRequestable: true,
+  resumable: false,
+  resumesTo: null,
   started: true,
   gate: null,
   autopilot: null,
@@ -37,6 +39,11 @@ describe('waits', () => {
       'a paused task with a pull request',
       { paused: true, pullRequest: pr('open', 'green') },
       { text: 'Paused — jig task resume t', tone: 'quiet' },
+    ],
+    [
+      'a paused task the page resumes',
+      { paused: true, resumable: true, resumesTo: 'in-progress' as const },
+      { text: 'Paused', tone: 'quiet' },
     ],
     [
       'a pull request with CI green',

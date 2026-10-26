@@ -13,6 +13,8 @@ import {
   readStatus,
   readTasks,
   requestPause,
+  RESUME_JIG_VERSION,
+  resumeTask,
   setPriority,
   supports,
   type TaskSummary,
@@ -92,8 +94,11 @@ const gone = (t: Finished): FinishedTask => ({
   pullRequest: t.pullRequest && { url: t.pullRequest.url, state: t.pullRequest.state },
 });
 
-/** A live task as a board's card shows it, with its place in the queue if it has one. */
-const card = (t: Live, q: QueueItem | undefined): Task => ({
+/**
+ * A live task as a board's card shows it, with its place in the queue if it has one; `resumes` when the project's Jig
+ * takes `task resume --revision`.
+ */
+const card = (t: Live, q: QueueItem | undefined, resumes: boolean): Task => ({
   id: t.id,
   class: t.class,
   status: t.status,
@@ -101,6 +106,7 @@ const card = (t: Live, q: QueueItem | undefined): Task => ({
   paused: t.paused,
   pauseRequest: t.pauseRequest,
   pauseRequestable: t.actions.some((a) => a.id === 'request-pause' && a.offered),
+  resumable: resumes && t.actions.some((a) => a.id === 'resume' && a.offered),
   started: t.branch !== null,
   gate: t.gate?.state ?? null,
   autopilot: t.autopilot?.state ?? null,
@@ -110,8 +116,8 @@ const card = (t: Live, q: QueueItem | undefined): Task => ({
 });
 
 /** A live task in full; where its worktree is was never read, and an action Jig refuses is left out. */
-const details = (t: Live, q: QueueItem | undefined, attention: Attention[]): TaskDetails => ({
-  ...card(t, q),
+const details = (t: Live, q: QueueItem | undefined, attention: Attention[], resumes: boolean): TaskDetails => ({
+  ...card(t, q, resumes),
   issue: t.issue,
   branch: t.branch,
   baseBranch: t.baseBranch,
@@ -164,6 +170,7 @@ async function readProject(project: Project): Promise<Read> {
   const queued = new Map(queue.items.map((q) => [q.id, q]));
   // The oldest of the reads the board is made of: a write against it is refused if anything was written after any of them.
   const revision = Math.min(status.revision, list.revision, queue.revision);
+  const resumes = supports(jigVersion, RESUME_JIG_VERSION);
   return {
     view: {
       id: project.id,
@@ -173,8 +180,8 @@ async function readProject(project: Project): Promise<Read> {
       attention: status.attention,
       housekeepingStale: status.housekeepingStale,
     },
-    tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id))), finished: finished.map(gone), revision },
-    details: live.map((t) => details(t, queued.get(t.id), status.attention)),
+    tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id), resumes)), finished: finished.map(gone), revision },
+    details: live.map((t) => details(t, queued.get(t.id), status.attention, resumes)),
     specs: { state: 'ready', specs },
     revision,
   };
@@ -400,6 +407,9 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     },
     cancelPause(id, taskId, revision) {
       return writing(id, [taskId], (root) => cancelPause(root, taskId, revision));
+    },
+    resume(id, taskId, revision) {
+      return writing(id, [taskId], (root) => resumeTask(root, taskId, revision));
     },
     fileTask(id, taskId, goal) {
       // A new id names no live task: Jig itself refuses a taken one.

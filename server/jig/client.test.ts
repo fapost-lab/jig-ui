@@ -15,6 +15,7 @@ import {
   readStatus,
   readTasks,
   requestPause,
+  resumeTask,
   setPriority,
   supports,
   writtenByReads,
@@ -414,6 +415,24 @@ describe('asking a task to pause', () => {
     ['queue-stale.json', 'stale-revision'],
   ])('carries the refusal in %s as %s', async (json, code) => {
     await expect(requestPause(answering(`case-${cases++}`, json, 1), 'beta', 1)).rejects.toEqual(refusal(code));
+  });
+});
+
+// task-resume*.json are what Jig 0.35.0 printed in a scratch repository.
+describe('resuming a task', () => {
+  it('resumes a paused task against the revision it was read at, named by its bare id', async () => {
+    const dir = logging(`case-${cases++}`, 'task-resume.json');
+    await resumeTask(dir, 'beta', 1793042037);
+    expect(args(dir)).toEqual(['task', 'resume', 'beta', '--revision', '1793042037', '--json']);
+  });
+
+  it.each([
+    ['task-resume-not-paused.json', 'not-paused'],
+    ['task-resume-wrong-checkout.json', 'wrong-checkout'],
+    ['task-resume-stash-conflict.json', 'stash-conflict'],
+    ['queue-stale.json', 'stale-revision'],
+  ])('carries the refusal in %s as %s', async (json, code) => {
+    await expect(resumeTask(answering(`case-${cases++}`, json, 1), 'beta', 1)).rejects.toEqual(refusal(code));
   });
 });
 

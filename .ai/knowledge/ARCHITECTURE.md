@@ -29,13 +29,14 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   (adr-20261017-registry-of-connected-projects). It knows neither git nor Jig.
 - `server/jig/` — JigClient: the project's Jig version against `MIN_JIG_VERSION`, the JSON
   reads `jig status` (what needs the person), `jig task list`, `jig queue list` and `jig spec list`
-  (feature-specs), and the writes `jig queue move` and `jig queue set --priority`, each answer
+  (feature-specs), and the writes `jig queue move`, `jig queue set --priority`, `jig queue request`
+  and `cancel` (a pause), `jig task new` and `jig task resume` (from Jig 0.35.0), each answer
   checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
   fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue
   (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, a project's live
-  tasks, one task in full, connect, disconnect, subscribe to changes, and the writes `move` and
-  `prioritise`) and its local adapter (`local.ts`), which holds the
+  tasks, one task in full, connect, disconnect, subscribe to changes, and the writes `move`,
+  `prioritise`, `requestPause`, `cancelPause`, `resume` and `fileTask`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
   read), `incompatible` (a newer Jig's shape), `unreadable` (Jig refused; its code only) or
@@ -46,8 +47,9 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   (feature-board).
 - `server/http/` also serves `GET /api/workspace`, `GET /api/projects/:id/board`,
   `GET /api/projects/:id/tasks/:task` (feature-task-details), `GET /api/projects/:id/specs`
-  (feature-specs), `POST /api/projects/:id/queue/move` and `/queue/priority`
-  (adr-20261022-writes-carry-the-revision-of-their-read), connect /
+  (feature-specs), `POST /api/projects/:id/queue/move`, `/queue/priority`, `/queue/pause`,
+  `/queue/pause/cancel` and `/tasks/resume` (adr-20261022-writes-carry-the-revision-of-their-read),
+  `POST /api/projects/:id/tasks` (adr-20261022-filing-a-task-carries-no-revision), connect /
   disconnect under `/api/projects`, and `GET /api/events` — the SSE stream of "project X changed,
   revision R" — through the port only; responses name projects by id.
   Directions: `http/` → `board/`, `source/`; `board/` → `source/` (types); `source/` → `jig/`,
@@ -84,7 +86,8 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   again; Jig's `stale-revision` comes back as 409, and the page reads the board again and shows
   the conflict: what changed between the board the write was made on and that read, its cards
   marked (adr-20261022-writes-carry-the-revision-of-their-read, feature-board). Built for the
-  queue: order, priority and pause requests. Filing a task is the one write with no revision: it
+  queue: order, priority and pause requests; and for a resume
+  (adr-20261026-a-drop-out-of-paused-resumes-at-once). Filing a task is the one write with no revision: it
   names a new id, which Jig claims or refuses `already-exists`
   (adr-20261022-filing-a-task-carries-no-revision).
 - **Release flow.** A merge to `main` runs the CI matrix, builds `dist/` in a job without
@@ -117,8 +120,9 @@ The start flow, read-and-follow and change, with its conflict display, are built
 ### System-wide constraints and invariants
 
 - Jig's files are the source of truth; Jig UI keeps only its registry and interface settings.
-- Board columns are derived, never stored; a drop is a sticky request
-  (adr-20261014-board-columns-are-derived-from-jig-state).
+- Board columns are derived, never stored; a drop on another column is a sticky request
+  (adr-20261014-board-columns-are-derived-from-jig-state), except a drop out of Paused, which
+  resumes the task at once (adr-20261026-a-drop-out-of-paused-resumes-at-once).
 - A hosted or self-hosted Jig UI stays possible: projects by id, access behind a replaceable
   guard, writes carrying a revision (adr-20261014-project-source-port-keeps-hosting-open).
 - Stack: adr-20261014-stack-vue-hono-sse-on-node.

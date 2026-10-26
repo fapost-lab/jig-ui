@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpToLine, Ellipsis, Pause, Undo2 } from '@lucide/vue';
+  import { ArrowDown, ArrowDownToLine, ArrowUp, ArrowUpToLine, Ellipsis, Pause, Play, Undo2 } from '@lucide/vue';
   import { computed } from 'vue';
   import type { Place, Task } from '@/api';
   import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@
   } from '@/components/ui/dropdown-menu';
   import { step } from '@/lib/placement';
 
-  /** What a drag does, in one press: a task's place in Jig's queue within its column, its priority, and a pause asked of it. */
+  /** What a drag does, in one press: a task's place in Jig's queue within its column, its priority, a pause asked of it and a resume. */
   const props = defineProps<{
     task: Task;
     /** The task's column, in the order the board shows it. */
@@ -28,6 +28,7 @@
     prioritise: [priority: number | null];
     /** Asks a pause (`true`) or takes the request back (`false`). */
     pause: [ask: boolean];
+    resume: [];
   }>();
 
   const index = computed(() => props.cards.findIndex((t) => t.id === props.task.id));
@@ -64,6 +65,7 @@
       </DropdownMenuRadioGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem v-if="task.pauseRequest" @select="emit('pause', false)"><Undo2 />Cancel pause request</DropdownMenuItem>
+      <DropdownMenuItem v-else-if="task.paused" :disabled="!task.resumable" @select="emit('resume')"><Play />Resume</DropdownMenuItem>
       <DropdownMenuItem v-else :disabled="!task.pauseRequestable" @select="emit('pause', true)"><Pause />Request pause</DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>

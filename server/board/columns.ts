@@ -2,10 +2,15 @@ import type { Task } from '../source/project-source.js';
 
 export type ColumnId = 'backlog' | 'in-progress' | 'needs-you' | 'paused' | 'ready';
 
+/** A task on the board, with the column a resume would put it in: `null` unless it is resumable. */
+export type Card = Task & {
+  resumesTo: ColumnId | null;
+};
+
 export interface Column {
   id: ColumnId;
   title: string;
-  cards: Task[];
+  cards: Card[];
 }
 
 /** The board's order: what waits for the person first, then what moves, what is done, what is not begun, what is set aside. */
@@ -46,10 +51,19 @@ function byQueue(a: Task, b: Task): number {
   return a.queue.position - b.queue.position;
 }
 
+/** After a resume only `paused` changes, so the rules say where the task lands. */
+const card = (task: Task): Card => ({ ...task, resumesTo: task.resumable ? columnOf({ ...task, paused: false }) : null });
+
 /**
  * The board: every column, in a fixed order, its cards in Jig's queue order and the tasks not queued after them in the
  * order Jig listed them (the sort is stable). Computed on every read, never stored.
  */
 export function columns(tasks: Task[]): Column[] {
-  return COLUMNS.map((c) => ({ ...c, cards: tasks.filter((t) => columnOf(t) === c.id).sort(byQueue) }));
+  return COLUMNS.map((c) => ({
+    ...c,
+    cards: tasks
+      .filter((t) => columnOf(t) === c.id)
+      .sort(byQueue)
+      .map(card),
+  }));
 }

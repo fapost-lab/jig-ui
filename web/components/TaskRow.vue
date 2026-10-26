@@ -23,6 +23,7 @@
     move: [place: Place];
     prioritise: [priority: number | null];
     pause: [ask: boolean];
+    resume: [];
   }>();
 
   const note = computed(() => waits(props.task));
@@ -57,6 +58,7 @@
       @move="(place) => $emit('move', place)"
       @prioritise="(p) => $emit('prioritise', p)"
       @pause="(ask) => $emit('pause', ask)"
+      @resume="$emit('resume')"
     />
   </div>
 </template>

@@ -144,9 +144,21 @@ stage begins. Until then the card stays in its column and says *Pause requested 
 **cancel** to take the request back (`jig queue cancel`, also in the ⋯ menu). Paused is offered
 only where Jig offers the request: not for a task already paused, and not twice.
 
-A paused task says how to resume it: run `jig task resume <id>` in the project. Jig UI does not
-resume a task itself: `jig task resume` can restore a stash into your checkout, and it cannot
-check that the project is still as the board showed it.
+## Resuming a task
+
+**Drag a paused card out of Paused**, or choose **Resume** in its ⋯ menu, to resume it. Jig UI
+runs `jig task resume <id>` in the project's main checkout, with the revision of the board you saw,
+and the card moves to the column the task is in once resumed: that column is the only one the
+drop is offered on.
+
+A task paused with `jig task pause --stash` kept its changes in a stash, and resuming applies the
+stash again — as `jig task resume` in a terminal does, in the project's main checkout. Jig does
+that only when the checkout is on the task's branch; otherwise the line above the board says to run
+`jig task resume <id>` there. When the stash does not apply cleanly, the task stays paused and the
+line says to resolve the conflicts in the checkout first. A pause Jig UI asked for never stashes.
+
+Resuming from the board needs Jig 0.35.0 or later in the project. With an older Jig the card says
+how to resume it — run `jig task resume <id>` in the project — and **Resume** is off.
 
 A drop on any other column does nothing.
 

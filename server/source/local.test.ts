@@ -56,7 +56,7 @@ function project(
     tasks?: unknown;
     specs?: unknown;
     queue?: unknown;
-    /** What `queue move`, `set`, `request` and `cancel` print: an envelope's `data`, or a refusal's code. */
+    /** What `queue move`, `set`, `request`, `cancel`, `task new` and `task resume` print: an envelope's `data`, or a refusal's code. */
     write?: unknown;
   } = {},
 ): string {
@@ -88,7 +88,7 @@ case "$*" in
   "task list --all --json") cat tasks.json ;;
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
-  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*) cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*) cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
 esac
 `,
   );
@@ -268,6 +268,7 @@ describe('localSource', () => {
           paused: false,
           pauseRequest: null,
           pauseRequestable: true,
+          resumable: false,
           started: true,
           gate: null,
           autopilot: null,
@@ -322,6 +323,19 @@ describe('localSource', () => {
     expect(await source.task('nobody', 'a')).toBeUndefined();
   });
 
+  it('offers a resume only where Jig offers it and takes `task resume --revision`', async () => {
+    const resume = { id: 'resume', command: 'jig task resume p', offered: true, reason: null };
+    const paused = { tasks: [task('p', 'active', true, { actions: [resume] }), task('q', 'active', true)], hidden: 0, housekeeping: null };
+    await source.connect(project('resumes', '0.35.0', { tasks: paused }));
+    await source.connect(project('pre-resume', '0.34.0', { tasks: paused }));
+    expect(await source.tasks('resumes')).toMatchObject({
+      tasks: [expect.objectContaining({ id: 'p', resumable: true }), expect.objectContaining({ id: 'q', resumable: false })],
+    });
+    expect(await source.tasks('pre-resume')).toMatchObject({
+      tasks: [expect.objectContaining({ id: 'p', resumable: false }), expect.anything()],
+    });
+  });
+
   it('disconnects by id', async () => {
     expect(await source.disconnect('gone')).toBe(true);
     expect(await source.disconnect('gone')).toBe(false);
@@ -335,7 +349,7 @@ describe('localSource, writing the queue', () => {
     hidden: 0,
     housekeeping: null,
   };
-  const writes = (dir: string) => calls(dir).filter((c) => /^(queue (move|set|request|cancel)|task new) /.test(c));
+  const writes = (dir: string) => calls(dir).filter((c) => /^(queue (move|set|request|cancel)|task (new|resume)) /.test(c));
   /** The calls since `from`: what Jig ran for one write. */
   const since = (dir: string, from: number) => calls(dir).slice(from);
 
@@ -383,6 +397,17 @@ describe('localSource, writing the queue', () => {
     expect(await source.cancelPause('pauser', 'a', 7)).toEqual({ state: 'written' });
     expect(await source.requestPause('pauser', 'gone', 7)).toEqual({ state: 'refused', code: 'not-found' });
     expect(writes(dir)).toEqual(['queue request task:a pause --revision 7 --json', 'queue cancel task:a pause --revision 7 --json']);
+  });
+
+  it('resumes a paused task, and carries the refusal of a stash it could not apply by its code', async () => {
+    const dir = project('resumer', '0.35.0', { tasks });
+    await source.connect(dir);
+    expect(await source.resume('resumer', 'a', 7)).toEqual({ state: 'written' });
+    expect(await source.resume('resumer', 'gone', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(writes(dir)).toEqual(['task resume a --revision 7 --json']);
+    const stashed = project('stashed', '0.35.0', { tasks, write: 'wrong-checkout' });
+    await source.connect(stashed);
+    expect(await source.resume('stashed', 'a', 7)).toEqual({ state: 'refused', code: 'wrong-checkout' });
   });
 
   it.each([

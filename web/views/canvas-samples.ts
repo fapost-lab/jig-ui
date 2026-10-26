@@ -10,6 +10,8 @@ const task = (id: string, more: Partial<Task>): Task => ({
   paused: false,
   pauseRequest: null,
   pauseRequestable: true,
+  resumable: false,
+  resumesTo: null,
   started: true,
   gate: null,
   autopilot: null,
@@ -79,6 +81,14 @@ export const tasks: Task[] = [
     pauseRequestable: false,
     goal: 'Show what changed when a write was based on a stale read.',
   }),
+  task('resume-from-page', {
+    class: 'T3',
+    paused: true,
+    pauseRequestable: false,
+    resumable: true,
+    resumesTo: 'in-progress',
+    goal: 'A drop out of Paused, or the card menu, resumes the task through jig task resume.',
+  }),
 ];
 
 /** The samples placed as the board places them: every column with cards. */
@@ -87,7 +97,7 @@ export const board: Column[] = [
   { id: 'in-progress', title: 'In progress', cards: [tasks[3]!, tasks[12]!, tasks[11]!] },
   { id: 'ready', title: 'Ready', cards: tasks.slice(4, 9) },
   { id: 'backlog', title: 'Backlog', cards: [tasks[10]!] },
-  { id: 'paused', title: 'Paused', cards: [tasks[9]!] },
+  { id: 'paused', title: 'Paused', cards: [tasks[9]!, tasks[13]!] },
 ];
 
 /** A board with no live task. */

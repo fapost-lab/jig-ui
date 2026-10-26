@@ -13,6 +13,7 @@
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { conflict } from '@/lib/conflict';
   import { lastWins } from '@/lib/last-wins';
+  import { refusal } from '@/lib/refusal';
   import { toneText } from '@/lib/tones';
 
   const props = defineProps<{
@@ -128,7 +129,7 @@
         text: `The project changed while you were ${doing} ${task}${seen ? ` — ${seen.said}` : ''}. Try again on the board as it is now.`,
         changed: seen?.changed ?? [],
       };
-    } else if (code !== undefined) notice.value = { text: `Jig refused ${doing} ${task} (${code}).`, changed: [] };
+    } else if (code !== undefined) notice.value = { text: refusal(code, doing, task), changed: [] };
     pending.value = undefined;
   }
 
@@ -141,6 +142,9 @@
       : write(task, 'taking back the pause request of', (revision) =>
           client.api.projects[':id'].queue.pause.cancel.$post({ param, json: { task, revision } }),
         );
+
+  const resume = (task: string) =>
+    write(task, 'resuming', (revision) => client.api.projects[':id'].tasks.resume.$post({ param, json: { task, revision } }));
 
   /** The new-task form: open, its request on its way, and why the last one was refused. */
   const filing = ref(false);
@@ -241,6 +245,7 @@
       @move="move"
       @prioritise="prioritise"
       @pause="pause"
+      @resume="resume"
     />
 
     <div v-else-if="view === 'specs'" class="min-h-0 flex-1 overflow-y-auto">
@@ -267,6 +272,7 @@
       @move="move"
       @prioritise="prioritise"
       @pause="pause"
+      @resume="resume"
     />
   </div>
 </template>

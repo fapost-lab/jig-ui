@@ -1,0 +1,1 @@
+{"schema":1,"revision":1793042056,"generated_at":"2026-10-26T19:15:39Z","error":{"code":"stash-conflict","message":"task resume: git stash apply failed for 13d86c7787764f28cc8bb2d75c23a28c848359bc (conflicts); resolve them, then run `jig task resume stashy` again"}}

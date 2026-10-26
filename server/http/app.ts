@@ -174,6 +174,12 @@ function apiRoutes(source: ProjectSource, version: string) {
         return written(c, await source.cancelPause(c.req.param('id'), task, revision));
       })
 
+      .post('/api/projects/:id/tasks/resume', validator('json', taskAt), async (c) => {
+        const { task, revision } = c.req.valid('json');
+        if (task === undefined || revision === undefined) return refuse(c, 422, 'usage', 'Give a task and the revision it was read at.');
+        return written(c, await source.resume(c.req.param('id'), task, revision));
+      })
+
       // A new task carries no revision: it writes nothing that exists (adr-20261022-filing-a-task-carries-no-revision).
       .post(
         '/api/projects/:id/tasks',

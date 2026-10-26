@@ -4,16 +4,18 @@ import { placement } from './placement';
 
 /**
  * Dragging a card: within its list (a column), with the gap it would land in and the place Jig's queue would give it;
- * onto the Paused column, a pause asked of the task. A drop is allowed only where `placement` says one
- * `jig queue move` puts it, or on Paused when Jig offers the request; any other list allows none.
+ * onto the Paused column, a pause asked of the task; out of Paused, a resume. A drop is allowed only where `placement`
+ * says one `jig queue move` puts it, on Paused when Jig offers the request, or on the one list a resume would put the
+ * task in; any other list allows none.
  */
-export function useDrop(onMove: (task: string, place: Place) => void, onPause: (task: string) => void) {
+export function useDrop(onMove: (task: string, place: Place) => void, onPause: (task: string) => void, onResume: (task: string) => void) {
   const dragged = ref<{
     task: string;
     list: string;
     pausable: boolean;
+    resumesTo: string | null;
   }>();
-  /** Where the card would land: a gap in its own list, or the Paused list as a whole (`index` -1, no place). */
+  /** Where the card would land: a gap in its own list, or another list as a whole (`index` -1, no place). */
   const gap = ref<{
     list: string;
     index: number;
@@ -21,7 +23,7 @@ export function useDrop(onMove: (task: string, place: Place) => void, onPause: (
   }>();
 
   function start(event: DragEvent, list: string, task: Task): void {
-    dragged.value = { task: task.id, list, pausable: task.pauseRequestable };
+    dragged.value = { task: task.id, list, pausable: task.pauseRequestable, resumesTo: task.resumesTo };
     event.dataTransfer?.setData('text/plain', task.id);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
   }
@@ -31,7 +33,7 @@ export function useDrop(onMove: (task: string, place: Place) => void, onPause: (
     const d = dragged.value;
     if (!d) return;
     if (d.list !== list) {
-      if (list !== 'paused' || !d.pausable) return;
+      if (list === 'paused' ? !d.pausable : list !== d.resumesTo) return;
       gap.value = { list, index: -1 };
       event.preventDefault(); // allows the drop here
       return;
@@ -52,7 +54,8 @@ export function useDrop(onMove: (task: string, place: Place) => void, onPause: (
     end();
     if (!d || g?.list !== list) return;
     if (g.place) onMove(d.task, g.place);
-    else onPause(d.task);
+    else if (list === 'paused') onPause(d.task);
+    else onResume(d.task);
   }
 
   function end(): void {

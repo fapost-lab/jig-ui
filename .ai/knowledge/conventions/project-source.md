@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-10-25
+reviewed_at: 2026-10-26
 ---
 # ProjectSource — how the server reaches a project
 
@@ -33,7 +33,7 @@ live tasks and the finished ones Jig still keeps (`tasks(id)`, for the board), o
 (`specs(id)`), connect,
 disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,
 `prioritise(id, taskId, priority, revision)`, `requestPause(id, taskId, revision)`,
-`cancelPause(id, taskId, revision)` and `fileTask(id, taskId, goal)`, which answer `written`, `refused` with Jig's code,
+`cancelPause(id, taskId, revision)`, `resume(id, taskId, revision)` and `fileTask(id, taskId, goal)`, which answer `written`, `refused` with Jig's code,
 or the project's state when it is not `ready`; its local adapter
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
 only the path a person types to connect. A read that fails becomes a state of the project, not an

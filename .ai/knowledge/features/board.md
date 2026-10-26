@@ -11,8 +11,9 @@ paths:
   - web/lib/conflict.ts
   - web/components/FinishedList.vue
   - web/lib/finished.ts
+  - web/lib/refusal.ts
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
-reviewed_at: 2026-10-25
+reviewed_at: 2026-10-26
 ---
 # Board
 
@@ -58,8 +59,14 @@ done, or moving.
   (`jig queue cancel`) until Jig pauses it — the drop as a request of
   adr-20261014-board-columns-are-derived-from-jig-state. The age moves on with a clock of the
   page (`web/lib/clock.ts`), once a minute, not with reads: an idle project is not read again.
-  A drop on any other column does nothing.
-- A paused card names `jig task resume <id>`; the page does not resume a task.
+- A paused card leaves Paused by a drop on the one column it will be in, or **Resume** in its
+  menu: the page runs `jig task resume` at once — no request (adr-20261026-a-drop-out-of-paused-resumes-at-once).
+  Offered only where Jig offers the `resume` action and the project's Jig is 0.35.0 or later; below
+  that the card names `jig task resume <id>`. Jig's refusals are said in Jig UI's own words
+  (`web/lib/refusal.ts`), never Jig's message: `wrong-checkout` — the pause kept a stash and the
+  main checkout is not on the task's branch — and `stash-conflict` — the stash did not apply, the
+  task is still paused — both send the person to the terminal. Any other drop on another column
+  does nothing.
 - A change Jig refuses as `stale-revision` shows the conflict: the page compares the board the
   change was made on with the read the change itself started (`web/lib/conflict.ts`), marks each
   card that is new, in another column, moved within its own, or shows other facts — "Changed while
@@ -92,11 +99,14 @@ done, or moving.
 - vue-router for the board's address — rejected for two screens in `project-board`; adopted
   with the design system when the page reached four (adr-20261018-page-built-from-shadcn-vue-with-router-and-canvas). The address stays
   `#/projects/<id>`.
-- Resuming from the page by a drop out of Paused (the roadmap's wish) — not built: Jig 0.31.0's
-  `jig task resume` takes no `--revision` and no `--json`, refuses unless the checkout is on the
-  task's branch (never so for a task in its own worktree), and applies a stash into the person's
-  checkout. Raised as fapost-lab/jig#295; the maintainer chose to show the command meanwhile
-  (task `pause-request`, 2026-10-22).
+- Resuming from the page (task `resume-from-page`, 2026-10-26). Waited for Jig: 0.31.0's
+  `jig task resume` took no `--revision` and no `--json` (fapost-lab/jig#295, in 0.35.0), and the
+  maintainer chose to show the command meanwhile (task `pause-request`, 2026-10-22). Built as a
+  direct write; its alternatives are in adr-20261026-a-drop-out-of-paused-resumes-at-once. Two more
+  choices of the maintainer at the gate: no line on the page when a resume applied a stash (it is
+  applied only for the person who paused with `--stash` and checked the branch out again), and no
+  ask of Jig to stop offering `resume` where it will refuse `wrong-checkout` (rare; the refusal's
+  line says what to do).
 - Conflict display (task `conflict-display`, 2026-10-25, the maintainer's choice of marking the
   changes over a list of them or the one line as before). A move within a column is the cards
   outside the longest run that kept its order — of equal runs, the one keeping most cards whose

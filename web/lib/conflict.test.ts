@@ -10,6 +10,8 @@ const task = (id: string, more: Partial<Task> = {}): Task => ({
   paused: false,
   pauseRequest: null,
   pauseRequestable: true,
+  resumable: false,
+  resumesTo: null,
   started: true,
   gate: null,
   autopilot: null,

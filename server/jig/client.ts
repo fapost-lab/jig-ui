@@ -9,6 +9,9 @@ const run = promisify(execFile);
 /** The oldest Jig Jig UI reads and writes: 0.29.0 is the first that prints JSON, 0.31.0 the first with a queue. */
 export const MIN_JIG_VERSION = '0.31.0';
 
+/** The first Jig whose `task resume` takes `--revision` and `--json` (fapost-lab/jig#295). */
+export const RESUME_JIG_VERSION = '0.35.0';
+
 const SCRIPT = '.ai/scripts/jig';
 const TIMEOUT_MS = 10_000;
 
@@ -83,7 +86,18 @@ export class JigRefusal extends Error {
   }
 }
 
-const CODES = new Set(['usage', 'not-a-repository', 'not-initialised', 'stale-revision', 'not-found', 'already-exists', 'failed']);
+const CODES = new Set([
+  'usage',
+  'not-a-repository',
+  'not-initialised',
+  'stale-revision',
+  'not-found',
+  'already-exists',
+  'not-paused',
+  'wrong-checkout',
+  'stash-conflict',
+  'failed',
+]);
 
 /** Jig answered in a shape this Jig UI does not read: a Jig newer than the contract its tests pin. */
 export class JigShapeError extends Error {
@@ -422,6 +436,20 @@ export async function cancelPause(
   platform: NodeJS.Platform = process.platform,
 ): Promise<void> {
   await readJson(root, ['queue', 'cancel', `task:${task}`, 'pause', '--revision', String(revision)], platform);
+}
+
+/**
+ * Resumes a paused task (`jig task resume <id>`), in the main checkout. Refused as `not-paused`; `wrong-checkout` when
+ * the pause kept a stash and the checkout is not on the task's branch; `stash-conflict` when that stash does not apply,
+ * the task still paused; and as `moveInQueue` is. Applied, a stash is back in the checkout, as the terminal's resume.
+ */
+export async function resumeTask(
+  root: string,
+  task: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  await readJson(root, ['task', 'resume', task, '--revision', String(revision)], platform);
 }
 
 /**

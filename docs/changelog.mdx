@@ -8,6 +8,11 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+- [Resume a paused task](/projects#resuming-a-task) from the board: drag it out of Paused onto the
+  column it will be in, or choose **Resume** in its ⋯ menu. Jig UI runs `jig task resume` with the
+  revision of the board you saw; a pause whose stash cannot be applied says what to do instead.
+  Needs Jig 0.35.0 or later in the project; with an older Jig the card names the command as before.
+
 ## 0.3.0 — 2026-10-25
 
 The board changes things now, always through Jig's own commands.

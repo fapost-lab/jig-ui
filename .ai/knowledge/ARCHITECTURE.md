@@ -81,11 +81,12 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   "project X changed, revision R"; the page re-reads, served from that read (feature-live-updates).
 - **Change.** The page sends a write with the revision of the board it showed; ProjectSource
   runs the matching Jig command for live task ids only and answers after reading the project
-  again; Jig's `stale-revision` comes back as 409, the page says so in one line and reads the
-  board again (adr-20261022-writes-carry-the-revision-of-their-read). Built for the queue: order,
-  priority and pause requests. Filing a task is the one write with no revision: it names a new
-  id, which Jig claims or refuses `already-exists` (adr-20261022-filing-a-task-carries-no-revision).
-  A full conflict display is still to build.
+  again; Jig's `stale-revision` comes back as 409, and the page reads the board again and shows
+  the conflict: what changed between the board the write was made on and that read, its cards
+  marked (adr-20261022-writes-carry-the-revision-of-their-read, feature-board). Built for the
+  queue: order, priority and pause requests. Filing a task is the one write with no revision: it
+  names a new id, which Jig claims or refuses `already-exists`
+  (adr-20261022-filing-a-task-carries-no-revision).
 - **Release flow.** A merge to `main` runs the CI matrix, builds `dist/` in a job without
   credentials, and publishes `<version>-next.<run>` under npm's `next` tag; a `v*` tag on a
   commit of `main` publishes `latest`. Details in `RELEASING.md`.
@@ -111,9 +112,7 @@ One npm package with a server and a page
 
 ### Runtime flows
 
-The start flow, read-and-follow and change are built (see Built above). Still to build:
-
-1. **Conflict display** (Phase 2). A stale write shows what changed instead of one line.
+The start flow, read-and-follow and change, with its conflict display, are built (see Built above).
 
 ### System-wide constraints and invariants
 

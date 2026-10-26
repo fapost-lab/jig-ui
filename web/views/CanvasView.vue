@@ -8,6 +8,7 @@
   import BoardList from '@/components/BoardList.vue';
   import ColumnHeader from '@/components/ColumnHeader.vue';
   import ConnectForm from '@/components/ConnectForm.vue';
+  import FinishedList from '@/components/FinishedList.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
   import CopyCommand from '@/components/CopyCommand.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
@@ -28,10 +29,11 @@
   import { Input } from '@/components/ui/input';
   import { Label } from '@/components/ui/label';
   import { Separator } from '@/components/ui/separator';
+  import { Toggle } from '@/components/ui/toggle';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { toneRule, toneText } from '@/lib/tones';
   import CanvasSection from './CanvasSection.vue';
-  import { actions, attention, board, columns, details, emptyBoard, projects, specItems, specs, tasks } from './canvas-samples';
+  import { actions, attention, board, columns, details, emptyBoard, finished, projects, specItems, specs, tasks } from './canvas-samples';
 
   const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
   const buttonSizes = ['xs', 'sm', 'default', 'lg'] as const;
@@ -107,6 +109,13 @@
       </ToggleGroup>
     </CanvasSection>
 
+    <CanvasSection title="Toggle" note="the board's finished tasks: off, on">
+      <div class="flex gap-2">
+        <Toggle variant="outline" size="sm" :model-value="false">3 finished tasks</Toggle>
+        <Toggle variant="outline" size="sm" :model-value="true">3 finished tasks</Toggle>
+      </div>
+    </CanvasSection>
+
     <CanvasSection title="Collapsible" note="open and folded">
       <Collapsible v-for="open in [true, false]" :key="String(open)" :default-open="open">
         <CollapsibleTrigger class="w-full border-b bg-muted/50 px-3 py-1.5 text-left"
@@ -179,29 +188,44 @@
 
     <CanvasSection
       title="TaskCard"
-      note="every note a card carries, a priority among them; with its queue menu; while its change is on its way; open with details, while reading, unreadable"
+      note="every note a card carries, a priority among them; with its queue menu; while its change is on its way; changed since a refused change; open with details, while reading, unreadable"
     >
       <div class="grid grid-cols-2 gap-2 xl:grid-cols-3">
         <TaskCard v-for="task in tasks" :key="task.id" project="jig-ui" :task="task" :open="false" />
         <TaskCard project="jig-ui" :task="tasks[1]!" :open="false" :cards="tasks" />
         <TaskCard project="jig-ui" :task="tasks[0]!" :open="false" :cards="tasks" busy />
+        <TaskCard project="jig-ui" :task="tasks[3]!" :open="false" :cards="tasks" changed />
         <TaskCard project="jig-ui" :task="tasks[2]!" :open="true" :details="details[0]" />
         <TaskCard project="jig-ui" :task="tasks[0]!" :open="true" />
         <TaskCard project="jig-ui" :task="tasks[1]!" :open="true" details="unavailable" />
       </div>
     </CanvasSection>
 
-    <CanvasSection title="TaskRow" note="each note and priority; selected; with its queue menu; while its change is on its way">
+    <CanvasSection
+      title="TaskRow"
+      note="each note and priority; selected; with its queue menu; while its change is on its way; changed since a refused change"
+    >
       <div>
         <TaskRow v-for="(task, i) in tasks" :key="task.id" :task="task" :selected="i === 2" />
         <TaskRow :task="tasks[1]!" :selected="false" :cards="tasks" />
         <TaskRow :task="tasks[0]!" :selected="false" :cards="tasks" busy />
+        <TaskRow :task="tasks[3]!" :selected="false" :cards="tasks" changed />
       </div>
     </CanvasSection>
 
-    <CanvasSection title="BoardColumns" note="cards in every column, one open with its details; no live task">
+    <CanvasSection
+      title="BoardColumns"
+      note="cards in every column, one open with its details, two changed since a refused change; no live task"
+    >
       <div class="flex h-[28rem] flex-col">
-        <BoardColumns project="jig-ui" :columns="board" :selected="tasks[2]!.id" :details="details[0]" :pending="tasks[0]!.id" />
+        <BoardColumns
+          project="jig-ui"
+          :columns="board"
+          :selected="tasks[2]!.id"
+          :details="details[0]"
+          :pending="tasks[0]!.id"
+          :changed="[tasks[1]!.id, tasks[3]!.id]"
+        />
       </div>
       <div class="flex h-40 flex-col">
         <BoardColumns project="jig-ui" :columns="emptyBoard" />
@@ -218,6 +242,10 @@
       <div class="flex h-64 flex-col">
         <BoardList project="jig-ui" :columns="emptyBoard" />
       </div>
+    </CanvasSection>
+
+    <CanvasSection title="FinishedList" note="closed with its pull request merged; abandoned; one without a goal">
+      <FinishedList :tasks="finished" class="border" />
     </CanvasSection>
 
     <CanvasSection title="TaskFacts" note="everything a task can carry; a task not started">

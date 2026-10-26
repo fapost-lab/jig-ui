@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-10-22
+reviewed_at: 2026-10-25
 ---
 # JigClient — the only module that knows Jig
 
@@ -38,7 +38,7 @@ dropped by `z.object`, so nothing Jig UI does not read gets past `server/jig/`.
 
 ## Example
 
-A task-list read runs Jig's JSON task listing, checks the envelope, then `data` through the
+A task-list read runs Jig's JSON task listing with `--all`, finished tasks included, checks the envelope, then `data` through the
 `TaskList` schema — the status among Jig's own words — and returns typed tasks. Jig's refusal throws `JigRefusal` with its code
 (an unknown code is `failed`); an envelope of another shape throws `JigShapeError`, which the
 project shows as `incompatible` ("update Jig UI"), never half-parsed. Each read has a contract
@@ -55,7 +55,9 @@ tests pin that a person's goal reaches Jig as one argument, unglobbed
 command line, which it parses itself: it globbed a one-word goal `out*` that Node left unquoted,
 and with `MSYS=noglob` it read `\"` as a backslash and a quote (both caught by the Windows CI leg).
 They go in the environment as `JIG_UI_ARG_<n>`, and the fixed script
-`exec "$BASH" "$JIG_UI_ARG_0" …` hands them to Jig unparsed.
+`. "$JIG_UI_ARG_0" "$JIG_UI_ARG_1" …` hands them to Jig unparsed. It sources Jig, which finds itself by
+`BASH_SOURCE` and never reads `$0`: Git bash's `exec` starts a second bash and waits for it, and
+every Jig run took about 1.6 times as long — a Windows CI timeout (task `conflict-display`).
 
 ## Rationale
 

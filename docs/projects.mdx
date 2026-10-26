@@ -39,7 +39,7 @@ Connect only projects whose Jig you would run yourself; that includes running
 ## What the page shows
 
 A row of tabs runs along the top: `jig-ui://` for this page, then one tab per connected project
-with how many things need you there (`!` when the project cannot be read). Below, each connected
+with how many things need you there (a red `!` when the project cannot be read). Below, each connected
 project, in the order you connected them. The page is dark; the button at the right end of the tabs
 switches it to light, and the browser remembers the choice. For a readable project:
 
@@ -79,7 +79,16 @@ fits wins:
 | In progress | anything else that is live |
 
 A card shows the task's id, class and goal, its priority (`P0`, the most urgent, to `P5`) when it
-has one, and what it waits for. Finished tasks are only counted above the board.
+has one, and what it waits for.
+
+Finished tasks are not on the board. When the project has any, **N finished tasks** above the
+board shows them in a list under it, the latest first: each one's id, *closed* or *abandoned*,
+its goal, its pull request and the day it finished. Click it again to hide the list; it starts
+hidden. The list holds what Jig still keeps: `jig housekeeping` moves a closed task's workspace to
+trash once it sees the task's branch merged — for a task of an epic, once the epic reached the
+default branch — and an abandoned one's after 14 days (`housekeeping.abandoned_ttl`); the task
+leaves the list with it. A closed task that never had a branch, or whose branch housekeeping never
+sees merged, stays. The history of finished work is the project's merged pull requests.
 
 **Board / List** switches between the columns side by side and a list: the same columns as
 groups of one-line rows, each group folding away; **Specs** shows the project's specs
@@ -90,7 +99,8 @@ groups of one-line rows, each group folding away; **Specs** shows the project's 
 **New task** above the board opens a form: an id and a goal of one line. **File it** runs
 `jig task new <id> --goal <goal>` in the project, and the task appears in **Backlog** once Jig
 has written it. An id is letters, digits, `.`, `_` and `-`, not starting with `.` or `-`. An id the
-project already has is refused — a finished task's too, though the board does not show it.
+project already has is refused — a finished task's too, though only the list of finished tasks
+shows it.
 
 The rest of a task — its class, domains, a longer description — is set in the terminal, or by
 the agent that starts it.
@@ -112,8 +122,18 @@ A queue starts empty: a task joins it the first time it is moved, so the first c
 goes to the top of the queue or right after the last queued task above it.
 
 If anything was written in the project between the moment the board was read and your change —
-an agent working, a `jig` command in a terminal — Jig refuses the change. The page says so above
-the board and reads it again; look at the new order and make the change again.
+an agent working, a `jig` command in a terminal — Jig refuses the change, so nothing written
+meanwhile is overwritten. The page reads the board again and shows the conflict:
+
+- the line above the board says what became of your card — *beta is now in Ready*, *beta moved in
+  Backlog*, *beta is no longer on the board* — and how many other cards changed;
+- each card that changed while you acted says *Changed while you acted* (*changed* in the list):
+  new, in another column, moved within its own, or with other facts, such as its priority. The
+  marks show what changed up to Jig's refusal; the board itself keeps following the project.
+
+Jig counts every write in the project, so the line may say *nothing on the board changed*: an agent
+wrote elsewhere, a document or a stage. Make the change again on the board as it is now;
+**dismiss**, or your next change, clears the marks.
 
 ## Pausing a task
 
@@ -163,8 +183,8 @@ keep. The details are:
   button. Jig UI runs none of them; the page follows the change once you do.
 
 Two things are not shown yet: which of the task's documents exist (Jig does not report them in a
-form Jig UI reads) and dependencies between tasks (they come with Jig's task queue). A finished
-task has no details page; its link says so.
+form Jig UI reads) and dependencies between tasks (Jig's queue holds them; Jig UI does not show
+them yet). A finished task has no details page; its link says so.
 
 ## Staying current
 
@@ -176,7 +196,7 @@ project is also read again, for a change the system did not report.
 A read that fails while an agent is in the middle of writing does not blank the page: the last
 good read stays until the next one. A project that keeps failing shows why, as in the table above.
 
-Watching stops when the last page closes; nothing is written in the project. If the page says its
+Watching stops when the last page closes; watching writes nothing in the project. If the page says its
 session has ended, Jig UI was restarted: run `npx @fapost/jig-ui` again to reopen it.
 
 ## Disconnect a project

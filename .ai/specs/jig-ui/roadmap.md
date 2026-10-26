@@ -45,7 +45,8 @@ instead of being overwritten.
 - [x] `queue-reorder` — reorder and prioritise by drag (after: project board; Jig queue — writes go through Jig's queue command with the revision: `jig queue move` and `jig queue set --priority` with `--revision <n> --json`, read with `jig queue list --json`)
 - [x] `pause-request` — pause and resume as a request — a drop on the paused column writes a sticky request through Jig; the card shows "requested" with its age and a cancel until Jig's state changes; a drop out of it resumes directly (after: project board; Jig legal actions and requests — they say when a pause is offered: `jig queue request|cancel task:<id> pause`, the task's `pause_request` and the `request-pause` / `cancel-pause-request` / `resume` actions in `jig task list --json`)
 - [x] `file-backlog-task` — file a minimal backlog task from the page (after: project board — through `jig task new <id> --goal <text> --json`, refused as `already-exists` when the id is taken)
-- [ ] conflict display (after: reorder and prioritise by drag — the refusal of a stale revision is what it shows: `error.code` `stale-revision`)
+- [x] `conflict-display` — conflict display (after: reorder and prioritise by drag — the refusal of a stale revision is what it shows: `error.code` `stale-revision`)
+- [x] `finished-list` — finished tasks from the board's count — the count of finished tasks opens the list of those Jig still keeps, with status and pull request (after: project board — the count is on its header; Jig — `jig task list --all --json`, which keeps a finished task only until housekeeping moves its workspace to trash)
 
 ## Phase 3 — Further
 
@@ -68,9 +69,10 @@ instead of being overwritten.
 8. connect by running in the project
 9. reorder and prioritise by drag; pause and resume as a request; file a minimal backlog task from the page
 10. conflict display
-11. resume from the page
-12. projects to upgrade
-13. upgrade from the page
+11. finished tasks from the board's count
+12. resume from the page
+13. projects to upgrade
+14. upgrade from the page
 
 <!--
 Rules (jig-idea §8):

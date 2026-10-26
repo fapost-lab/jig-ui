@@ -14,6 +14,8 @@
     cards?: Task[];
     /** A change of its place, priority or pause is on its way to Jig. */
     busy?: boolean;
+    /** It changed between the board a refused change was made on and the board read after it. */
+    changed?: boolean;
   }>();
 
   defineEmits<{
@@ -42,6 +44,7 @@
         {{ task.priority === null ? '' : `P${task.priority}` }}
       </span>
       <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ task.goal }}</span>
+      <span v-if="changed" class="shrink-0" :class="toneText.attention">changed</span>
       <span v-if="busy" class="shrink-0 text-muted-foreground" role="status">sending to Jig…</span>
       <span v-else-if="note" class="shrink-0" :class="toneText[note.tone]">{{ note.text }}</span>
       <span v-if="request && !busy" class="shrink-0" :class="toneText.quiet">{{ request }}</span>

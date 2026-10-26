@@ -48,13 +48,15 @@ async function bash(platform: NodeJS.Platform): Promise<string> {
  * Runs the project's own Jig in its main checkout, without a shell. Git bash on Windows parses its own command line:
  * it globs an argument Node left unquoted (a one-word goal `out*` became `out.json`), and with `MSYS=noglob` it reads
  * `\"` as a backslash and a quote instead (CI, task `file-backlog-task`). There the arguments go in the environment,
- * and a fixed script hands them to Jig, so nothing parses a person's text.
+ * and a fixed script hands them to Jig, so nothing parses a person's text. The script sources Jig (which finds itself
+ * by `BASH_SOURCE`) rather than `exec` it: Git bash's `exec` starts a second bash and waits for it, and every run took
+ * half as long again (CI, task `conflict-display`).
  */
 async function jig(root: string, args: string[], platform: NodeJS.Platform): Promise<string> {
   const argv = [SCRIPT, ...args];
   const { stdout } =
     platform === 'win32'
-      ? await run(await bash(platform), ['-c', `exec "$BASH" ${argv.map((_, i) => `"$JIG_UI_ARG_${i}"`).join(' ')}`], {
+      ? await run(await bash(platform), ['-c', `. ${argv.map((_, i) => `"$JIG_UI_ARG_${i}"`).join(' ')}`], {
           cwd: root,
           timeout: TIMEOUT_MS,
           env: { ...process.env, ...Object.fromEntries(argv.map((arg, i) => [`JIG_UI_ARG_${i}`, arg])) },
@@ -200,7 +202,7 @@ const TaskAction = z.object({
 });
 export type TaskAction = z.output<typeof TaskAction>;
 
-/** A task as `jig task list --json` reports it, as far as Jig UI reads it; the statuses are Jig's (schemas/state.md). */
+/** A task as `jig task list --all --json` reports it, as far as Jig UI reads it; the statuses are Jig's (schemas/state.md). */
 const TaskRow = z
   .object({
     id: text,
@@ -257,18 +259,17 @@ const TaskRow = z
   }));
 export type TaskSummary = z.output<typeof TaskRow>;
 
-const TaskList = z.object({ tasks: z.array(TaskRow), hidden: z.number() });
+const TaskList = z.object({ tasks: z.array(TaskRow) });
 
-/** The project's live tasks (`jig task list --json`) and how many finished ones it left out. */
+/** The project's tasks, the finished ones too while Jig keeps their workspace (`jig task list --all --json`). */
 export async function readTasks(
   root: string,
   platform: NodeJS.Platform = process.platform,
 ): Promise<{
   revision: number;
   tasks: TaskSummary[];
-  hidden: number;
 }> {
-  const { revision, data } = await readJson(root, ['task', 'list'], platform);
+  const { revision, data } = await readJson(root, ['task', 'list', '--all'], platform);
   return { revision, ...parsed(TaskList, data) };
 }
 

@@ -8,14 +8,23 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+## 0.3.0 — 2026-10-25
+
+The board changes things now, always through Jig's own commands.
+
 - [Order the work](/projects#ordering-the-work) from the board: drag a card within its column, or
   use its ⋯ menu, to move it in the project's queue; set its priority from P0 to P5. Every change
   goes through `jig queue`, and a change the project overtook is refused and the board read again.
+- A change the project overtook shows the [conflict](/projects#ordering-the-work): the line above
+  the board says what became of your card, and the cards that changed while you acted are marked.
 - [Pause a task](/projects#pausing-a-task) from the board: drag it onto Paused, or use its ⋯ menu,
   to ask Jig to pause it at its next stage boundary; the card shows the request with its age and a
   cancel. A paused card names the command that resumes it.
 - [File a task](/projects#filing-a-task) from the board: **New task** takes an id and a goal and
   runs `jig task new`; the task appears in Backlog.
+- The count of finished tasks above the board opens [the list of them](/projects#the-board) Jig
+  still keeps, with each one's status, goal and pull request; it starts hidden.
+- A project that cannot be read shows a red `!` on its tab.
 - Jig UI now needs Jig 0.31.0 or later in each project; run `jig upgrade` in an older one.
 
 ## 0.2.0 — 2026-10-22

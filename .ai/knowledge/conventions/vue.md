@@ -6,7 +6,7 @@ domains: []
 paths:
   - "web/**"
 summary: MAY/MUST/MUST NOT for web/ layers (views → components → components/ui), styling, lib decisions with tests, and the canvas
-reviewed_at: 2026-10-18
+reviewed_at: 2026-10-25
 ---
 # The page in Vue
 
@@ -43,8 +43,7 @@ MUST:     be the only callers of call(), client and onChange()
 - A decision about what to show — what a card says it waits for, and its tone — lives in
   `lib/*.ts` with a test, not in a template.
 - A component in `components/`, or one of `components/ui/` the page uses directly, has a section
-  in `views/CanvasView.vue` covering its variants and states (Toggle is shown through
-  ToggleGroup).
+  in `views/CanvasView.vue` covering its variants and states.
 - shadcn-vue components are added with `npx shadcn-vue@latest add <name>`, then moved to
   devDependencies if the CLI put anything under `dependencies`.
 - A preference of one browser goes to `localStorage` under a `jig-ui.` key, every read and write

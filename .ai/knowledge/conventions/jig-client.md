@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-10-26
+reviewed_at: 2026-10-27
 ---
 # JigClient — the only module that knows Jig
 
@@ -69,6 +69,13 @@ They go in the environment as `JIG_UI_ARG_<n>`, and the fixed script
 `. "$JIG_UI_ARG_0" "$JIG_UI_ARG_1" …` hands them to Jig unparsed. It sources Jig, which finds itself by
 `BASH_SOURCE` and never reads `$0`: Git bash's `exec` starts a second bash and waits for it, and
 every Jig run took about 1.6 times as long — a Windows CI timeout (task `conflict-display`).
+
+`planUpgrade` (`jig upgrade --dry-run --json`, 60 s) and `runUpgrade` (`jig upgrade --json`, 30 minutes:
+at `agent.git: merge` Jig waits for CI) read one `Upgrade` schema; its `files` are not read. Jig's
+human texts in it — `would_stop`, `manual_steps` — and the reasons of an `upgrade-blocked` refusal
+(the `  - ` lines of its message, on `JigRefusal.reasons`) go through `withoutPaths`, which puts `…`
+for an absolute path: Jig 0.35.0 names only relative ones, so the cut is a guard, tested on a real
+reason with an absolute path put in (adr-20261027-upgrading-a-project-runs-in-the-background).
 
 ## Rationale
 

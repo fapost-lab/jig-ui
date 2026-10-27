@@ -1,0 +1,1 @@
+{"schema":1,"revision":1793043519,"generated_at":"2026-10-26T20:33:32Z","data":{"mode":"copy","dry_run":false,"from":"0.33.0","to":"0.35.0","outcome":"staged","files":{"placed":0,"kept":114,"removed":0,"conflicts":0},"git":{"level":"none","branch":"jig/upgrade-0.35.0","commit":null,"pushed":false,"pull_request":null,"merged":false},"manual_steps":[],"would_stop":[]}}

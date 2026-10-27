@@ -56,8 +56,12 @@ function project(
     tasks?: unknown;
     specs?: unknown;
     queue?: unknown;
-    /** What `queue move`, `set`, `request`, `cancel`, `task new` and `task resume` print: an envelope's `data`, or a refusal's code. */
+    /** What `queue move`, `set`, `request`, `cancel`, `task new` and `task resume` print, once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
     write?: unknown;
+    /** What `upgrade --dry-run` prints, as `data`. */
+    plan?: unknown;
+    /** What `upgrade` prints once a file `go` is in the project: an envelope's `data`, or a whole envelope as a string. */
+    upgrade?: unknown;
   } = {},
 ): string {
   const dir = join(root, name);
@@ -78,6 +82,8 @@ function project(
       ? JSON.stringify({ schema: 1, revision: 9, generated_at: 'x', error: { code: write, message: 'refused' } })
       : envelope(write),
   );
+  writeFileSync(join(dir, 'plan.json'), envelope(answers.plan ?? {}));
+  writeFileSync(join(dir, 'upgrade.json'), typeof answers.upgrade === 'string' ? answers.upgrade : envelope(answers.upgrade ?? {}));
   writeFileSync(
     join(dir, '.ai', 'scripts', 'jig'),
     `#!/usr/bin/env bash
@@ -88,7 +94,9 @@ case "$*" in
   "task list --all --json") cat tasks.json ;;
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
-  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*) cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "upgrade --dry-run --json") cat plan.json ;;
+  "upgrade --json") while [ ! -f go ]; do sleep 0.05; done; cat upgrade.json; if grep -q '"error"' upgrade.json; then exit 1; fi ;;
 esac
 `,
   );
@@ -148,9 +156,10 @@ describe('localSource', () => {
         counts: { active: 2, paused: 1, ready: 1 },
         attention: [{ ...attention, versions: null }],
         housekeepingStale: true,
+        upgrade: null,
       },
-      { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' },
-      { id: 'broken', state: 'unreadable', code: 'not-initialised' },
+      { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0', upgrade: null },
+      { id: 'broken', state: 'unreadable', code: 'not-initialised', upgrade: null },
     ]);
     expect(calls(old)).not.toContain('status --json');
     expect(calls(old)).not.toContain('task list --all --json');
@@ -210,13 +219,13 @@ describe('localSource', () => {
     const gone = project('gone', '0.31.0');
     await source.connect(gone);
     rmSync(gone, { recursive: true, force: true });
-    expect((await source.workspace()).at(-1)).toEqual({ id: 'gone', state: 'unavailable', reason: 'missing' });
+    expect((await source.workspace()).at(-1)).toEqual({ id: 'gone', state: 'unavailable', reason: 'missing', upgrade: null });
   });
 
   it('shows a project whose Jig answers in a newer shape as incompatible', async () => {
     const newer = project('newer', '0.32.0', { tasks: { tasks: [task('a', 'parked')], hidden: 0, housekeeping: null } });
     await source.connect(newer);
-    expect((await source.workspace()).at(-1)).toEqual({ id: 'newer', state: 'incompatible', jigVersion: '0.32.0' });
+    expect((await source.workspace()).at(-1)).toEqual({ id: 'newer', state: 'incompatible', jigVersion: '0.32.0', upgrade: null });
     await source.disconnect('newer');
   });
 
@@ -569,7 +578,7 @@ describe('localSource, following changes', () => {
     touch(live.dir);
     await until(() => changes.length > 0);
     expect(changes).toEqual([{ id: 'live', revision: null }]);
-    expect((await source.workspace())[0]).toEqual({ id: 'live', state: 'unreadable', code: 'failed' });
+    expect((await source.workspace())[0]).toEqual({ id: 'live', state: 'unreadable', code: 'failed', upgrade: null });
     live.answer(3, [task('a', 'ready'), task('b', 'active')]);
     touch(live.dir);
     await until(() => changes.length > 1);
@@ -738,5 +747,173 @@ describe('localSource, following changes', () => {
       { id: 'again', revision: null },
       { id: 'again', revision: 1 },
     ]);
+  });
+});
+
+describe('localSource, upgrading a project', () => {
+  const source = localSource(join(root, 'upgrade-config'));
+  const item = {
+    kind: 'upgrade-available',
+    subject: { type: 'project', id: null },
+    tasks: [],
+    title: 'Jig in this project is older than on this machine',
+    detail: 'this project runs 0.34.0; this machine has 0.35.0',
+    todo: 'jig upgrade',
+    url: null,
+    versions: { from: '0.34.0', to: '0.35.0' },
+  };
+  const planned = {
+    mode: 'copy',
+    dry_run: true,
+    from: '0.34.0',
+    to: '0.35.0',
+    outcome: 'planned',
+    files: { placed: 3, kept: 100, removed: 0, conflicts: 0 },
+    git: null,
+    manual_steps: [],
+    would_stop: [],
+  };
+  const git = {
+    level: 'pr',
+    branch: 'jig/upgrade-0.35.0',
+    commit: 'abc',
+    pushed: true,
+    pull_request: 'https://github.com/o/r/pull/3',
+    merged: false,
+  };
+  const behind = project('behind', '0.34.0', {
+    status: { attention: [item], housekeeping: null },
+    plan: planned,
+    upgrade: { ...planned, dry_run: false, outcome: 'upgraded', git },
+  });
+  const current = project('current', '0.35.0');
+  const upgradeOf = async (id: string) => (await source.workspace()).find((p) => p.id === id)?.upgrade;
+  const reads = (dir: string) => calls(dir).filter((c) => c === 'status --json').length;
+  async function ended(id: string): Promise<void> {
+    for (let waited = 0; (await upgradeOf(id))?.state === 'running' && waited < 4_000; waited += 25) await delay(25);
+  }
+
+  it('plans an upgrade only where Jig names one to make', async () => {
+    await source.connect(behind);
+    await source.connect(current);
+    expect(await source.planUpgrade('behind')).toEqual({
+      state: 'planned',
+      plan: expect.objectContaining({ from: '0.34.0', to: '0.35.0', outcome: 'planned', wouldStop: [] }),
+    });
+    expect(await source.planUpgrade('current')).toEqual({ state: 'refused', code: 'not-found' });
+    expect(calls(current)).not.toContain('upgrade --dry-run --json');
+    expect(await source.planUpgrade('nobody')).toBeUndefined();
+  });
+
+  it('answers at once, does not read the project while the upgrade runs, and keeps what it came to', async () => {
+    expect(await source.upgrade('behind')).toEqual({ state: 'started' });
+    expect(await upgradeOf('behind')).toEqual({ state: 'running', since: expect.any(String), to: '0.35.0' });
+    expect(await source.upgrade('behind')).toEqual({ state: 'refused', code: 'running' });
+    expect(await source.planUpgrade('behind')).toEqual({ state: 'refused', code: 'running' });
+    const before = reads(behind);
+    await source.workspace();
+    expect(reads(behind)).toBe(before);
+
+    writeFileSync(join(behind, 'go'), '');
+    await ended('behind');
+    expect(await upgradeOf('behind')).toEqual({
+      state: 'done',
+      at: expect.any(String),
+      upgrade: expect.objectContaining({
+        outcome: 'upgraded',
+        git: expect.objectContaining({ pullRequest: 'https://github.com/o/r/pull/3' }),
+      }),
+    });
+    expect(reads(behind)).toBeGreaterThan(before);
+    expect(await source.dismissUpgrade('behind')).toBe(true);
+    expect(await upgradeOf('behind')).toBeNull();
+    expect(await source.upgrade('current')).toEqual({ state: 'refused', code: 'not-found' });
+  });
+
+  it('keeps a refusal to start with its reasons', async () => {
+    const blocked = project('blocked', '0.34.0', {
+      status: { attention: [item], housekeeping: null },
+      upgrade: JSON.stringify({
+        schema: 1,
+        revision: 7,
+        generated_at: 'x',
+        error: {
+          code: 'upgrade-blocked',
+          message: 'upgrade: nothing was changed:\n  - the working tree has uncommitted changes; commit them',
+        },
+      }),
+    });
+    writeFileSync(join(blocked, 'go'), '');
+    await source.connect(blocked);
+    await source.upgrade('blocked');
+    await ended('blocked');
+    expect(await upgradeOf('blocked')).toEqual({
+      state: 'refused',
+      at: expect.any(String),
+      code: 'upgrade-blocked',
+      reasons: ['the working tree has uncommitted changes; commit them'],
+    });
+  });
+
+  it('tells a listener when an upgrade starts and when it ends', async () => {
+    const changes: Change[] = [];
+    const unsubscribe = source.subscribe((c) => changes.push(c));
+    await settled(behind);
+    rmSync(join(behind, 'go'));
+    await source.upgrade('behind');
+    expect(changes.filter((c) => c.id === 'behind')).toHaveLength(1);
+    writeFileSync(join(behind, 'go'), '');
+    // The end is told once the project is read again, after the result is kept.
+    await until(() => changes.filter((c) => c.id === 'behind').length > 1);
+    expect(changes.filter((c) => c.id === 'behind')).toHaveLength(2);
+    unsubscribe();
+  });
+
+  it('runs no Jig of its own in the project while it upgrades, not even once a listener comes back', async () => {
+    let unsubscribe = source.subscribe(() => {});
+    await settled(behind);
+    rmSync(join(behind, 'go'));
+    await source.upgrade('behind');
+    unsubscribe();
+    unsubscribe = source.subscribe(() => {});
+    const others = () => calls(behind).filter((c) => c !== 'upgrade --json').length;
+    const before = others();
+    await source.workspace();
+    await settled(behind);
+    expect(await source.fileTask('behind', 'zeta', 'Do the thing')).toEqual({ state: 'refused', code: 'upgrading' });
+    expect(others()).toBe(before);
+    writeFileSync(join(behind, 'go'), '');
+    await ended('behind');
+    unsubscribe();
+  });
+
+  it('starts one run for two starts at once, once a write under way has ended, and keeps the project meanwhile', async () => {
+    rmSync(join(behind, 'go'));
+    writeFileSync(join(behind, 'hold'), '');
+    const filings = () => calls(behind).filter((c) => c.startsWith('task new ')).length;
+    const upgrades = () => calls(behind).filter((c) => c === 'upgrade --json').length;
+    const [filed, before] = [filings(), upgrades()];
+    const filing = source.fileTask('behind', 'zeta', 'Do the thing');
+    await until(() => filings() > filed);
+    const started = await Promise.all([source.upgrade('behind'), source.upgrade('behind')]);
+    expect(started).toEqual(expect.arrayContaining([{ state: 'started' }, { state: 'refused', code: 'running' }]));
+    expect(await source.disconnect('behind')).toBe('upgrading');
+    await delay(200);
+    expect(upgrades()).toBe(before);
+    rmSync(join(behind, 'hold'));
+    expect(await filing).toEqual({ state: 'written' });
+    await until(() => upgrades() > before);
+    writeFileSync(join(behind, 'go'), '');
+    await ended('behind');
+    expect(upgrades()).toBe(before + 1);
+  });
+
+  it('lets a disconnect sent with a start find the run, and keeps the project', async () => {
+    rmSync(join(behind, 'go'), { force: true });
+    const started = await Promise.all([source.upgrade('behind'), source.disconnect('behind')]);
+    expect(started).toEqual([{ state: 'started' }, 'upgrading']);
+    expect((await source.workspace()).map((p) => p.id)).toContain('behind');
+    writeFileSync(join(behind, 'go'), '');
+    await ended('behind');
   });
 });

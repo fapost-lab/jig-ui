@@ -14,6 +14,9 @@ export const RESUME_JIG_VERSION = '0.35.0';
 
 const SCRIPT = '.ai/scripts/jig';
 const TIMEOUT_MS = 10_000;
+/** A dry run compares every framework file; a real upgrade at `agent.git: merge` also waits for CI. */
+const PLAN_TIMEOUT_MS = 60_000;
+const UPGRADE_TIMEOUT_MS = 30 * 60_000;
 
 /** The directory whose changes may change what Jig reports: the main checkout's `.ai/`. */
 export const watchDir = (root: string): string => join(root, '.ai');
@@ -55,16 +58,16 @@ async function bash(platform: NodeJS.Platform): Promise<string> {
  * by `BASH_SOURCE`) rather than `exec` it: Git bash's `exec` starts a second bash and waits for it, and every run took
  * half as long again (CI, task `conflict-display`).
  */
-async function jig(root: string, args: string[], platform: NodeJS.Platform): Promise<string> {
+async function jig(root: string, args: string[], platform: NodeJS.Platform, timeout = TIMEOUT_MS): Promise<string> {
   const argv = [SCRIPT, ...args];
   const { stdout } =
     platform === 'win32'
       ? await run(await bash(platform), ['-c', `. ${argv.map((_, i) => `"$JIG_UI_ARG_${i}"`).join(' ')}`], {
           cwd: root,
-          timeout: TIMEOUT_MS,
+          timeout,
           env: { ...process.env, ...Object.fromEntries(argv.map((arg, i) => [`JIG_UI_ARG_${i}`, arg])) },
         })
-      : await run(await bash(platform), argv, { cwd: root, timeout: TIMEOUT_MS });
+      : await run(await bash(platform), argv, { cwd: root, timeout });
   return stdout;
 }
 
@@ -79,12 +82,24 @@ export async function jigVersion(root: string, platform: NodeJS.Platform = proce
   return match[1];
 }
 
-/** Why a JSON read was refused: Jig's failure code (`failed` for one this Jig UI does not know, or a shape it cannot read). */
+/**
+ * Why a JSON read was refused: Jig's failure code (`failed` for one this Jig UI does not know, or a shape it cannot
+ * read), and for `upgrade-blocked` every reason Jig gave, without a path.
+ */
 export class JigRefusal extends Error {
-  constructor(readonly code: string) {
+  constructor(
+    readonly code: string,
+    readonly reasons: string[] = [],
+  ) {
     super(`jig refused: ${code}`);
   }
 }
+
+/**
+ * Jig's text for a person with every absolute path in it cut out: no path reaches the page. Jig 0.35.0 names only
+ * paths under the project, relative to it, since it runs in the project's root; this keeps a later one from leaking.
+ */
+export const withoutPaths = (text: string): string => text.replace(/(?<=^|[\s(`'"])(?:[A-Za-z]:)?[\\/][^\s)`'"]*/g, '…');
 
 const CODES = new Set([
   'usage',
@@ -96,6 +111,7 @@ const CODES = new Set([
   'not-paused',
   'wrong-checkout',
   'stash-conflict',
+  'upgrade-blocked',
   'failed',
 ]);
 
@@ -118,13 +134,14 @@ async function readJson(
   root: string,
   args: string[],
   platform: NodeJS.Platform,
+  timeout?: number,
 ): Promise<{
   revision: number;
   data: Json;
 }> {
   let stdout: string;
   try {
-    stdout = await jig(root, [...args, '--json'], platform);
+    stdout = await jig(root, [...args, '--json'], platform, timeout);
   } catch (error) {
     // A refusal is an envelope too, printed before the non-zero exit.
     stdout = (error as { stdout?: string }).stdout ?? '';
@@ -137,7 +154,12 @@ async function readJson(
   }
   if (!isObject(envelope) || envelope.schema !== 1 || typeof envelope.revision !== 'number') throw new JigShapeError();
   if (isObject(envelope.error)) {
-    const code = envelope.error.code;
+    const { code, message } = envelope.error;
+    if (code === 'upgrade-blocked' && typeof message === 'string') {
+      // `upgrade: nothing was changed:` and then a reason a line, as `  - <reason>`.
+      const reasons = message.split('\n').flatMap((line) => (line.startsWith('  - ') ? [withoutPaths(line.slice(4))] : []));
+      throw new JigRefusal(code, reasons);
+    }
     throw new JigRefusal(typeof code === 'string' && CODES.has(code) ? code : 'failed');
   }
   if (!isObject(envelope.data)) throw new JigShapeError();
@@ -467,4 +489,56 @@ export async function resumeTask(
  */
 export async function fileTask(root: string, id: string, goal: string, platform: NodeJS.Platform = process.platform): Promise<void> {
   await readJson(root, ['task', 'new', id, '--goal', goal], platform);
+}
+
+/** What `jig upgrade --json` did, or for `--dry-run` would do (Jig 0.34.0): Jig's texts without a path. */
+const Upgrade = z
+  .object({
+    mode: text,
+    from: maybe,
+    to: maybe,
+    outcome: text,
+    git: z
+      .object({
+        level: text,
+        branch: maybe,
+        commit: maybe,
+        pushed: z.boolean(),
+        pull_request: maybe,
+        merged: z.boolean(),
+      })
+      .nullable(),
+    manual_steps: z.array(text),
+    would_stop: z.array(text),
+  })
+  .transform(({ git, manual_steps, would_stop, ...rest }) => ({
+    ...rest,
+    git: git && {
+      level: git.level,
+      branch: git.branch,
+      commit: git.commit,
+      pushed: git.pushed,
+      pullRequest: git.pull_request,
+      merged: git.merged,
+    },
+    manualSteps: manual_steps.map(withoutPaths),
+    wouldStop: would_stop.map(withoutPaths),
+  }));
+export type Upgrade = z.output<typeof Upgrade>;
+
+/**
+ * What upgrading the project's Jig would do (`jig upgrade --dry-run`), changing nothing: the versions, the steps the
+ * release asks for by hand and every reason a real run would not start.
+ */
+export async function planUpgrade(root: string, platform: NodeJS.Platform = process.platform): Promise<Upgrade> {
+  return parsed(Upgrade, (await readJson(root, ['upgrade', '--dry-run'], platform, PLAN_TIMEOUT_MS)).data);
+}
+
+/**
+ * Upgrades the project's Jig (`jig upgrade`) in its main checkout, on a branch, as far as its `agent.git` lets Jig take
+ * it — at `merge` Jig waits for CI first. Refused as `upgrade-blocked`, with its reasons, before anything is touched;
+ * any other refusal, a failed push or pull request after the commit included, is `failed`.
+ */
+export async function runUpgrade(root: string, platform: NodeJS.Platform = process.platform): Promise<Upgrade> {
+  return parsed(Upgrade, (await readJson(root, ['upgrade'], platform, UPGRADE_TIMEOUT_MS)).data);
 }

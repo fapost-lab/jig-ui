@@ -1,0 +1,1 @@
+{"schema":1,"revision":1793043519,"generated_at":"2026-10-27T07:06:54Z","data":{"mode":"copy","dry_run":true,"from":"0.33.0","to":"0.35.0","outcome":"planned","files":{"placed":0,"kept":114,"removed":0,"conflicts":0},"git":null,"manual_steps":[],"would_stop":[]}}

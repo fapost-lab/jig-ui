@@ -51,8 +51,9 @@ switches it to light, and the browser remembers the choice. For a readable proje
   `jig housekeeping`; when its last run is old or the forge did not answer, a waiting pull request
   may be missing until you run it.
 - **The newer Jig on this machine**, after the project's own version, when the project runs an
-  older Jig than the one installed here: *0.34.0 → 0.35.0 on this machine*. Run `jig upgrade` in
-  the project. Above the projects, a line counts how many need it.
+  older Jig than the one installed here: *0.34.0 → 0.35.0 on this machine*, and **Upgrade…** to
+  upgrade it from the page ([Upgrading a project's Jig](#upgrading-a-projects-jig)). Above the
+  projects, a line counts how many need it.
 
 The project's Jig says when it is behind, from Jig 0.34.0 on; a project on an older Jig shows only
 its version, so compare it with `jig --version` yourself.
@@ -68,6 +69,36 @@ project whose state is not readable shows why:
 | Jig UI needs 0.31.0 or later | The project's Jig is older than Jig UI reads. Run `jig upgrade` in the project; it is shown as readable once the upgrade lands, without connecting it again. |
 | The project directory is not there any more | The folder was moved or deleted. Disconnect it, then connect its new path. |
 | There is no Jig in the project any more | Jig was removed from the project. |
+
+## Upgrading a project's Jig
+
+**Upgrade…** on a marked project asks Jig what the upgrade would do — `jig upgrade --dry-run`,
+which changes nothing — and shows it on the card:
+
+- what would stop it, when Jig would not start here: uncommitted changes, a started task's branch
+  checked out in the project's main checkout, `jig verify` running. Deal with them and open it
+  again;
+- otherwise **Upgrade**, and the steps the release asks you to do by hand, if any;
+- and a request to copy for your agent — *Upgrade Jig in <project>* — which upgrades the project
+  and does those steps too. Jig UI runs no agent.
+
+**Upgrade** runs `jig upgrade` in the project's main checkout, as you would in a terminal: Jig cuts
+a branch, places its files, commits, and then goes as far as the project's `agent.git` lets it —
+push, a pull request, a merge after CI. The card says *Upgrading…* meanwhile, in every tab and
+after a reload. Until it ends Jig UI neither reads the project nor changes it: a change from the
+board is refused, and the card offers no **Disconnect**. Then the card says what came of
+it: merged, a pull request waiting for review with its link, pushed, committed, staged, nothing
+to do, or why Jig stopped. It stays until you choose **Dismiss** or upgrade again, and until Jig
+UI stops: it is not kept anywhere.
+
+- With `agent.git: none` Jig stages the upgrade and leaves the main checkout on its branch; the
+  card says how to commit it there.
+- A push or a pull request is made by Jig with your git and `gh` credentials, as in a terminal;
+  on macOS the Keychain may ask first.
+- Stopping Jig UI with Ctrl+C while an upgrade runs stops the upgrade too; run `jig upgrade` in the
+  project to carry it on.
+
+One project at a time: there is no "upgrade all".
 
 ## The board
 

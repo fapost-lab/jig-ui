@@ -159,15 +159,23 @@ const maybe = z.string().nullable();
 const count = z.int().nonnegative();
 
 /** Something that needs the person, as `jig status --json` reports it; a kind this Jig UI does not know is shown by its texts. */
-const Attention = z.object({
-  kind: text,
-  subject: z.object({ type: text, id: maybe }),
-  tasks: z.array(text),
-  title: text,
-  detail: maybe,
-  todo: text,
-  url: maybe,
-});
+const Attention = z
+  .object({
+    kind: text,
+    subject: z.object({ type: text, id: maybe }),
+    tasks: z.array(text),
+    title: text,
+    detail: maybe,
+    todo: text,
+    url: maybe,
+    // The project's Jig and the machine's. The one field left out: only `upgrade-available` carries it
+    // (Jig 0.34.0), and that item never without it.
+    versions: z
+      .object({ from: text, to: text })
+      .nullish()
+      .transform((v) => v ?? null),
+  })
+  .refine((a) => a.kind !== 'upgrade-available' || a.versions !== null);
 export type Attention = z.output<typeof Attention>;
 
 const Status = z.object({

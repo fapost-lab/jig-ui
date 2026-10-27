@@ -50,6 +50,12 @@ switches it to light, and the browser remembers the choice. For a readable proje
 - **A note when pull request facts may be out of date.** Jig reads pull requests only during
   `jig housekeeping`; when its last run is old or the forge did not answer, a waiting pull request
   may be missing until you run it.
+- **The newer Jig on this machine**, after the project's own version, when the project runs an
+  older Jig than the one installed here: *0.34.0 → 0.35.0 on this machine*. Run `jig upgrade` in
+  the project. Above the projects, a line counts how many need it.
+
+The project's Jig says when it is behind, from Jig 0.34.0 on; a project on an older Jig shows only
+its version, so compare it with `jig --version` yourself.
 
 The page follows the projects while it is open — see [Staying current](#staying-current). A
 project whose state is not readable shows why:

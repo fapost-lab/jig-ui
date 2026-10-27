@@ -134,6 +134,7 @@ export const attention: Attention[] = [
     detail: null,
     todo: 'Review the design and approve it: jig task gate design-system approved',
     url: null,
+    versions: null,
   },
   {
     kind: 'pull-request-ci-failed',
@@ -143,6 +144,7 @@ export const attention: Attention[] = [
     detail: 'pull request #19',
     todo: 'Look at the failing check.',
     url: 'https://github.com/fapost-lab/jig-ui/pull/19',
+    versions: null,
   },
   {
     kind: 'housekeeping',
@@ -152,6 +154,7 @@ export const attention: Attention[] = [
     detail: null,
     todo: 'Run jig housekeeping.',
     url: 'https://example.com/docs',
+    versions: null,
   },
 ];
 
@@ -224,6 +227,22 @@ const ready = (id: string, more: Partial<Extract<Project, { state: 'ready' }>> =
 export const projects: Project[] = [
   ready('jig-ui', { attention, housekeepingStale: true }),
   ready('nextjs-store', { counts: { active: 0, paused: 0, ready: 0 } }),
+  ready('legacy-shop', {
+    jigVersion: '0.34.0',
+    counts: { active: 2, paused: 0, ready: 0 },
+    attention: [
+      {
+        kind: 'upgrade-available',
+        subject: { type: 'project', id: null },
+        tasks: [],
+        title: 'Jig in this project is older than on this machine',
+        detail: 'this project runs 0.34.0; this machine has 0.35.0',
+        todo: 'jig upgrade',
+        url: null,
+        versions: { from: '0.34.0', to: '0.35.0' },
+      },
+    ],
+  }),
   { id: 'old-jig', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' },
   { id: 'new-jig', state: 'incompatible', jigVersion: '1.0.0' },
   { id: 'busy', state: 'unreadable', code: 'locked' },

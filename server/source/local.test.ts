@@ -146,7 +146,7 @@ describe('localSource', () => {
         state: 'ready',
         jigVersion: '0.31.0',
         counts: { active: 2, paused: 1, ready: 1 },
-        attention: [attention],
+        attention: [{ ...attention, versions: null }],
         housekeepingStale: true,
       },
       { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' },
@@ -310,7 +310,7 @@ describe('localSource', () => {
         baseBranch: 'main',
         worktree: { uncommitted: 3 },
         actions: [{ id: 'pause', command: 'jig task pause b' }],
-        attention: [attention],
+        attention: [{ ...attention, versions: null }],
       }),
     });
     expect(JSON.stringify(read)).not.toContain('/secret/');

@@ -1,12 +1,17 @@
 <script setup lang="ts">
+  import { computed } from 'vue';
   import { describe, type Project } from '@/api';
   import { Button } from '@/components/ui/button';
   import { Card } from '@/components/ui/card';
+  import { toneText } from '@/lib/tones';
+  import { upgradeOf } from '@/lib/upgrade';
   import AttentionItem from './AttentionItem.vue';
 
-  defineProps<{
+  const props = defineProps<{
     project: Project;
   }>();
+
+  const upgrade = computed(() => upgradeOf(props.project));
 
   defineEmits<{
     disconnect: [];
@@ -18,6 +23,7 @@
     <div class="flex items-center gap-3">
       <h2 :id="`project-${project.id}`" class="shrink-0 text-sm font-bold">{{ project.id }}</h2>
       <span class="text-muted-foreground">{{ describe(project) }}</span>
+      <span v-if="upgrade" :class="toneText.attention">{{ upgrade.from }} → {{ upgrade.to }} on this machine</span>
       <Button variant="ghost" size="xs" class="ml-auto" @click="$emit('disconnect')">Disconnect</Button>
     </div>
     <template v-if="project.state === 'ready'">

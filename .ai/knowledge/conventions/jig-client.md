@@ -39,6 +39,12 @@ camelCase by its `.transform`; the exported types are its `z.output`
 (adr-20261018-jig-answers-checked-by-zod-schemas). Keys Jig adds without raising `schema` are
 dropped by `z.object`, so nothing Jig UI does not read gets past `server/jig/`.
 
+Every field a schema reads is in Jig's output, `null` where Jig has nothing — except one: an
+attention item's `versions` (`{from, to}`, the project's Jig as its manifest says and the
+machine's), which only `upgrade-available` carries, from Jig 0.34.0, and older Jig never printed on
+any item. It reads as `null` when absent, and an `upgrade-available` item without it fails the read,
+as a field Jig dropped does (task `projects-to-upgrade`).
+
 ## Example
 
 A task-list read runs Jig's JSON task listing with `--all`, finished tasks included, checks the envelope, then `data` through the

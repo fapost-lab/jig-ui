@@ -184,9 +184,9 @@ describe('/api/projects and /api/workspace', () => {
     const text = await list.text();
     expect(JSON.parse(text)).toEqual({
       projects: [
-        { id: 'ready', state: 'ready', jigVersion: '0.31.0', ...empty },
-        { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' },
-        { id: 'broken', state: 'unreadable', code: 'failed' },
+        { id: 'ready', state: 'ready', jigVersion: '0.31.0', ...empty, upgrade: null },
+        { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0', upgrade: null },
+        { id: 'broken', state: 'unreadable', code: 'failed', upgrade: null },
       ],
     });
     expectNoPath(text);
@@ -488,6 +488,74 @@ describe('/api/projects/:id/queue', () => {
     const resumed = await post(fake, '/api/projects/x/tasks/resume', { task: 'a', revision: 1 });
     expect(resumed.status).toBe(status);
     expect(((await resumed.json()) as { error: { code: string } }).error.code).toBe(code);
+  });
+
+  it.each([
+    [
+      'a plan',
+      {
+        state: 'planned',
+        plan: {
+          mode: 'copy',
+          from: '0.34.0',
+          to: '0.35.0',
+          outcome: 'planned',
+          git: null,
+          manualSteps: [] as string[],
+          wouldStop: [] as string[],
+        },
+      },
+      200,
+    ],
+    ['an upgrade under way', { state: 'refused', code: 'running' }, 409],
+    ['no upgrade to make', { state: 'refused', code: 'not-found' }, 404],
+    ["another refusal of Jig's", { state: 'refused', code: 'failed' }, 422],
+    ['a project it cannot read', { id: 'x', state: 'unreadable', code: 'locked' }, 200],
+    ['a project not connected', undefined, 404],
+  ] as const)('answers a plan of an upgrade with %s', async (_, planned, status) => {
+    const source: ProjectSource = { ...localSource(join(webRoot, 'fake-config')), planUpgrade: () => Promise.resolve(planned) };
+    const res = await post(createApp({ port: PORT, token: TOKEN, source, webRoot }), '/api/projects/x/upgrade/plan', {});
+    expect(res.status).toBe(status);
+    expect(await res.json()).toEqual(
+      planned === undefined
+        ? { error: { code: 'not-connected', message: expect.any(String) } }
+        : planned.state === 'planned'
+          ? { plan: planned.plan }
+          : planned.state === 'refused'
+            ? { error: { code: planned.code, message: expect.any(String) } }
+            : { project: planned },
+    );
+  });
+
+  it.each([
+    ['started at once', { state: 'started' }, 202],
+    ['an upgrade under way', { state: 'refused', code: 'running' }, 409],
+    ['no upgrade to make', { state: 'refused', code: 'not-found' }, 404],
+    ['a project not connected', undefined, 404],
+  ] as const)('answers an upgrade %s', async (_, started, status) => {
+    const source: ProjectSource = { ...localSource(join(webRoot, 'fake-config')), upgrade: () => Promise.resolve(started) };
+    const res = await post(createApp({ port: PORT, token: TOKEN, source, webRoot }), '/api/projects/x/upgrade', {});
+    expect(res.status).toBe(status);
+    if (started?.state === 'started') expect(await res.json()).toEqual({ started: true });
+  });
+
+  it('forgets what an upgrade came to, refuses a disconnect while one runs, and is refused without the token', async () => {
+    const source: ProjectSource = { ...localSource(join(webRoot, 'fake-config')), dismissUpgrade: (id) => Promise.resolve(id === 'x') };
+    const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
+    const dismiss = (id: string, headers: Record<string, string> = { cookie: COOKIE }) =>
+      fake.request(`/api/projects/${id}/upgrade`, { method: 'DELETE', headers: { host: HOST, ...headers } });
+    expect((await dismiss('x')).status).toBe(204);
+    expect((await dismiss('y')).status).toBe(404);
+    expect((await dismiss('x', {})).status).toBe(401);
+    const upgrading = createApp({
+      port: PORT,
+      token: TOKEN,
+      source: { ...source, disconnect: () => Promise.resolve('upgrading' as const) },
+      webRoot,
+    });
+    expect((await upgrading.request('/api/projects/x', { method: 'DELETE', headers: { host: HOST, cookie: COOKIE } })).status).toBe(409);
+    expect((await post(fake, '/api/projects/x/upgrade', {}, {})).status).toBe(401);
+    expect((await post(fake, '/api/projects/x/upgrade/plan', {}, {})).status).toBe(401);
   });
 
   it('answers a project it cannot read with its state', async () => {

@@ -7,6 +7,7 @@ import {
   jigVersion,
   MIN_JIG_VERSION,
   moveInQueue,
+  planUpgrade,
   type QueueItem,
   readQueue,
   readSpecs,
@@ -15,6 +16,7 @@ import {
   requestPause,
   RESUME_JIG_VERSION,
   resumeTask,
+  runUpgrade,
   setPriority,
   supports,
   type TaskSummary,
@@ -36,6 +38,7 @@ import type {
   Task,
   TaskCounts,
   TaskDetails,
+  UpgradeRun,
   Written,
 } from './project-source.js';
 
@@ -187,6 +190,10 @@ async function readProject(project: Project): Promise<Read> {
   };
 }
 
+/** The version Jig's `upgrade-available` item in a read names for this machine; none without the item. */
+const upgradeTo = (read: Read): string | undefined =>
+  read.view.state === 'ready' ? (read.view.attention.find((a) => a.kind === 'upgrade-available')?.versions?.to ?? undefined) : undefined;
+
 /** A read that may have caught Jig mid-write: worth one more try before it is believed. */
 const torn = (read: Read): boolean => read.view.state === 'unreadable' || read.view.state === 'incompatible';
 
@@ -205,6 +212,10 @@ interface Entry {
   dirty: boolean;
   /** Registered since the page last read the workspace: its first read is signalled too. */
   news: boolean;
+  /** The upgrade started from the page, kept until dismissed or the next one starts. */
+  upgrade?: UpgradeRun;
+  /** The writes under way: an upgrade starts once they have ended. */
+  writes: Set<Promise<void>>;
 }
 
 export interface LocalOptions {
@@ -221,6 +232,13 @@ export interface LocalOptions {
  */
 export function localSource(configDir: string, { rescanMs = 60_000, quietMs, maxWaitMs }: LocalOptions = {}): ProjectSource {
   const entries = new Map<string, Entry>();
+  /** The last upgrade start or disconnect: they run one at a time, each checking what the one before changed. */
+  let changing: Promise<unknown> = Promise.resolve();
+  function oneAtATime<T>(change: () => Promise<T>): Promise<T> {
+    const done = changing.then(change);
+    changing = done.catch(() => undefined);
+    return done;
+  }
   const listeners = new Set<(change: Change) => void>();
   let rescan: NodeJS.Timeout | undefined;
   /** Counts the times following started; a read that finishes after a stop belongs to none. */
@@ -231,7 +249,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
 
   const entryOf = (project: Project): Entry => {
     let entry = entries.get(project.id);
-    if (!entry) entries.set(project.id, (entry = { project, held: false, dirty: false, news: false }));
+    if (!entry) entries.set(project.id, (entry = { project, held: false, dirty: false, news: false, writes: new Set() }));
     return entry;
   };
 
@@ -254,6 +272,8 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
    */
   function refresh(entry: Entry, news = false): Promise<void> {
     entry.news ||= news;
+    // Jig replaces its own scripts while it upgrades: a read could run one half placed. The run reads once it ends.
+    if (entry.upgrade?.state === 'running' && entry.shown) return Promise.resolve();
     if (entry.reading) {
       entry.dirty = true;
       return entry.reading;
@@ -280,6 +300,52 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
 
   function signal(change: Change): void {
     for (const listener of listeners) listener(change);
+  }
+
+  /** Tells the listeners that what the project shows beyond Jig's read — its upgrade — changed. */
+  function signalUpgrade(entry: Entry): void {
+    if (following() && entries.get(entry.project.id) === entry) signal({ id: entry.project.id, revision: entry.shown?.revision ?? null });
+  }
+
+  /** The project's last read when an upgrade may start from it: ready and naming a version to upgrade to. */
+  async function upgradable(id: string): Promise<
+    | {
+        entry: Entry;
+        to: string;
+      }
+    | {
+        state: 'refused';
+        code: string;
+      }
+    | NotReady
+    | undefined
+  > {
+    const project = (await readProjects(configDir)).find((p) => p.id === id);
+    if (!project) return undefined;
+    const read = await shown(project);
+    if (read.view.state !== 'ready') return read.view;
+    const entry = entryOf(project);
+    if (entry.upgrade?.state === 'running') return { state: 'refused', code: 'running' };
+    const to = upgradeTo(read);
+    return to === undefined ? { state: 'refused', code: 'not-found' } : { entry, to };
+  }
+
+  /** Runs the upgrade to its end, then keeps what it came to and reads the project again. */
+  async function upgrading(entry: Entry): Promise<void> {
+    // A read or a write under way runs Jig in the same checkout.
+    await Promise.allSettled([entry.reading, ...entry.writes]);
+    let run: UpgradeRun;
+    try {
+      run = { state: 'done', at: '', upgrade: await runUpgrade(entry.project.path) };
+    } catch (error) {
+      run =
+        error instanceof JigRefusal
+          ? { state: 'refused', at: '', code: error.code, reasons: error.reasons }
+          : { state: 'refused', at: '', code: 'failed', reasons: [] };
+    }
+    entry.upgrade = { ...run, at: new Date().toISOString() };
+    await refresh(entry);
+    signalUpgrade(entry);
   }
 
   /** What the project shows: from the watch while following, read through Jig otherwise. */
@@ -337,7 +403,8 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     for (const entry of entries.values()) {
       entry.watch?.close();
       entry.watch = undefined;
-      entry.shown = undefined;
+      // A project being upgraded keeps its read: it is read again only once the upgrade ends.
+      if (entry.upgrade?.state !== 'running') entry.shown = undefined;
       entry.held = false;
     }
   }
@@ -353,20 +420,29 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     const { tasks } = await shown(project);
     if (tasks.state !== 'ready') return tasks;
     if (!taskIds.every((t) => tasks.tasks.some((live) => live.id === t))) return { state: 'refused', code: 'not-found' };
+    const entry = entryOf(project);
+    // Jig replaces its own scripts while it upgrades: the write waits for the person to try again.
+    if (entry.upgrade?.state === 'running') return { state: 'refused', code: 'upgrading' };
     let written: Written = { state: 'written' };
+    const run = write(project.path);
+    entry.writes.add(run);
     try {
-      await write(project.path);
+      await run;
     } catch (error) {
       // Only the code goes on: Jig's message may name a path.
       written = { state: 'refused', code: error instanceof JigRefusal ? error.code : 'failed' };
+    } finally {
+      entry.writes.delete(run);
     }
-    await refresh(entryOf(project));
+    await refresh(entry);
     return written;
   }
 
   return {
     async workspace() {
-      return Promise.all((await readProjects(configDir)).map(async (p) => (await shown(p)).view));
+      return Promise.all(
+        (await readProjects(configDir)).map(async (p) => ({ ...(await shown(p)).view, upgrade: entryOf(p).upgrade ?? null })),
+      );
     },
     async connect(path) {
       const found = await connectable(path);
@@ -415,13 +491,47 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       // A new id names no live task: Jig itself refuses a taken one.
       return writing(id, [], (root) => fileTask(root, taskId, goal));
     },
-    async disconnect(id) {
-      if (!(await removeProject(configDir, id))) return false;
-      entries.get(id)?.watch?.close();
-      entries.delete(id);
-      known?.delete(id); // connected again before the next sweep, it is news again
-      if (following()) signal({ id, revision: null });
+    async planUpgrade(id) {
+      const found = await upgradable(id);
+      if (!found || !('entry' in found)) return found;
+      try {
+        return { state: 'planned', plan: await planUpgrade(found.entry.project.path) };
+      } catch (error) {
+        return { state: 'refused', code: error instanceof JigRefusal ? error.code : 'failed' };
+      }
+    },
+    upgrade(id) {
+      // Two starts at once make one run; a disconnect sent with a start finds the run, or the start no project.
+      return oneAtATime(async () => {
+        const found = await upgradable(id);
+        if (!found || !('entry' in found)) return found;
+        found.entry.upgrade = { state: 'running', since: new Date().toISOString(), to: found.to };
+        signalUpgrade(found.entry);
+        void upgrading(found.entry);
+        return { state: 'started' } as const;
+      });
+    },
+    async dismissUpgrade(id) {
+      const project = (await readProjects(configDir)).find((p) => p.id === id);
+      if (!project) return false;
+      const entry = entryOf(project);
+      if (entry.upgrade && entry.upgrade.state !== 'running') {
+        entry.upgrade = undefined;
+        signalUpgrade(entry);
+      }
       return true;
+    },
+    disconnect(id) {
+      return oneAtATime(async () => {
+        // The run is the entry's: without it a project connected again would be read, and upgraded, meanwhile.
+        if (entries.get(id)?.upgrade?.state === 'running') return 'upgrading' as const;
+        if (!(await removeProject(configDir, id))) return false;
+        entries.get(id)?.watch?.close();
+        entries.delete(id);
+        known?.delete(id); // connected again before the next sweep, it is news again
+        if (following()) signal({ id, revision: null });
+        return true;
+      });
     },
     subscribe(listener) {
       listeners.add(listener);

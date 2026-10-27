@@ -1,6 +1,7 @@
 // Sample data for the canvas: every state a component shows, in the shapes of api.ts.
-import type { Attention, Column, Project, ReadyDetails, Spec, SpecItem, Task } from '@/api';
+import type { Attention, Column, Project, ReadyDetails, Spec, SpecItem, Task, UpgradePlan } from '@/api';
 import type { FinishedTask } from '@/lib/finished';
+import type { PlanState, UpgradeRun } from '@/lib/upgrade';
 
 const task = (id: string, more: Partial<Task>): Task => ({
   id,
@@ -220,6 +221,7 @@ const ready = (id: string, more: Partial<Extract<Project, { state: 'ready' }>> =
   counts: { active: 11, paused: 1, ready: 3 },
   attention: [],
   housekeepingStale: false,
+  upgrade: null,
   ...more,
 });
 
@@ -243,10 +245,61 @@ export const projects: Project[] = [
       },
     ],
   }),
-  { id: 'old-jig', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0' },
-  { id: 'new-jig', state: 'incompatible', jigVersion: '1.0.0' },
-  { id: 'busy', state: 'unreadable', code: 'locked' },
-  { id: 'moved', state: 'unavailable', reason: 'missing' },
+  { id: 'old-jig', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.29.0', upgrade: null },
+  { id: 'new-jig', state: 'incompatible', jigVersion: '1.0.0', upgrade: null },
+  { id: 'busy', state: 'unreadable', code: 'locked', upgrade: null },
+  { id: 'moved', state: 'unavailable', reason: 'missing', upgrade: null },
+];
+
+const plan: UpgradePlan = { mode: 'copy', from: '0.34.0', to: '0.35.0', outcome: 'planned', git: null, manualSteps: [], wouldStop: [] };
+
+/** The upgrade panel before a run: reading the dry run, its plan with and without steps by hand, a stop, a refusal. */
+export const plans: PlanState[] = [
+  { state: 'reading' },
+  { state: 'planned', plan },
+  { state: 'planned', plan: { ...plan, manualSteps: ['Restart your agent sessions: the skills changed.'] } },
+  {
+    state: 'planned',
+    plan: {
+      ...plan,
+      wouldStop: [
+        'the working tree has uncommitted changes; commit them, stash them (`git stash`), or finish the task they belong to, then run `jig upgrade` again',
+      ],
+    },
+  },
+  { state: 'refused', message: 'Jig refused the upgrade.' },
+];
+
+const git = {
+  level: 'pr',
+  branch: 'jig/upgrade-0.35.0',
+  commit: '279390b',
+  pushed: true,
+  pullRequest: 'https://github.com/fapost-lab/jig-ui/pull/49',
+  merged: false,
+};
+const done = (more: Partial<UpgradePlan>): UpgradeRun => ({
+  state: 'done',
+  at: '2026-10-27T08:00:00Z',
+  upgrade: { ...plan, outcome: 'upgraded', git, ...more },
+});
+
+/** An upgrade under way, and what one can come to. */
+export const runs: UpgradeRun[] = [
+  { state: 'running', since: new Date(Date.now() - 120_000).toISOString(), to: '0.35.0' },
+  done({ git: { ...git, merged: true } }),
+  done({ manualSteps: ['Restart your agent sessions: the skills changed.'] }),
+  done({ outcome: 'staged', git: { ...git, level: 'none', commit: null, pushed: false, pullRequest: null } }),
+  done({ outcome: 'nothing-to-do', git: null }),
+  {
+    state: 'refused',
+    at: '2026-10-27T08:00:00Z',
+    code: 'upgrade-blocked',
+    reasons: [
+      'task up-x is started and its branch task/up-x is checked out here (record .ai/runtime/working/up-x); the upgrade would take this checkout off it',
+    ],
+  },
+  { state: 'refused', at: '2026-10-27T08:00:00Z', code: 'failed', reasons: [] },
 ];
 
 export const specItems: SpecItem[] = [

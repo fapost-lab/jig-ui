@@ -32,8 +32,23 @@
   import { Toggle } from '@/components/ui/toggle';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { toneRule, toneText } from '@/lib/tones';
+  import UpgradePanel from '@/components/UpgradePanel.vue';
   import CanvasSection from './CanvasSection.vue';
-  import { actions, attention, board, columns, details, emptyBoard, finished, projects, specItems, specs, tasks } from './canvas-samples';
+  import {
+    actions,
+    attention,
+    board,
+    columns,
+    details,
+    emptyBoard,
+    finished,
+    plans,
+    projects,
+    runs,
+    specItems,
+    specs,
+    tasks,
+  } from './canvas-samples';
 
   const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
   const buttonSizes = ['xs', 'sm', 'default', 'lg'] as const;
@@ -139,9 +154,17 @@
 
     <CanvasSection
       title="ProjectCard"
-      note="ready with attention and stale housekeeping; nothing needs you; its Jig older than the machine's; each state it cannot be read in"
+      note="ready with attention and stale housekeeping; nothing needs you; its Jig older than the machine's, Upgrade… offered; each state it cannot be read in"
     >
       <ProjectCard v-for="project in projects" :key="project.id" :project="project" />
+    </CanvasSection>
+
+    <CanvasSection
+      title="UpgradePanel"
+      note="on a card: reading the dry run; the plan, with steps by hand; a stop; a refusal; under way; merged, with steps by hand, staged, nothing to do; not started; failed"
+    >
+      <UpgradePanel v-for="(plan, i) in plans" :key="`plan-${i}`" project="legacy-shop" :run="null" :plan="plan" />
+      <UpgradePanel v-for="(run, i) in runs" :key="`run-${i}`" project="legacy-shop" :run="run" :plan="undefined" />
     </CanvasSection>
 
     <CanvasSection title="NewTaskForm" note="empty, on its way, the id taken">

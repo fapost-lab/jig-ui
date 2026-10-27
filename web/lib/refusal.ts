@@ -8,5 +8,6 @@ export function refusal(code: string, doing: string, task: string): string {
     return `${task}'s stash did not apply cleanly in the project's checkout: resolve the conflicts there, then run jig task resume ${task}.`;
   }
   if (code === 'not-paused') return `${task} is not paused any more.`;
+  if (code === 'upgrading') return `Jig is being upgraded in this project: try ${doing} ${task} again once it has finished.`;
   return `Jig refused ${doing} ${task} (${code}).`;
 }

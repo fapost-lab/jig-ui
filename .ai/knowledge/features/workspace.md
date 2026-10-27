@@ -8,8 +8,10 @@ paths:
   - web/components/ProjectCard.vue
   - web/lib/upgrade.ts
   - server/jig/fixtures/status-upgrade.json
-summary: "The workspace page: a card per connected project with Jig's attention items, and the mark and count of projects whose Jig is older than the machine's"
-reviewed_at: 2026-10-26
+  - web/components/UpgradePanel.vue
+  - "server/jig/fixtures/upgrade-*.json"
+summary: "The workspace page: a card per connected project with Jig's attention items, the mark and count of projects whose Jig is older than the machine's, and their upgrade from the card"
+reviewed_at: 2026-10-27
 ---
 # Workspace — every connected project on one page
 
@@ -20,7 +22,10 @@ The page at `#/` (`web/views/WorkspaceView.vue`): one card per connected project
 person there — Jig's attention items as `jig status --json` lists them — and the housekeeping note.
 A project whose Jig is older than the machine's is marked with both versions
 (*0.34.0 → 0.35.0 on this machine*) and counted in a line above the projects; `web/lib/upgrade.ts`
-decides both.
+decides both. Its **Upgrade…** opens a panel on the card (`web/components/UpgradePanel.vue`): Jig's
+dry run — the reasons it would not start, or the steps by hand and **Upgrade** — then the run and its
+result, worded by `web/lib/upgrade.ts`, until **Dismiss**; beside it, a request to copy for the
+person's agent (adr-20261027-upgrading-a-project-runs-in-the-background).
 
 ## Why
 
@@ -47,5 +52,9 @@ version in the header and one count are quicker to scan than an item inside each
   machine's version for it, and its card already says to run `jig upgrade`.
 - `release-available` (the machine's own Jig is outdated) is not a project mark: it is about the
   machine, not a project.
-- Running the upgrade from the page is the next roadmap item (upgrade from the page), not this
-  mark.
+- One project at a time: no "upgrade all" (the maintainer, 2026-10-27).
+- A stopped upgrade is said on the card only, not as an attention item (the maintainer): Jig's
+  item is the todo, the result says why it is still there.
+- The agent's road is a copied request (*Upgrade Jig in <project>*), never an agent started:
+  Jig UI runs no agents (adr-20261014-jig-ui-is-an-optional-layer-over-jig). It matters when the
+  release asks for steps by hand, which the `jig-upgrade` skill does.

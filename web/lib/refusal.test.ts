@@ -9,6 +9,7 @@ describe('refusal', () => {
       "a's stash did not apply cleanly in the project's checkout: resolve the conflicts there, then run jig task resume a.",
     ],
     ['not-paused', 'a is not paused any more.'],
+    ['upgrading', 'Jig is being upgraded in this project: try resuming a again once it has finished.'],
     ['already-exists', 'Jig refused resuming a (already-exists).'],
   ])('says %s in its own words', (code, line) => {
     expect(refusal(code, 'resuming', 'a')).toBe(line);

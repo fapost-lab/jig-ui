@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-10-26
+reviewed_at: 2026-10-27
 ---
 # ProjectSource — how the server reaches a project
 
@@ -34,7 +34,8 @@ live tasks and the finished ones Jig still keeps (`tasks(id)`, for the board), o
 disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,
 `prioritise(id, taskId, priority, revision)`, `requestPause(id, taskId, revision)`,
 `cancelPause(id, taskId, revision)`, `resume(id, taskId, revision)` and `fileTask(id, taskId, goal)`, which answer `written`, `refused` with Jig's code,
-or the project's state when it is not `ready`; its local adapter
+or the project's state when it is not `ready`; and the upgrade of a project's Jig — `planUpgrade(id)`,
+`upgrade(id)`, which answers `started` before Jig has run, and `dismissUpgrade(id)`; its local adapter
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
 only the path a person types to connect. A read that fails becomes a state of the project, not an
 error of the workspace: `unreadable` with Jig's failure code and never its message (it may name a
@@ -60,6 +61,18 @@ read again (adr-20261022-writes-carry-the-revision-of-their-read). A board's `re
 lowest of its reads' revisions (status, task list, queue). `fileTask` is the exception: its id is
 new, so it names no live task and carries no revision; `http/` checks the id and the goal against
 Jig's grammar before the port sees them (adr-20261022-filing-a-task-carries-no-revision).
+
+An upgrade is offered only for a project whose last read carries Jig's `upgrade-available` item
+(else `refused: not-found`), one at a time (`refused: running`). Its run — `running`, then `done`
+with Jig's answer or `refused` with Jig's code and, for `upgrade-blocked`, Jig's reasons — lives in
+the adapter's memory on the project's entry and goes out on the workspace read as `upgrade`; the
+listeners hear it at the start and at the end. Those reasons are the one text of Jig's the port
+passes on; JigClient has cut their paths. While it runs the adapter runs no other Jig in the
+project: a read is skipped and the last one stays — kept by `stop()` too, so a new subscription does
+not read it — and a write is `refused: upgrading` without Jig; the run itself starts once the reads
+and writes under way have ended. `disconnect` answers `upgrading` meanwhile. Upgrade starts and
+disconnects run one at a time, so of two sent at once the second finds what the first did. It reads
+the project once the run ends (adr-20261027-upgrading-a-project-runs-in-the-background).
 
 ## Example
 

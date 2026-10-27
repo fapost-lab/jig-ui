@@ -26,6 +26,9 @@ export type Written = Awaited<
   ReturnType<Queue['move']['$post'] | Queue['priority']['$post'] | Queue['pause']['$post'] | Queue['pause']['cancel']['$post']>
 >;
 
+/** What upgrading a project's Jig would do: Jig's dry run of it. */
+export type UpgradePlan = Extract<Ok<Api['projects'][':id']['upgrade']['plan']['$post']>, { plan: unknown }>['plan'];
+
 /** Why the page cannot show anything: the session or the server ended, the registry cannot be read, or the server failed. */
 export const failure = ref<
   | {
@@ -71,8 +74,11 @@ export async function readTask(project: string, task: string): Promise<TaskDetai
   return (await res.json()).error.code === 'not-found' ? 'not-found' : 'not-connected';
 }
 
+/** A project's state as every read of it reports it, without the upgrade the workspace adds. */
+type ProjectState<P = Project> = P extends unknown ? Omit<P, 'upgrade'> : never;
+
 /** What a project's state means, for a person. */
-export function describe(project: Project): string {
+export function describe(project: ProjectState): string {
   if (project.state === 'ready') return `Jig ${project.jigVersion}`;
   if (project.state === 'unsupported') {
     const found = project.jigVersion ? `Jig ${project.jigVersion}` : 'A Jig of unknown version';

@@ -1,6 +1,6 @@
-import type { Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress } from '../jig/client.js';
+import type { Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade } from '../jig/client.js';
 
-export type { Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress };
+export type { Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade };
 export { RegistryUnreadable } from '../registry/projects.js';
 
 /** A project's live tasks by where they stand. */
@@ -41,6 +41,54 @@ export type ProjectView =
       state: 'unreadable';
       code: string;
     };
+
+type NotReady = Exclude<ProjectView, { state: 'ready' }>;
+
+/**
+ * An upgrade of a project's Jig started from the page, kept in memory while this server runs: under way, what Jig did,
+ * or why it did not get there — Jig's code, and for `upgrade-blocked` its reasons.
+ */
+export type UpgradeRun =
+  | {
+      state: 'running';
+      since: string;
+      to: string;
+    }
+  | {
+      state: 'done';
+      at: string;
+      upgrade: Upgrade;
+    }
+  | {
+      state: 'refused';
+      at: string;
+      code: string;
+      reasons: string[];
+    };
+
+/** A connected project as the workspace shows it, with the upgrade started from the page, if any. */
+export type WorkspaceProject = ProjectView & { upgrade: UpgradeRun | null };
+
+/** What a dry run of the upgrade came to: Jig's plan, a refusal by code, or why the project cannot be read. */
+export type Planned =
+  | {
+      state: 'planned';
+      plan: Upgrade;
+    }
+  | {
+      state: 'refused';
+      code: string;
+    }
+  | NotReady;
+
+/** An upgrade asked for: under way at once, or refused — `running`, or `not-found` when the project shows none to make. */
+export type Started =
+  | { state: 'started' }
+  | {
+      state: 'refused';
+      code: string;
+    }
+  | NotReady;
 
 /** A live task as a board shows it; where it stands is Jig's, the column the board's. */
 export interface Task {
@@ -126,7 +174,7 @@ export type ProjectTasks =
       finished: FinishedTask[];
       revision: number;
     }
-  | Exclude<ProjectView, { state: 'ready' }>;
+  | NotReady;
 
 /** One live task of a project, `null` when the project has no live task of that id; or why the project cannot be read. */
 export type ProjectTask =
@@ -170,7 +218,7 @@ export type Change = {
  */
 export interface ProjectSource {
   /** Every connected project, in the order it was connected. */
-  workspace(): Promise<ProjectView[]>;
+  workspace(): Promise<WorkspaceProject[]>;
   /** Connects the project a path names; one already connected keeps its id. */
   connect(path: string): Promise<
     | {
@@ -203,8 +251,21 @@ export interface ProjectSource {
    * a taken id is Jig's `already-exists`. `undefined` when no project has that id.
    */
   fileTask(id: string, taskId: string, goal: string): Promise<Written | undefined>;
-  /** False when no project has that id. Nothing in the project is touched. */
-  disconnect(id: string): Promise<boolean>;
+  /**
+   * What upgrading the project's Jig would do, changing nothing, for a project that shows Jig's `upgrade-available`
+   * item; refused `not-found` without one, `running` while its upgrade runs. `undefined` when no project has that id.
+   */
+  planUpgrade(id: string): Promise<Planned | undefined>;
+  /**
+   * Starts upgrading the project's Jig and answers at once; the run, and then what it came to, is the project's
+   * `upgrade` in the workspace, and listeners hear when it starts and ends. Refused as `planUpgrade` is. No revision:
+   * Jig itself answers `nothing-to-do` or `upgrade-blocked`. While it runs the project is not read again.
+   */
+  upgrade(id: string): Promise<Started | undefined>;
+  /** Forgets what the project's last upgrade came to; one under way stays. False when no project has that id. */
+  dismissUpgrade(id: string): Promise<boolean>;
+  /** False when no project has that id, `upgrading` while its upgrade runs. Nothing in the project is touched. */
+  disconnect(id: string): Promise<boolean | 'upgrading'>;
   /**
    * Calls `listener` whenever a connected project changed — connected and disconnected included;
    * returns the unsubscribe. Projects are followed only while someone listens.

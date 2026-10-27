@@ -87,6 +87,13 @@ function written(c: Context, w: Written | undefined) {
   return refuse(c, 422, w.code, 'Jig refused the change.');
 }
 
+/** An upgrade refused before it ran, in the API's form: under way already, none to make, or Jig's code. */
+function upgradeRefused(c: Context, code: string) {
+  if (code === 'running') return refuse(c, 409, code, 'An upgrade of this project is under way.');
+  if (code === 'not-found') return refuse(c, 404, code, 'This project shows no upgrade of Jig to make.');
+  return refuse(c, 422, code, 'Jig refused the upgrade.');
+}
+
 /**
  * The API, chained so that its type carries every route's answers: the page derives its types
  * from `AppType` and never declares them a second time.
@@ -205,6 +212,29 @@ function apiRoutes(source: ProjectSource, version: string) {
         },
       )
 
+      // A dry run: what upgrading the project's Jig would do, changing nothing.
+      .post('/api/projects/:id/upgrade/plan', async (c) => {
+        const planned = await source.planUpgrade(c.req.param('id'));
+        if (planned === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        if (planned.state === 'planned') return c.json({ plan: planned.plan }, 200);
+        if (planned.state !== 'refused') return c.json({ project: planned }, 200);
+        return upgradeRefused(c, planned.code);
+      })
+
+      // Answered at once: the upgrade runs on in the server, and the workspace shows it and then what it came to.
+      .post('/api/projects/:id/upgrade', async (c) => {
+        const started = await source.upgrade(c.req.param('id'));
+        if (started === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        if (started.state === 'started') return c.json({ started: true as const }, 202);
+        if (started.state !== 'refused') return c.json({ project: started }, 200);
+        return upgradeRefused(c, started.code);
+      })
+
+      .delete('/api/projects/:id/upgrade', async (c) => {
+        if (!(await source.dismissUpgrade(c.req.param('id')))) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        return c.body(null, 204);
+      })
+
       .post(
         '/api/projects',
         validator('json', (body: unknown) => ({
@@ -220,9 +250,10 @@ function apiRoutes(source: ProjectSource, version: string) {
       )
 
       .delete('/api/projects/:id', async (c) => {
-        if (!(await source.disconnect(c.req.param('id')))) {
-          return refuse(c, 404, 'not-connected', 'No connected project has this id.');
-        }
+        const disconnected = await source.disconnect(c.req.param('id'));
+        if (disconnected === 'upgrading')
+          return refuse(c, 409, 'upgrading', 'The project is being upgraded; disconnect it once that ends.');
+        if (!disconnected) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
         return c.body(null, 204);
       })
 

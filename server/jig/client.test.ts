@@ -10,14 +10,17 @@ import {
   JigShapeError,
   MIN_JIG_VERSION,
   moveInQueue,
+  planUpgrade,
   readQueue,
   readSpecs,
   readStatus,
   readTasks,
   requestPause,
   resumeTask,
+  runUpgrade,
   setPriority,
   supports,
+  withoutPaths,
   writtenByReads,
 } from './client.js';
 
@@ -448,6 +451,75 @@ describe('resuming a task', () => {
     ['queue-stale.json', 'stale-revision'],
   ])('carries the refusal in %s as %s', async (json, code) => {
     await expect(resumeTask(answering(`case-${cases++}`, json, 1), 'beta', 1)).rejects.toEqual(refusal(code));
+  });
+});
+
+// upgrade-*.json are what Jig 0.35.0 printed in scratch repositories whose manifest says 0.33.0: clean, with a task
+// started in the checkout, at agent.git none (staged), commit and push (to a bare remote).
+describe('upgrading the project', () => {
+  it('plans with a dry run, changing nothing', async () => {
+    const dir = logging(`case-${cases++}`, 'upgrade-plan.json');
+    expect(await planUpgrade(dir)).toEqual({
+      mode: 'copy',
+      from: '0.33.0',
+      to: '0.35.0',
+      outcome: 'planned',
+      git: null,
+      manualSteps: [],
+      wouldStop: [],
+    });
+    expect(args(dir)).toEqual(['upgrade', '--dry-run', '--json']);
+  });
+
+  it('reads every reason a real run would not start', async () => {
+    const plan = await planUpgrade(answering(`case-${cases++}`, 'upgrade-plan-stop.json'));
+    expect(plan.wouldStop).toEqual([expect.stringMatching(/^task up-x is started and its branch task\/up-x is checked out here/)]);
+  });
+
+  it.each([
+    ['upgrade-staged.json', 'staged', { level: 'none', commit: null, pushed: false }],
+    ['upgrade-commit.json', 'upgraded', { level: 'commit', commit: '3110eef8eab82123984eed97745ca146a0eb21b0', pushed: false }],
+    ['upgrade-push.json', 'upgraded', { level: 'push', pushed: true }],
+  ])('reads what %s did: %s', async (json, outcome, git) => {
+    const dir = logging(`case-${cases++}`, json);
+    const done = await runUpgrade(dir);
+    expect(done).toMatchObject({
+      outcome,
+      from: '0.33.0',
+      to: '0.35.0',
+      git: { branch: 'jig/upgrade-0.35.0', pullRequest: null, merged: false, ...git },
+    });
+    expect(args(dir)).toEqual(['upgrade', '--json']);
+  });
+
+  it("carries Jig's reasons with a refusal to start, a path in them cut out", async () => {
+    const blocked = readFileSync(fixture('upgrade-blocked.json'), 'utf8').replace('(record .ai/', '(record /home/me/shop/.ai/');
+    const refused = await runUpgrade(answering(`case-${cases++}`, blocked, 1)).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(JigRefusal);
+    expect((refused as JigRefusal).code).toBe('upgrade-blocked');
+    expect((refused as JigRefusal).reasons).toEqual([expect.stringContaining('checked out here (record …); the upgrade would take')]);
+  });
+
+  it.each([
+    ['an upgrade without its outcome', (d: Record<string, any>) => delete d.outcome],
+    ['git without pushed', (d: Record<string, any>) => delete d.git.pushed],
+    ['reasons that are not a list', (d: Record<string, any>) => (d.would_stop = 'x')],
+  ])('refuses %s', async (_, change) => {
+    await expect(runUpgrade(answering(`case-${cases++}`, changed('upgrade-commit.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+describe('withoutPaths', () => {
+  it.each([
+    ['(record /Users/me/shop/.ai/runtime/working/x); then', '(record …); then'],
+    ['in /c/Users/me/shop and', 'in … and'],
+    ['at C:\\Users\\me\\shop.', 'at …'],
+    [
+      'branch task/up-x, `git stash`, .gitattributes, https://example.com/a',
+      'branch task/up-x, `git stash`, .gitattributes, https://example.com/a',
+    ],
+  ])('%s', (text, expected) => {
+    expect(withoutPaths(text)).toBe(expected);
   });
 });
 

@@ -251,7 +251,7 @@ const TaskRow = z
   .object({
     id: text,
     class: maybe,
-    status: z.enum(['active', 'ready', 'consolidated', 'abandoned']),
+    status: z.enum(['active', 'ready', 'consolidated', 'abandoned', 'archived']),
     issue: maybe,
     goal: maybe,
     knowledge_consolidated: z.boolean(),

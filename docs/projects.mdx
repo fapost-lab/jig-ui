@@ -124,7 +124,9 @@ its goal, its pull request and the day it finished. Click it again to hide the l
 hidden. The list holds what Jig still keeps: `jig housekeeping` moves a closed task's workspace to
 trash once it sees the task's branch merged — for a task of an epic, once the epic reached the
 default branch — and an abandoned one's after 14 days (`housekeeping.abandoned_ttl`); the task
-leaves the list with it. A closed task that never had a branch, or whose branch housekeeping never
+leaves the list with it. From Jig 0.37.0 on, housekeeping archives the abandoned task instead and
+keeps its notes; an archived task is shown nowhere on the board, and `jig task list --status
+archived` lists them. A closed task that never had a branch, or whose branch housekeeping never
 sees merged, stays. The history of finished work is the project's merged pull requests.
 
 **Board / List** switches between the columns side by side and a list: the same columns as

@@ -136,6 +136,7 @@ describe('localSource', () => {
           pull_request: { url: 'https://github.com/o/r/pull/9', state: 'merged', ci: 'green', fetched_at: 'x' },
         }),
         task('dropped', 'abandoned', true, { goal: null, branch: null }),
+        task('put-away', 'archived', false, { goal: null, branch: null }),
       ],
       hidden: 0,
       housekeeping: null,

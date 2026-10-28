@@ -10,7 +10,7 @@ paths:
   - web/components/UpgradePanel.vue
   - web/lib/upgrade.ts
 summary: "Upgrade from the page: a dry run first, then jig upgrade runs in the server's background — 202 at once, state in memory on the workspace read, no other Jig in the project meanwhile, no revision; amends three ADRs for it"
-reviewed_at: 2026-10-27
+reviewed_at: 2026-10-28
 ---
 # Upgrading a project runs in the background of Jig UI's server
 
@@ -56,9 +56,13 @@ For the upgrade alone, this amends three decisions; every other write stands as 
 - adr-20261014-project-source-port-keeps-hosting-open ("writes are commands carrying the revision
   they were based on") and the matching line of ARCHITECTURE.md — the upgrade carries none;
 - adr-20261014-jig-ui-is-an-optional-layer-over-jig ("stopping Jig UI changes nothing in any
-  project") — stopping Jig UI while an upgrade runs stops the `jig upgrade` it started, as Ctrl+C
-  on `jig upgrade` in a terminal does. The project may be left on `jig/upgrade-<to>`, or with the
-  branch pushed and no pull request; the next `jig upgrade` there says what to do. Decided with
+  project") — stopping Jig UI with Ctrl+C while an upgrade runs stops the `jig upgrade` it
+  started, as Ctrl+C on `jig upgrade` in a terminal does: the signal reaches the whole process
+  group. The project may be left on `jig/upgrade-<to>`, or with the branch pushed and no pull
+  request; the next `jig upgrade` there says what to do. A run past its 30 minutes is killed with
+  the same leftovers, and the card says it failed. Stopped otherwise — a `kill`, which sends
+  SIGTERM to Jig UI alone — Jig UI exits and the `jig upgrade` runs on to its end with nobody to
+  read its result: what it did is on the project's branch and pull request, not on a card. Decided with
   the maintainer after the architecture review, 2026-10-27: a run that survives Jig UI would need
   its output in files and a path of its own on Windows, and its result would be lost anyway.
 

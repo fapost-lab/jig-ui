@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Attention, Project } from '../api';
-import { agentRequest, upgradeLine, upgradeOf, upgradeResult, type UpgradeRun } from './upgrade';
+import { agentRequest, upgradeLine, upgradeMark, upgradeOf, upgradeResult, type UpgradeRun } from './upgrade';
 
 const item = (kind: string, versions: Attention['versions'] = null): Attention => ({
   kind,
@@ -35,6 +35,17 @@ describe('upgradeOf', () => {
   it('finds none without the item, or where the project cannot be read', () => {
     expect(upgradeOf(current)).toBeUndefined();
     expect(upgradeOf(old)).toBeUndefined();
+  });
+});
+
+describe('upgradeMark', () => {
+  it("marks a project behind with its Jig and the machine's", () => {
+    expect(upgradeMark(behind)).toBe('0.34.0 → 0.35.0 on this machine');
+  });
+
+  it('marks none that is not behind, or cannot be read', () => {
+    expect(upgradeMark(current)).toBeUndefined();
+    expect(upgradeMark(old)).toBeUndefined();
   });
 });
 

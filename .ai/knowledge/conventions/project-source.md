@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-10-27
+reviewed_at: 2026-10-28
 ---
 # ProjectSource — how the server reaches a project
 
@@ -66,8 +66,8 @@ An upgrade is offered only for a project whose last read carries Jig's `upgrade-
 (else `refused: not-found`), one at a time (`refused: running`). Its run — `running`, then `done`
 with Jig's answer or `refused` with Jig's code and, for `upgrade-blocked`, Jig's reasons — lives in
 the adapter's memory on the project's entry and goes out on the workspace read as `upgrade`; the
-listeners hear it at the start and at the end. Those reasons are the one text of Jig's the port
-passes on; JigClient has cut their paths. While it runs the adapter runs no other Jig in the
+listeners hear it at the start and at the end. Those reasons, the plan's `wouldStop` and the
+`manualSteps` of a plan or a run are Jig's own text, and JigClient has cut their paths. While it runs the adapter runs no other Jig in the
 project: a read is skipped and the last one stays — kept by `stop()` too, so a new subscription does
 not read it — and a write is `refused: upgrading` without Jig; the run itself starts once the reads
 and writes under way have ended. `disconnect` answers `upgrading` meanwhile. Upgrade starts and

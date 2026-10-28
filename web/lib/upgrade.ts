@@ -15,6 +15,12 @@ export function upgradeOf(project: Project):
   return project.attention.find((a) => a.kind === 'upgrade-available')?.versions ?? undefined;
 }
 
+/** A card's mark of a project behind the machine's Jig, both versions; none when it is not behind. */
+export function upgradeMark(project: Project): string | undefined {
+  const versions = upgradeOf(project);
+  return versions && `${versions.from} → ${versions.to} on this machine`;
+}
+
 /** The line above the projects when some run an older Jig than the machine's; none when no project does. */
 export function upgradeLine(projects: Project[]): string | undefined {
   const n = projects.filter((p) => upgradeOf(p) !== undefined).length;

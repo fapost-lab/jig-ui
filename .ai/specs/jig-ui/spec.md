@@ -166,6 +166,14 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
   Jig UI finding the Jig projects under a folder the person names and offering each to connect —
   a setting, a scan wider than the registry and a screen; it is the way to go if one command per
   project proves too much, since it covers the projects already there and needs nothing of Jig.
+- Planning epics and specs from the page is cut by what Jig's contract already carries
+  (maintainer, 2026-10-28). Epics are ordered and prioritised through the queue, which holds them
+  beside tasks (`epic:<spec-id>`) with the same writes and revision; filing a phase's tasks and
+  continuing a spec go to the person's agent as a request to copy, as an upgrade's steps by hand
+  do; editing a roadmap from the page stays a fog item until Jig has a command for it. Rejected:
+  Jig UI editing `roadmap.md` itself — RULES let it write nothing in a project, and a spec lives
+  on a branch of its own. Rejected: dropping the fog item — the maintainer keeps it for when Jig
+  can carry it.
 - Public documentation lives in `docs/` of this repository and is published with Mintlify
   (maintainer, 2026-10-14). The requirements page states the Node.js requirement the installer
   checks.
@@ -187,6 +195,10 @@ them to Decisions.
   one item and respaces a level inside the same write only when no gap is left). For Jig's
   `contract-extensions`: a reorder is one command that moves one item (sparse position),
   never a renumbering the UI issues as several commands.
+- For Jig: a command that changes a roadmap — add an item, move it, file its task — with a
+  revision, saying which branch the change lands on. Until there is one, the fog item on editing
+  a roadmap from the page stays fog (2026-10-28).
+
 - Raised by Jig's maintainer (2026-10-25): a person with many projects does not follow each Jig
   upgrade by hand. Should the workspace show which projects run an older Jig than the machine's,
   and offer the upgrade — run through `jig upgrade --json`, or handed to an agent as a request to

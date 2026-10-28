@@ -155,8 +155,17 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
   second word for the common case, when the folder already says which project is meant.
   Rejected: refusing a worktree as the page does — the terminal can name the main checkout itself,
   and the page's refusal exists because a pasted path may be a mistake. This covers most of the
-  `jig init` fog item without a hook on Jig's side; the fog item stays for registering a project
-  without running Jig UI.
+  `jig init` fog item without a hook on Jig's side.
+- A project is registered by running `npx @fapost/jig-ui` in its folder, or by connecting its path
+  on the page; `jig init` knows nothing of Jig UI, and the Phase 1 fog item on registration by
+  `jig init` is closed (maintainer, on the agent's recommendation, 2026-10-28). A project
+  initialised while Jig UI is closed is on the page after that one command. Rejected: an `init`
+  hook in Jig with a `--connect-only` mode of Jig UI — a feature of Jig's own (`project-hooks`)
+  for a rare moment, a second process writing the registry, `npx` and its network on every
+  `init`, and it helps only new projects, not the ones already on the disk. Rejected for now:
+  Jig UI finding the Jig projects under a folder the person names and offering each to connect —
+  a setting, a scan wider than the registry and a screen; it is the way to go if one command per
+  project proves too much, since it covers the projects already there and needs nothing of Jig.
 - Public documentation lives in `docs/` of this repository and is published with Mintlify
   (maintainer, 2026-10-14). The requirements page states the Node.js requirement the installer
   checks.
@@ -178,10 +187,6 @@ them to Decisions.
   one item and respaces a level inside the same write only when no gap is left). For Jig's
   `contract-extensions`: a reorder is one command that moves one item (sparse position),
   never a renumbering the UI issues as several commands.
-- How `jig init` registers a project in an installed UI without making the UI a dependency of
-  Jig — needs a small hook on Jig's side, not designed yet (on Jig's side a fog item of its
-  `project-hooks` spec since 2026-10-20).
-
 - Raised by Jig's maintainer (2026-10-25): a person with many projects does not follow each Jig
   upgrade by hand. Should the workspace show which projects run an older Jig than the machine's,
   and offer the upgrade — run through `jig upgrade --json`, or handed to an agent as a request to

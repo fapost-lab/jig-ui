@@ -52,9 +52,11 @@ instead of being overwritten.
 - [x] `resume-from-page` — resume from the page — a drop out of Paused onto the column the task will be in, or the card's menu, resumes the task through `jig task resume <id> --revision <n> --json`; below Jig 0.35.0 a paused card names `jig task resume <id>` (after: pause and resume as a request — its other half; Jig — `jig task resume` with `--revision <n> --json` and refusals as codes, fapost-lab/jig#295)
 - [x] `projects-to-upgrade` — projects to upgrade — the workspace marks each connected project whose installed Jig is older than the machine's, with both versions, and counts them (after: workspace dashboard — it is one more thing a project needs from the person; Jig — an `upgrade-available` attention item in `jig status --json`, task `status-json-upgrade-available` in fapost-lab/jig)
 - [x] `upgrade-from-page` — upgrade from the page — for one project or every marked one: run the upgrade through Jig (`jig upgrade --json`) and show its outcome — the branch and pull request it made, merged or not by the project's `agent.git`, or why it stopped and what to do; or copy the request for an agent ("Upgrade Jig in <project>"), for a release whose upgrade asks for steps by hand (after: projects to upgrade — it acts on the marked projects; Jig — `jig upgrade --json`, task `upgrade-json`, and the agent's upgrade path, task `agent-runs-the-upgrade`, in fapost-lab/jig)
+- [ ] order and prioritise epics — the project's specs with an open epic are shown in the queue's order, and a person drags one, or uses its ⋯ menu, to move it among the top level of the queue and set its priority P0–P5, through `jig queue move epic:<id>` and `jig queue set epic:<id> --priority`, with the revision of the read the person saw (after: reorder and prioritise by drag — the same writes and refusals on another ref; specs and epics — the epics are shown there)
+- [ ] a request for the agent on a spec — a spec offers a request to copy for the person's agent: file the tasks of a phase that has items with no task, or continue the spec while it has fog items (after: specs and epics — it sits on a spec's row)
 - [ ] fog: hosted and self-hosted Jig UI — a connector on the machine with the projects behind the ProjectSource port; first form is a read-only snapshot with a revision; accounts and file access rules are not stated
 - [ ] fog: installation for people without a development environment, Windows first
-- [ ] fog: epic and spec planning from the page
+- [ ] fog: editing a roadmap from the page — adding, moving and filing its items needs a Jig command that changes a roadmap with a revision and says which branch the change lands on (`spec/<id>`, the epic, committed or not); none exists, and Jig UI writes no project file
 
 ## Waves
 
@@ -72,6 +74,7 @@ instead of being overwritten.
 12. resume from the page
 13. projects to upgrade
 14. upgrade from the page
+15. order and prioritise epics; a request for the agent on a spec
 
 <!--
 Rules (jig-idea §8):

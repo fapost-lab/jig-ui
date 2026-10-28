@@ -13,7 +13,7 @@ paths:
   - web/lib/finished.ts
   - web/lib/refusal.ts
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
-reviewed_at: 2026-10-26
+reviewed_at: 2026-10-28
 ---
 # Board
 
@@ -85,7 +85,10 @@ done, or moving.
 - The finished list holds what `jig task list --all` returns, read with the live tasks in one Jig
   run: a closed task until housekeeping sees its branch merged — a task of an epic, the epic on
   the default branch — and moves its workspace to trash (one with no branch, or none seen merged,
-  stays), an abandoned one for `housekeeping.abandoned_ttl` (14 days by default). Each row is the
+  stays), an abandoned one for `housekeeping.abandoned_ttl` (14 days by default). An archived task
+  (Jig 0.37.0: an abandoned one past that time, one nobody touched for `housekeeping.stale_after`,
+  or one put away by hand) is shown nowhere: Jig keeps it out of its own lists, and a board that
+  showed it would be the one place it still turns up. Each row is the
   id, closed or abandoned, the goal, the pull request and the day Jig last changed the task, the
   latest first; a finished task has no details and no actions. The list starts hidden on every
   visit, and closes when the last finished task leaves; nothing remembers it.

@@ -214,6 +214,7 @@ describe('readTasks', () => {
       ['fix-typo', 'consolidated'],
       ['live-one', 'active'],
       ['old-idea', 'abandoned'],
+      ['put-away', 'archived'],
     ]);
   });
 

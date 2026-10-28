@@ -167,7 +167,7 @@ async function readProject(project: Project): Promise<Read> {
   });
   if (!('list' in read)) return { view: read, tasks: read, details: [], specs: read, revision: null };
   const { status, list, queue, specs, jigVersion } = read;
-  // Live: active and ready; the rest are finished.
+  // Live: active and ready; finished: closed and abandoned. An archived one (Jig 0.37.0) is neither: Jig keeps it out of its lists.
   const live = list.tasks.filter((t): t is Live => t.status === 'active' || t.status === 'ready');
   const finished = list.tasks.filter((t): t is Finished => t.status === 'consolidated' || t.status === 'abandoned');
   const queued = new Map(queue.items.map((q) => [q.id, q]));

@@ -67,6 +67,11 @@ done, or moving.
   main checkout is not on the task's branch — and `stash-conflict` — the stash did not apply, the
   task is still paused — both send the person to the terminal. Any other drop on another column
   does nothing.
+- A ready card carries a ✕ beside its menu where the task is `closable`: a press asks, **Close
+  task** in the question runs `jig task set <id> status consolidated` (adr-20261029-close-a-ready-task-from-the-board).
+  Unlike the other refusals, a refused close is said in Jig's own words — its `jig: error:` lines with
+  the paths cut out (`closeRefusal` in `web/lib/refusal.ts`) — because the reason (pull request not
+  merged, knowledge decision not recorded) is what the person needs, and only Jig knows it.
 - A change Jig refuses as `stale-revision` shows the conflict: the page compares the board the
   change was made on with the read the change itself started (`web/lib/conflict.ts`), marks each
   card that is new, in another column, moved within its own, or shows other facts — "Changed while
@@ -110,6 +115,10 @@ done, or moving.
   applied only for the person who paused with `--stash` and checked the branch out again), and no
   ask of Jig to stop offering `resume` where it will refuse `wrong-checkout` (rare; the refusal's
   line says what to do).
+- Closing from the board (task `close-ready-task`, 2026-10-29). Not waited for Jig, unlike the
+  resume: `jig task set` takes no `--revision`, and the board checks the revision by a read before
+  the write instead; Jig's own merge gate keeps the close safe. Asking Jig for `task set --revision`
+  and for an offer of `close` that does not need housekeeping's cache are open.
 - Conflict display (task `conflict-display`, 2026-10-25, the maintainer's choice of marking the
   changes over a list of them or the one line as before). A move within a column is the cards
   outside the longest run that kept its order — of equal runs, the one keeping most cards whose

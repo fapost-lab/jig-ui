@@ -12,6 +12,7 @@ const task = (id: string, more: Partial<Task>): Task => ({
   pauseRequest: null,
   pauseRequestable: true,
   resumable: false,
+  closable: false,
   resumesTo: null,
   started: true,
   gate: null,
@@ -54,7 +55,7 @@ export const tasks: Task[] = [
     queue: { level: null, position: 300 },
     goal: "Show each spec with its phases, progress and epic branch beside the board, from Jig's spec list.",
   }),
-  task('task-details', { status: 'ready', pullRequest: pr('open', 'green'), goal: "Open a task's details from its card." }),
+  task('task-details', { status: 'ready', closable: true, pullRequest: pr('open', 'green'), goal: "Open a task's details from its card." }),
   task('refusal-fixture', {
     class: 'T0',
     status: 'ready',
@@ -64,10 +65,16 @@ export const tasks: Task[] = [
   task('docs-board', {
     class: 'T1',
     status: 'ready',
+    closable: true,
     pullRequest: pr('open', 'pending'),
     goal: 'Describe the five columns on the projects page of the docs.',
   }),
-  task('live-updates', { status: 'ready', pullRequest: pr('merged', 'none'), goal: 'Follow connected projects without a reload.' }),
+  task('live-updates', {
+    status: 'ready',
+    closable: true,
+    pullRequest: pr('merged', 'none'),
+    goal: 'Follow connected projects without a reload.',
+  }),
   task('no-pr-yet', { class: 'T1', status: 'ready', goal: 'Ready, nothing pushed.' }),
   task('jig-init-hook', {
     class: 'T3',

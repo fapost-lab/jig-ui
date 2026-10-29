@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { localSource } from '../source/local.js';
-import type { Change, ProjectSource } from '../source/project-source.js';
+import type { Change, ProjectSource, Written } from '../source/project-source.js';
 import { createApp, readPackageVersion } from './app.js';
 
 const PORT = 4870;
@@ -523,6 +523,7 @@ describe('/api/projects/:id/queue', () => {
       requestPause: () => Promise.resolve(outcome),
       cancelPause: () => Promise.resolve(outcome),
       resume: () => Promise.resolve(outcome),
+      close: () => Promise.resolve(outcome),
     };
     const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
     for (const [kind, body] of [
@@ -537,9 +538,38 @@ describe('/api/projects/:id/queue', () => {
       expect(res.status).toBe(status);
       expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);
     }
-    const resumed = await post(fake, '/api/projects/x/tasks/resume', { task: 'a', revision: 1 });
-    expect(resumed.status).toBe(status);
-    expect(((await resumed.json()) as { error: { code: string } }).error.code).toBe(code);
+    for (const kind of ['resume', 'close']) {
+      const res = await post(fake, `/api/projects/x/tasks/${kind}`, { task: 'a', revision: 1 });
+      expect(res.status).toBe(status);
+      expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);
+    }
+  });
+
+  it("closes a task through the port, the revision required, and says Jig's reasons when it refuses", async () => {
+    const closed: [string, string, number][] = [];
+    let outcome: Written = { state: 'written' };
+    const source: ProjectSource = {
+      ...localSource(join(webRoot, 'fake-config')),
+      close: (id, task, revision) => {
+        closed.push([id, task, revision]);
+        return Promise.resolve(outcome);
+      },
+    };
+    const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
+    const res = await post(fake, '/api/projects/x/tasks/close', { task: 'a', revision: 3 });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ written: true });
+    expect(closed).toEqual([['x', 'a', 3]]);
+    const usage = await post(fake, '/api/projects/x/tasks/close', { task: 'a' });
+    expect(usage.status).toBe(422);
+    expect(((await usage.json()) as { error: { code: string } }).error.code).toBe('usage');
+    outcome = { state: 'refused', code: 'failed', reasons: ['its pull request is open;', 'merge it first'] };
+    const refused = await post(fake, '/api/projects/x/tasks/close', { task: 'a', revision: 3 });
+    expect(refused.status).toBe(422);
+    expect(await refused.json()).toEqual({
+      error: { code: 'failed', message: 'Jig refused the change.', reasons: ['its pull request is open;', 'merge it first'] },
+    });
+    expect((await post(fake, '/api/projects/x/tasks/close', { task: 'a', revision: 3 }, {})).status).toBe(401);
   });
 
   it.each([

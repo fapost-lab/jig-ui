@@ -229,7 +229,7 @@
 
     <CanvasSection
       title="TaskCard"
-      note="every note a card carries, a priority among them; with its queue menu; while its change is on its way; changed since a refused change; open with details, while reading, unreadable"
+      note="every note a card carries, a priority among them; with its queue menu; while its change is on its way; changed since a refused change; open with details, while reading, unreadable; ready and closable (✕) with its queue menu, asking before it closes, while its close is on its way"
     >
       <div class="grid grid-cols-2 gap-2 xl:grid-cols-3">
         <TaskCard v-for="task in tasks" :key="task.id" project="jig-ui" :task="task" :open="false" />
@@ -239,18 +239,22 @@
         <TaskCard project="jig-ui" :task="tasks[2]!" :open="true" :details="details[0]" />
         <TaskCard project="jig-ui" :task="tasks[0]!" :open="true" />
         <TaskCard project="jig-ui" :task="tasks[1]!" :open="true" details="unavailable" />
+        <TaskCard project="jig-ui" :task="tasks[4]!" :open="false" :cards="tasks" />
+        <TaskCard project="jig-ui" :task="tasks[7]!" :open="false" :cards="tasks" confirming />
+        <TaskCard project="jig-ui" :task="tasks[6]!" :open="false" :cards="tasks" busy />
       </div>
     </CanvasSection>
 
     <CanvasSection
       title="TaskRow"
-      note="each note and priority; selected; with its queue menu; while its change is on its way; changed since a refused change"
+      note="each note and priority; selected; with its queue menu; while its change is on its way; changed since a refused change; ready and closable, asking before it closes"
     >
       <div>
         <TaskRow v-for="(task, i) in tasks" :key="task.id" :task="task" :selected="i === 2" />
         <TaskRow :task="tasks[1]!" :selected="false" :cards="tasks" />
         <TaskRow :task="tasks[0]!" :selected="false" :cards="tasks" busy />
         <TaskRow :task="tasks[3]!" :selected="false" :cards="tasks" changed />
+        <TaskRow :task="tasks[7]!" :selected="false" :cards="tasks" confirming />
       </div>
     </CanvasSection>
 

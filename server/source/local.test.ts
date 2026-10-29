@@ -69,6 +69,11 @@ function project(
       code?: number;
       statusAfter?: unknown;
     };
+    /** What `task set` prints on stderr, and its exit code. */
+    set?: {
+      err?: string;
+      code?: number;
+    };
   } = {},
 ): string {
   const dir = join(root, name);
@@ -94,6 +99,7 @@ function project(
   const self = answers.selfUpdate ?? {};
   writeFileSync(join(dir, 'self.out'), self.out ?? 'self-update: already current');
   writeFileSync(join(dir, 'self.err'), self.err ?? '');
+  writeFileSync(join(dir, 'set.err'), answers.set?.err ?? '');
   if (self.statusAfter !== undefined) writeFileSync(join(dir, 'status-after.json'), envelope(self.statusAfter));
   writeFileSync(
     join(dir, '.ai', 'scripts', 'jig'),
@@ -106,6 +112,7 @@ case "$*" in
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
   "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "task set "*) cat set.err >&2; exit ${answers.set?.code ?? 0} ;;
   "upgrade --dry-run --json") cat plan.json ;;
   "self-update") while [ -f hold-self ]; do sleep 0.05; done; cat self.out; echo; cat self.err >&2; if [ -f status-after.json ] && [ ${self.code ?? 0} -eq 0 ]; then cp status-after.json status.json; fi; exit ${self.code ?? 0} ;;
   "upgrade --json") while [ ! -f go ]; do sleep 0.05; done; cat upgrade.json; if grep -q '"error"' upgrade.json; then exit 1; fi ;;
@@ -337,6 +344,7 @@ describe('localSource', () => {
           pauseRequest: null,
           pauseRequestable: true,
           resumable: false,
+          closable: false,
           started: true,
           gate: null,
           autopilot: null,
@@ -506,6 +514,80 @@ describe('localSource, writing the queue', () => {
     const stashed = project('stashed', '0.35.0', { tasks, write: 'wrong-checkout' });
     await source.connect(stashed);
     expect(await source.resume('stashed', 'a', 7)).toEqual({ state: 'refused', code: 'wrong-checkout' });
+  });
+
+  describe('closing a ready task', () => {
+    const close = { id: 'close', command: 'jig task set r status consolidated', offered: true, reason: null };
+    const pr = (state: string | null) => ({ url: 'https://github.com/o/r/pull/1', state, ci: null, fetched_at: null });
+    const ready = {
+      tasks: [
+        task('offered', 'ready', false, { knowledge_consolidated: true, actions: [close] }),
+        task('unheard', 'ready', false, { knowledge_consolidated: true, pull_request: pr(null) }),
+        task('cached-open', 'ready', false, { knowledge_consolidated: true, pull_request: pr('open') }),
+        task('unmerged', 'ready', false, { knowledge_consolidated: true, pull_request: pr('closed') }),
+        task('undecided', 'ready', false, { pull_request: pr(null) }),
+        task('working', 'active', false, { knowledge_consolidated: true, actions: [close] }),
+      ],
+      hidden: 0,
+      housekeeping: null,
+    };
+    const sets = (dir: string) => calls(dir).filter((c) => c.startsWith('task set '));
+
+    it("is offered where Jig offers it, or where only Jig's forge cache is behind", async () => {
+      await source.connect(project('closables', '0.37.0', { tasks: ready }));
+      const shown = await source.tasks('closables');
+      const closable = shown?.state === 'ready' ? Object.fromEntries(shown.tasks.map((t) => [t.id, t.closable])) : {};
+      expect(closable).toEqual({
+        offered: true,
+        unheard: true,
+        'cached-open': true,
+        unmerged: false,
+        undecided: false,
+        working: false,
+      });
+    });
+
+    it("runs the command of Jig's close action against the revision of the read, then reads the project again", async () => {
+      const dir = project('closer', '0.37.0', { tasks: ready });
+      await source.connect(dir);
+      const from = calls(dir).length;
+      expect(await source.close('closer', 'unheard', 7)).toEqual({ state: 'written' });
+      const ran = since(dir, from);
+      const set = ran.indexOf('task set unheard status consolidated');
+      expect(ran.slice(0, set)).toContain('queue list --json');
+      expect(ran.slice(set + 1)).toEqual(expect.arrayContaining(['task list --all --json']));
+    });
+
+    it('refuses a task it does not offer to close without running Jig', async () => {
+      const dir = project('unclosable', '0.37.0', { tasks: ready });
+      await source.connect(dir);
+      for (const id of ['unmerged', 'undecided', 'working', 'gone']) {
+        expect(await source.close('unclosable', id, 7)).toEqual({ state: 'refused', code: 'not-found' });
+      }
+      expect(sets(dir)).toEqual([]);
+      expect(await source.close('nobody', 'offered', 7)).toBeUndefined();
+    });
+
+    it('refuses a revision the project has moved past, running nothing', async () => {
+      const dir = project('stale-closer', '0.37.0', { tasks: ready });
+      await source.connect(dir);
+      expect(await source.close('stale-closer', 'offered', 6)).toEqual({ state: 'refused', code: 'stale-revision' });
+      expect(sets(dir)).toEqual([]);
+    });
+
+    it("carries Jig's refusal with its reasons", async () => {
+      const err =
+        'jig: error: task set: status consolidated requires its pull request to be merged: https://github.com/o/r/pull/1 is open; merge it, then run this again\n';
+      const dir = project('refused-closer', '0.37.0', { tasks: ready, set: { err, code: 1 } });
+      await source.connect(dir);
+      expect(await source.close('refused-closer', 'cached-open', 7)).toEqual({
+        state: 'refused',
+        code: 'failed',
+        reasons: [
+          'status consolidated requires its pull request to be merged: https://github.com/o/r/pull/1 is open; merge it, then run this again',
+        ],
+      });
+    });
   });
 
   it.each([

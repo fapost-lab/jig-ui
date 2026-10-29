@@ -79,13 +79,15 @@ function taskAt(body: unknown) {
   return { task: isId(task) ? task : undefined, revision: isRevision(revision) ? revision : undefined };
 }
 
-/** What a write came to, in the API's form. A refusal names no path: only Jig's code goes on. */
+/** What a write came to, in the API's form. A refusal names no path: Jig's code goes on, and its reasons with the paths cut out. */
 function written(c: Context, w: Written | undefined) {
   if (w === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
   if (w.state === 'written') return c.json({ written: true as const }, 200);
   if (w.state !== 'refused') return c.json({ project: w }, 200);
   if (w.code === 'stale-revision') return refuse(c, 409, w.code, 'The project changed since the board was read.');
   if (w.code === 'not-found') return refuse(c, 404, w.code, 'This project has no live task with this id.');
+  // Jig's own reasons, where the command gave them (a close): the person sees why, not only a code.
+  if (w.reasons) return c.json({ error: { code: w.code, message: 'Jig refused the change.', reasons: w.reasons } }, 422);
   return refuse(c, 422, w.code, 'Jig refused the change.');
 }
 
@@ -255,6 +257,13 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
         const { task, revision } = c.req.valid('json');
         if (task === undefined || revision === undefined) return refuse(c, 422, 'usage', 'Give a task and the revision it was read at.');
         return written(c, await source.resume(c.req.param('id'), task, revision));
+      })
+
+      // Closing as done: Jig asks the forge whether the pull request merged, and its refusal says why in `message`.
+      .post('/api/projects/:id/tasks/close', validator('json', taskAt), async (c) => {
+        const { task, revision } = c.req.valid('json');
+        if (task === undefined || revision === undefined) return refuse(c, 422, 'usage', 'Give a task and the revision it was read at.');
+        return written(c, await source.close(c.req.param('id'), task, revision));
       })
 
       // A new task carries no revision: it writes nothing that exists (adr-20261022-filing-a-task-carries-no-revision).

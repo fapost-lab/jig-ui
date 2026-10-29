@@ -13,7 +13,7 @@ import {
   type StopRequested,
 } from './registry/instance.js';
 
-/** The log of the background instance; overwritten at each start, so it never grows without bound. */
+/** The log of the background instance; overwritten at each start, but it grows while the instance runs (task server-log-rotation). */
 export const LOG_FILE = 'server.log';
 
 /** How long the instance gets to answer a probe; one that stays silent is busy, never stale. */

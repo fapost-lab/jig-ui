@@ -65,8 +65,9 @@ export async function askInstance(info: Pick<InstanceInfo, 'port' | 'token'>, ti
       return res.ok ? 'up' : 'gone';
     } catch (error) {
       if (refused(error)) return 'gone';
-      // A kept-alive connection to a server that has since stopped is reset; a new one tells.
-      if (causeCode(error) === 'ECONNRESET' && attempt === 0) continue;
+      // A kept-alive connection to a server that has since stopped breaks (reset, or closed as it
+      // is used, as on Linux); only a timeout means silence, and a new connection tells the rest.
+      if ((error as Error).name !== 'TimeoutError' && attempt === 0) continue;
       return 'silent';
     }
   }

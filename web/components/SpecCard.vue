@@ -1,10 +1,12 @@
 <script setup lang="ts">
   import { ChevronDown, ChevronRight } from '@lucide/vue';
-  import { ref } from 'vue';
+  import { computed, ref } from 'vue';
   import type { Spec } from '@/api';
   import { Badge } from '@/components/ui/badge';
   import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+  import { agentRequests } from '@/lib/specs';
   import { toneText } from '@/lib/tones';
+  import CopyCommand from './CopyCommand.vue';
   import ProgressBar from './ProgressBar.vue';
   import SpecItemRow from './SpecItemRow.vue';
 
@@ -23,6 +25,8 @@
     if (open) folded.value.delete(i);
     else folded.value.add(i);
   }
+
+  const requests = computed(() => agentRequests(props.spec, props.project));
 </script>
 
 <template>
@@ -56,6 +60,10 @@
       </p>
       <p v-if="spec.missingFiles.length > 0" :class="toneText.attention">Missing from the spec: {{ spec.missingFiles.join(', ') }}</p>
       <p v-else-if="spec.progress === null" :class="toneText.attention">The roadmap cannot be read.</p>
+      <template v-if="requests.length">
+        <p class="text-muted-foreground">Ask your agent:</p>
+        <CopyCommand v-for="request in requests" :key="request" :command="request" />
+      </template>
     </div>
 
     <Collapsible v-for="(phase, i) in spec.phases" :key="i" :open="!folded.has(i)" @update:open="(open: boolean) => fold(i, open)">

@@ -12,7 +12,7 @@ paths:
   - web/components/EpicMenu.vue
   - web/lib/epics.ts
 summary: A project's specs from jig spec list, shown as the Specs view with open epics in Jig's queue order and a menu to move and prioritise them; read with the board, no ref or path on the page
-reviewed_at: 2026-10-28
+reviewed_at: 2026-10-29
 ---
 # Specs and epics
 
@@ -26,6 +26,9 @@ and release level; phases folding away, a finished one folded; items done, open 
 naming a live task linking to its details (`web/lib/specs.ts` shapes an item's words). The specs
 with an open epic come first, in the order of Jig's queue, and an epic's ⋯ menu (`EpicMenu.vue`)
 moves it and sets its priority (`POST /api/projects/:id/queue/epic/move`, `/queue/epic/priority`).
+A spec with work for the person's agent offers the request to copy (`agentRequests` in
+`web/lib/specs.ts`): to file the tasks of the first phase with an item that has none, and to continue
+the spec while it has fog.
 
 ## Why
 
@@ -56,7 +59,10 @@ the epic branch, so the page shows Jig's numbers and computes none.
 - **Only an open epic.** A write naming a spec without one is `not-found` before Jig runs; Jig
   refuses a spec that declares no epic as `not-found` too.
 - **Editing a roadmap is not here.** Adding, moving or filing its items needs a Jig command with a
-  revision; it is a fog item in spec `jig-ui`.
+  revision; it is a fog item in spec `jig-ui`. Filing a phase's tasks and continuing a spec go to the
+  person's agent as a request to copy, in the words of Jig's `jig-idea` skill; the page runs no agent.
+- **"Phase N" names the phase.** Items before the first phase heading get no request to file: the
+  request could not name them.
 - **Not shown — not in Jig's contract:** which spec a task on the board belongs to (Jig's task
   list carries no spec link).
 
@@ -76,3 +82,8 @@ Task `epic-order` (2026-10-28), decided by the maintainer:
 - To top is the top of the whole queue (`--top`), not the place before the first epic: putting
   an epic first is putting its tasks ahead of all other work. Rejected: a view of the whole top
   level, epics and tasks mixed — bigger, and the board orders the tasks already.
+
+Task `spec-agent-request` (2026-10-29), decided by the maintainer:
+
+- The requests stand in the card's head, one line each to copy, as an upgrade's request does.
+  Rejected: an "Ask agent…" button that opens them — one click more for a line or two.

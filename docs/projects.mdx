@@ -104,8 +104,9 @@ UI stops: it is not kept anywhere.
   card says how to commit it there.
 - A push or a pull request is made by Jig with your git and `gh` credentials, as in a terminal;
   on macOS the Keychain may ask first.
-- Stopping Jig UI with Ctrl+C while an upgrade runs stops the upgrade too; run `jig upgrade` in the
-  project to carry it on.
+- Stopping Jig UI while an upgrade runs: with Ctrl+C in its terminal the upgrade stops too; with
+  `jig-ui stop` it carries on without Jig UI, and the card does not learn how it ended. Either way,
+  run `jig upgrade` in the project to see where it stands.
 
 ### Upgrade all
 

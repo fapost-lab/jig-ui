@@ -19,10 +19,6 @@ it.
 
 ## Without Node.js
 
-<Note>
-  Available from the next release: the line below downloads the script from Jig UI's latest release on GitHub.
-</Note>
-
 No Node.js on your computer? Paste one line into Git Bash on Windows — Jig needs Git anyway — or into
 a terminal on macOS and Linux:
 
@@ -79,16 +75,16 @@ does not answer may only be busy: every command then says so, exits with 1 and l
 
 The server writes to `server.log` in Jig UI's config folder: `~/.config/jig-ui/`
 (`$XDG_CONFIG_HOME/jig-ui/` when that is set), `%APPDATA%\jig-ui\` on Windows. Each `start`
-overwrites it; while the server runs, the log keeps growing, as it is not rotated yet. If the server
-fails to start, the end of the log is printed. To connect a project afterwards, run `npx @fapost/jig-ui` in its folder, or
-[connect it from the page](/projects).
+overwrites it, but while the server runs the log keeps growing: it is not rotated. If the server
+fails to start, the end of the log is printed. To connect a project afterwards, run
+`npx @fapost/jig-ui` in its folder, or [connect it from the page](/projects).
 
 ## Options
 
 | Option | What it does |
 | --- | --- |
 | `--port <n>` | Listen on another port than 4870; `start` takes it too. |
-| `--no-open` | Print the link instead of opening the browser, for example over SSH. |
+| `--no-open` | Print the link instead of opening the browser, for example over SSH; only without a command. |
 
 ## Development channel
 

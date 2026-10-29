@@ -320,7 +320,9 @@ A read that fails while an agent is in the middle of writing does not blank the 
 good read stays until the next one. A project that keeps failing shows why, as in the table above.
 
 Watching stops when the last page closes; watching writes nothing in the project. If the page says its
-session has ended, Jig UI was restarted: run `npx @fapost/jig-ui` again to reopen it.
+session has ended, the browser was closed since the page was opened, the token was reset, or Jig UI
+now runs on another port: run
+`jig-ui open`, or `npx @fapost/jig-ui`, to reopen it. A restart of Jig UI does not end it.
 
 ## Disconnect a project
 

@@ -55,7 +55,7 @@ instead of being overwritten.
 - [x] `epic-order` — order and prioritise epics — the project's specs with an open epic are shown in the queue's order, and a person drags one, or uses its ⋯ menu, to move it among the top level of the queue and set its priority P0–P5, through `jig queue move epic:<id>` and `jig queue set epic:<id> --priority`, with the revision of the read the person saw (after: reorder and prioritise by drag — the same writes and refusals on another ref; specs and epics — the epics are shown there)
 - [x] `spec-agent-request` — a request for the agent on a spec — a spec offers a request to copy for the person's agent: file the tasks of a phase that has items with no task, or continue the spec while it has fog items (after: specs and epics — it sits on a spec's row)
 - [ ] fog: hosted and self-hosted Jig UI — a connector on the machine with the projects behind the ProjectSource port; first form is a read-only snapshot with a revision; accounts and file access rules are not stated
-- [ ] fog: installation for people without a development environment, Windows first
+- [ ] install without Node.js — one line in Git Bash on Windows, or a terminal on macOS and Linux (`curl -fsSL https://github.com/fapost-lab/jig-ui/releases/latest/download/install.sh | bash`), puts the official Node.js 24, checked against nodejs.org's checksums, in Jig UI's own folder unless Node.js 24 or later is already there, and adds a `jig-ui` command that runs `npx @fapost/jig-ui` with it; the Release workflow attaches the script to each stable release, and the requirements and installation pages give both ways (after: package and release pipeline — the script ships with a release)
 - [ ] fog: editing a roadmap from the page — adding, moving and filing its items needs a Jig command that changes a roadmap with a revision and says which branch the change lands on (`spec/<id>`, the epic, committed or not); none exists, and Jig UI writes no project file
 
 ## Waves
@@ -75,6 +75,7 @@ instead of being overwritten.
 13. projects to upgrade
 14. upgrade from the page
 15. order and prioritise epics; a request for the agent on a spec
+16. install without Node.js
 
 <!--
 Rules (jig-idea §8):

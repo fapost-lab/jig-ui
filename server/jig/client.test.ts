@@ -741,14 +741,15 @@ describe('stopJig', () => {
   it.skipIf(process.platform === 'win32')('gives up on a run whose output a process out of its group holds', async () => {
     const dir = join(root, 'held-upgrade');
     mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
-    // A daemon of the run's own (as ssh or git may leave) leaves the group and keeps the output open.
+    // A daemon of the run's own (as ssh or git may leave) leaves the group and keeps the output open. It says so with
+    // `left`: until then it is still in the group, and on a slow runner the SIGKILL would take it along.
     writeFileSync(
       join(dir, '.ai', 'scripts', 'jig'),
-      "#!/usr/bin/env bash\nperl -MPOSIX -e 'POSIX::setsid(); exec qw(sleep 6)' &\nsleep 60\n",
+      '#!/usr/bin/env bash\nperl -MPOSIX -e \'POSIX::setsid(); open(F, ">", "left"); close F; exec qw(sleep 6)\' &\nsleep 60\n',
     );
     const client = await fresh();
     const upgrade = client.runUpgrade(dir).catch((e: unknown) => e);
-    await delay(300);
+    for (let waited = 0; !existsSync(join(dir, 'left')) && waited < 5_000; waited += 25) await delay(25);
     const started = Date.now();
     await client.stopJig(200);
     expect(Date.now() - started).toBeGreaterThanOrEqual(1_000); // it waited for the run, past the SIGKILL

@@ -3,6 +3,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { serve } from '@hono/node-server';
 import { type CliCommand, DEFAULT_PORT, parseCliArgs } from './args.js';
 import { createApp, readPackageVersion } from './http/app.js';
+import { stopJig } from './jig/client.js';
 import { openBrowser } from './open-browser.js';
 import { configDir } from './registry/config-dir.js';
 import { connectThrough, type InstanceInfo, probeInstance, readInstance, removeInstance, writeInstance } from './registry/instance.js';
@@ -128,7 +129,8 @@ async function runServer(command: Extract<CliCommand, { kind: 'run' | 'serve' }>
     fail(`Could not read or write the token in ${dir}: ${error instanceof Error ? error.message : String(error)}`),
   );
   const shutdown = (): void => {
-    void removeInstance(dir, { token, pid: process.pid }).finally(() => {
+    // A Jig run under way — an upgrade above all — ends with Jig UI, however Jig UI was stopped.
+    void Promise.allSettled([stopJig(), removeInstance(dir, { token, pid: process.pid })]).finally(() => {
       server.close(() => process.exit(0));
       if ('closeAllConnections' in server) server.closeAllConnections();
     });
@@ -159,6 +161,8 @@ async function runServer(command: Extract<CliCommand, { kind: 'run' | 'serve' }>
 
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+  // The terminal closed: its Jig runs lead groups of their own, so they hear of it only through Jig UI.
+  process.on('SIGHUP', shutdown);
 }
 
 async function startBackground({ port, open }: Extract<CliCommand, { kind: 'start' }>, dir: string): Promise<void> {

@@ -45,6 +45,12 @@ machine's), which only `upgrade-available` carries, from Jig 0.34.0, and older J
 any item. It reads as `null` when absent, and an `upgrade-available` item without it fails the read,
 as a field Jig dropped does (task `projects-to-upgrade`).
 
+A test that runs real processes — a stand-in `jig` script that starts a child, leaves its process
+group, or waits — waits for a marker file the process writes once it is where the test needs it,
+never for a fixed delay: CI runners and a machine running several sessions are loaded enough that a
+fixed 300 ms lost the race to `perl`'s `setsid` (task `stopjig-test-race`, Release run on `main`
+after #80). The `stopJig` tests write `waiter.pid` and `left` for this.
+
 ## Example
 
 A task-list read runs Jig's JSON task listing with `--all`, finished tasks included, checks the envelope, then `data` through the

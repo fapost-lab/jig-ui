@@ -60,11 +60,15 @@ For the upgrade alone, this amends three decisions; every other write stands as 
   started, as Ctrl+C on `jig upgrade` in a terminal does: the signal reaches the whole process
   group. The project may be left on `jig/upgrade-<to>`, or with the branch pushed and no pull
   request; the next `jig upgrade` there says what to do. A run past its 30 minutes is killed with
-  the same leftovers, and the card says it failed. Stopped otherwise — a `kill`, which sends
-  SIGTERM to Jig UI alone — Jig UI exits and the `jig upgrade` runs on to its end with nobody to
-  read its result: what it did is on the project's branch and pull request, not on a card. Decided with
-  the maintainer after the architecture review, 2026-10-27: a run that survives Jig UI would need
-  its output in files and a path of its own on Windows, and its result would be lost anyway.
+  the same leftovers, and the card says it failed. Every other stop does the same since task
+  `stop-ends-upgrade` (2026-10-29): `jig-ui stop`, a `kill` (SIGTERM), a closed terminal (SIGHUP)
+  and a Jig UI started in the background stop each Jig run first — SIGINT to the run's own process group, SIGKILL to what is
+  left after five seconds — then exit. Only a SIGKILL to Jig UI itself leaves a `jig upgrade`
+  running on with nobody to read its result. Decided with the maintainer after the architecture
+  review, 2026-10-27: a run that survives Jig UI would need its output in files and a path of its
+  own on Windows, and its result would be lost anyway. On Windows the run's bash alone is signalled.
+  A run in a group of its own has no controlling terminal, so a git or ssh prompt on `/dev/tty`
+  fails instead of waiting in Jig UI's terminal; the macOS Keychain asks as before.
 
 ## Alternatives
 

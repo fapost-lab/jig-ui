@@ -83,3 +83,29 @@ jobs:
             *-*) npm publish --tag next --ignore-scripts ;;
             *) npm publish --ignore-scripts ;;
           esac
+
+  # Runs install.sh for real on each OS, against what was just published, before a release carries it.
+  installer:
+    if: github.ref_type == 'tag' && !contains(github.ref_name, '-')
+    needs: publish
+    uses: ./.github/workflows/installer.yml
+
+  # A stable release's GitHub Release carries install.sh: the installation line downloads it from
+  # releases/latest. Nothing is installed here, next to a token that can write the repository.
+  github-release:
+    if: github.ref_type == 'tag' && !contains(github.ref_name, '-')
+    needs: [publish, installer]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create the GitHub Release with install.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" install.sh --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" \
+            --notes "What changed: https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/docs/changelog.mdx"

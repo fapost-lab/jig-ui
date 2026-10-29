@@ -1,0 +1,51 @@
+name: Installer
+
+# Runs install.sh for real — Node.js downloaded from nodejs.org, Jig UI from npm — with no Node.js on
+# PATH, on each OS. Only when the script changes, and before a stable release carries it (release.yml).
+on:
+  pull_request:
+    paths: [install.sh, .github/workflows/installer.yml]
+  push:
+    branches: [main]
+    paths: [install.sh, .github/workflows/installer.yml]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install with no Node.js on PATH, then ask Jig UI its version
+        shell: bash
+        run: |
+          set -eu
+          if [ "$RUNNER_OS" = Windows ]; then
+            tmp=$(cygpath -u "$RUNNER_TEMP")
+            path=/mingw64/bin:/usr/bin:/c/Windows/System32
+            node="$tmp/data/jig-ui/node/node.exe"
+            launcher="$tmp/home/bin/jig-ui"
+          else
+            tmp=$RUNNER_TEMP
+            path=/usr/bin:/bin:/usr/sbin:/sbin
+            node="$tmp/data/jig-ui/node/bin/node"
+            launcher="$tmp/home/.local/bin/jig-ui"
+          fi
+          mkdir -p "$tmp/home"
+          # Not in the repository: there npx would take the repository's own package.
+          cd "$tmp"
+          version=$(HOME="$tmp/home" PATH="$path" LOCALAPPDATA="$RUNNER_TEMP/data" XDG_DATA_HOME="$tmp/data" \
+            "$BASH" "$GITHUB_WORKSPACE/install.sh" --version)
+          echo "Jig UI $version"
+          test -x "$node"
+          test -x "$launcher"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]

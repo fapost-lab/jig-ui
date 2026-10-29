@@ -11,6 +11,9 @@ publishing (OIDC). There is no npm token in the repository secrets.
 - **Tag `v<version>`** publishes that version under `latest`. The workflow fails unless the tag
   equals `v` plus the `version` in `package.json`.
 - Nothing is published unless typecheck, tests and build pass on Linux first.
+- **A stable tag** also creates its GitHub Release carrying `install.sh`, once the script has
+  installed and started the published version on Linux, macOS and Windows (`installer.yml`). The
+  line in `docs/installation.mdx` downloads the script from the latest release.
 
 ## Cutting a stable release
 

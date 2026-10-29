@@ -62,7 +62,11 @@ stash applied) is not read. Its success answer carries the revision before
 the write, so the caller reads again; a test pins each command's arguments and a refusal.
 `fileTask` (`jig task new <id> --goal <text>`) takes no revision — Jig has none for it — and its
 tests pin that a person's goal reaches Jig as one argument, unglobbed
-(adr-20261022-filing-a-task-carries-no-revision). On Windows the arguments do not go on Git bash's
+(adr-20261022-filing-a-task-carries-no-revision). `closeTask` (`jig task set <id> status consolidated`) is the
+one text write: Jig takes no `--revision` and prints no JSON for it, so it reads `queue list --json` first and refuses
+`stale-revision` itself when the clone's revision is not the caller's, then runs the command with a longer timeout (Jig
+asks the forge); a refusal is `failed` with Jig's `jig: error:` lines, through `withoutPaths`, as `reasons`
+(adr-20261029-close-a-ready-task-from-the-board). On Windows the arguments do not go on Git bash's
 command line, which it parses itself: it globbed a one-word goal `out*` that Node left unquoted,
 and with `MSYS=noglob` it read `\"` as a backslash and a quote (both caught by the Windows CI leg).
 They go in the environment as `JIG_UI_ARG_<n>`, and the fixed script

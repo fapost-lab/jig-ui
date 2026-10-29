@@ -1,12 +1,14 @@
 <script setup lang="ts">
-  import { ExternalLink } from '@lucide/vue';
+  import { ExternalLink, X } from '@lucide/vue';
   import { computed } from 'vue';
   import type { Place, ReadyDetails, Task } from '@/api';
   import { Badge } from '@/components/ui/badge';
+  import { Button } from '@/components/ui/button';
   import { Card } from '@/components/ui/card';
   import { toneRule } from '@/lib/tones';
   import { minute } from '@/lib/clock';
   import { requested, waits } from '@/lib/waits';
+  import CloseConfirm from './CloseConfirm.vue';
   import QueueMenu from './QueueMenu.vue';
   import TaskBrief from './TaskBrief.vue';
 
@@ -29,7 +31,11 @@
     prioritise: [priority: number | null];
     pause: [ask: boolean];
     resume: [];
+    close: [];
   }>();
+
+  /** The question before closing the task is open: one press asks, the question's button closes. */
+  const confirming = defineModel<boolean>('confirming', { default: false });
 
   const note = computed(() => waits(props.task));
   const request = computed(() => requested(props.task, minute.value.getTime()));
@@ -58,7 +64,28 @@
         @pause="(ask) => $emit('pause', ask)"
         @resume="$emit('resume')"
       />
+      <Button
+        v-if="task.closable"
+        variant="ghost"
+        size="icon-xs"
+        :disabled="busy"
+        :aria-label="`Close ${task.id} as done`"
+        :aria-expanded="confirming"
+        title="Close as done"
+        @click="confirming = !confirming"
+      >
+        <X />
+      </Button>
     </div>
+    <CloseConfirm
+      v-if="task.closable && confirming && !busy"
+      :task="task.id"
+      @close="
+        confirming = false;
+        $emit('close');
+      "
+      @cancel="confirming = false"
+    />
     <p v-if="busy" class="text-muted-foreground" role="status">sending to Jig…</p>
     <p v-if="changed" :class="toneRule.attention">Changed while you acted</p>
     <p v-if="note" :class="toneRule[note.tone]">

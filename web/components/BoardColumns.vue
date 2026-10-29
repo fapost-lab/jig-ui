@@ -23,6 +23,7 @@
     prioritise: [task: string, priority: number | null];
     pause: [task: string, ask: boolean];
     resume: [task: string];
+    close: [task: string];
   }>();
 
   const drag = useDrop(
@@ -71,6 +72,7 @@
             @prioritise="(p) => $emit('prioritise', task.id, p)"
             @pause="(ask) => $emit('pause', task.id, ask)"
             @resume="$emit('resume', task.id)"
+            @close="$emit('close', task.id)"
           />
           <span
             v-if="gap?.list === column.id && gap.index === column.cards.length && i === column.cards.length - 1"

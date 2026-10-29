@@ -3,8 +3,9 @@ title: "Requirements"
 description: "What must be on the machine before installing Jig UI."
 ---
 
-- **Node.js 24 or later.** Jig UI runs on Node.js, and Node.js must already be installed — Jig UI does not
-  bundle it. Jig UI is started with `npx`, which comes with Node.js.
+- **Node.js 24 or later.** Jig UI runs on Node.js and is started with `npx`, which comes with Node.js.
+  Without Node.js, [one line](/installation#without-nodejs) puts Node.js in Jig UI's own folder,
+  with nothing installed system-wide.
 - **git.**
 - **Jig 0.31.0 or later**, in each project you connect. Older versions are shown as such and not read;
   `jig upgrade` in the project brings it up to date. Marking a project to upgrade and upgrading it

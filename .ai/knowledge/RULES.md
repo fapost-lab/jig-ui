@@ -21,6 +21,10 @@ are added as sections of this file.
   Jig's fields; the only other `child_process` uses are `server/open-browser.ts` starting the
   system browser opener, `git rev-parse` and `git worktree list` in `server/source/` telling a main
   checkout from a worktree and finding a worktree's main checkout, and `git --exec-path` in `server/jig/` finding Git's bash on Windows.)
+- `install.sh` writes only Jig UI's Node.js folder and its own `jig-ui` command, never over a
+  command it did not write, and installs Node.js only after its SHA-256 sum matched nodejs.org's; it
+  edits no shell profile and no system setting. (spec `jig-ui`, task `install-without-node`. Checked
+  by `server/install.test.ts` and the Installer workflow.)
 - The API and the page name projects by id; no path reaches `web/`.
   (adr-20261014-project-source-port-keeps-hosting-open. Checked by tests on the API responses.)
 - The server binds 127.0.0.1 unless a guard other than the local token is in place, refuses a

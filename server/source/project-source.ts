@@ -53,6 +53,8 @@ export type UpgradeRun =
       state: 'running';
       since: string;
       to: string;
+      /** Landing a merged upgrade (`jig upgrade --land`), not upgrading. */
+      landing?: boolean;
     }
   | {
       state: 'done';
@@ -116,10 +118,35 @@ export interface Machine {
   release: string | null;
   selfUpdate: SelfUpdateRun | null;
   upgradeAll: UpgradeAllRun | null;
+  /** Check all merges is under way. */
+  landingAll: boolean;
+}
+
+/** What Check all merges came to: the projects whose upgrade landed, whose pull request is still open, and the rest. */
+export interface LandedAll {
+  landed: string[];
+  waiting: string[];
+  /** Refused otherwise — a dirty tree, another branch checked out — or failed; each card says why. */
+  stopped: string[];
 }
 
 /** A connected project as the workspace shows it, with the upgrade started from the page, if any. */
-export type WorkspaceProject = ProjectView & { upgrade: UpgradeRun | null };
+/**
+ * An upgrade of the project that ended in a pull request and waits for it: still open, or merged and not brought here
+ * yet. Only where the project's Jig can land it (0.39.0).
+ */
+export interface MergeWait {
+  state: 'open' | 'merged';
+  /** The version the upgrade goes to; `null` when Jig does not know it. */
+  to: string | null;
+  url: string | null;
+}
+
+export type WorkspaceProject = ProjectView & {
+  upgrade: UpgradeRun | null;
+  /** Present while an upgrade waits for its pull request: the card offers Check merge, not Upgrade. */
+  mergeWait?: MergeWait;
+};
 
 /** What a dry run of the upgrade came to: Jig's plan, a refusal by code, or why the project cannot be read. */
 export type Planned =
@@ -389,6 +416,32 @@ export interface ProjectSource {
    */
   upgradeAll(): Promise<
     | { state: 'started' }
+    | {
+        state: 'refused';
+        code: string;
+      }
+  >;
+  /**
+   * Checks whether the project's upgrade pull request was merged and, if so, brings it here (`jig upgrade --land`, Jig
+   * 0.39.0): the base branch checked out and fast-forwarded. Answers once Jig has; what it came to is the project's
+   * `upgrade` — Jig's answer, or refused `not-merged` while the pull request is open. Refused `not-found` without an
+   * upgrade pull request to check, `running` while an upgrade runs. `undefined` when no project has that id.
+   */
+  land(id: string): Promise<
+    | { state: 'ended' }
+    | {
+        state: 'refused';
+        code: string;
+      }
+    | NotReady
+    | undefined
+  >;
+  /** Checks every project's upgrade pull request in turn, as `land` does each. Refused `running` while an upgrade runs. */
+  landAll(): Promise<
+    | {
+        state: 'ended';
+        landed: LandedAll;
+      }
     | {
         state: 'refused';
         code: string;

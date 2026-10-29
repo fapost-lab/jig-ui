@@ -209,7 +209,7 @@ describe('/api/projects and /api/workspace', () => {
         { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0', upgrade: null },
         { id: 'broken', state: 'unreadable', code: 'failed', upgrade: null },
       ],
-      machine: { release: null, selfUpdate: null, upgradeAll: null },
+      machine: { release: null, selfUpdate: null, upgradeAll: null, landingAll: false },
     });
     expectNoPath(text);
     expect(text).not.toContain('"path"');
@@ -743,6 +743,7 @@ describe('/api/self-update and /api/upgrade-all', () => {
   it('shows what the machine is doing beside the projects', async () => {
     const machine = {
       release: '0.38.0',
+      landingAll: false,
       selfUpdate: { state: 'failed' as const, at: 'x', reasons: ['no remote'] },
       upgradeAll: { state: 'running' as const, since: 'y', current: 'a', upgraded: ['b'] },
     };
@@ -801,6 +802,58 @@ describe('/api/self-update and /api/upgrade-all', () => {
     expect(selfUpdate).not.toHaveBeenCalled();
     expect(upgradeAll).not.toHaveBeenCalled();
     expect(dismissUpgradeAll).not.toHaveBeenCalled();
+  });
+});
+
+describe('/api/projects/:id/upgrade/land and /api/upgrade/land-all', () => {
+  const base = localSource(join(webRoot, 'land-config'));
+  const appOf = (over: Partial<ProjectSource>) => createApp({ port: PORT, token: TOKEN, source: { ...base, ...over }, webRoot });
+  const call = (target: Hono, path: string, headers: Record<string, string> = { cookie: COOKIE }) =>
+    target.request(path, { method: 'POST', headers: { host: HOST, ...headers } });
+
+  it.each([
+    ['landed', { state: 'ended' }, 200],
+    ['a project it cannot read', { id: 'x', state: 'unreadable', code: 'locked' }, 200],
+    ['an upgrade under way', { state: 'refused', code: 'running' }, 409],
+    ['no pull request to check', { state: 'refused', code: 'not-found' }, 404],
+    ['a project not connected', undefined, 404],
+  ] as const)('answers a check of the merge with %s', async (_, landed, status) => {
+    const land = vi.fn(() => Promise.resolve(landed));
+    const res = await call(appOf({ land }), '/api/projects/x/upgrade/land');
+    expect(res.status).toBe(status);
+    expect(land).toHaveBeenCalledWith('x');
+    expect(await res.json()).toEqual(
+      landed === undefined
+        ? { error: { code: 'not-connected', message: expect.any(String) } }
+        : landed.state === 'ended'
+          ? { ended: true }
+          : landed.state === 'refused'
+            ? { error: { code: landed.code, message: expect.any(String) } }
+            : { project: landed },
+    );
+  });
+
+  it('answers Check all merges with what it came to, or refuses it while an upgrade runs', async () => {
+    const landed = { landed: ['a'], waiting: ['b'], stopped: ['c'] };
+    const ended = await call(appOf({ landAll: () => Promise.resolve({ state: 'ended', landed }) }), '/api/upgrade/land-all');
+    expect(ended.status).toBe(200);
+    expect(await ended.json()).toEqual({ landed });
+    const refused = await call(appOf({ landAll: () => Promise.resolve({ state: 'refused', code: 'running' }) }), '/api/upgrade/land-all');
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({ error: { code: 'running', message: expect.any(String) } });
+  });
+
+  it('is refused without the token and from another origin, checking nothing', async () => {
+    const land = vi.fn();
+    const landAll = vi.fn();
+    const guarded = appOf({ land, landAll });
+    const foreign = { cookie: COOKIE, origin: 'https://evil.example' };
+    for (const path of ['/api/projects/x/upgrade/land', '/api/upgrade/land-all']) {
+      expect((await call(guarded, path, {})).status).toBe(401);
+      expect((await call(guarded, path, foreign)).status).toBe(403);
+    }
+    expect(land).not.toHaveBeenCalled();
+    expect(landAll).not.toHaveBeenCalled();
   });
 });
 

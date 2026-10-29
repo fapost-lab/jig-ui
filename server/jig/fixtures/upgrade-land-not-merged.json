@@ -1,0 +1,1 @@
+{"schema":1,"revision":1793292969,"generated_at":"2026-10-29T16:56:10Z","error":{"code":"not-merged","message":"upgrade --land: the pull request of jig/upgrade-9.9.9 is not merged yet (https://github.com/example/example/pull/12); merge it, then run `jig upgrade --land` again. Nothing was changed"}}

@@ -29,6 +29,9 @@ export type Written = Awaited<
 >;
 
 /** What upgrading a project's Jig would do: Jig's dry run of it. */
+/** What Check all merges came to: the projects landed, still waiting for a merge, and stopped. */
+export type LandedAll = Ok<Api['upgrade']['land-all']['$post']>['landed'];
+
 export type UpgradePlan = Extract<Ok<Api['projects'][':id']['upgrade']['plan']['$post']>, { plan: unknown }>['plan'];
 
 /** Why the page cannot show anything: the session or the server ended, the registry cannot be read, or the server failed. */

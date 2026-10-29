@@ -1,10 +1,11 @@
 <script setup lang="ts">
   import { computed } from 'vue';
-  import type { Project } from '@/api';
+  import { ExternalLink } from '@lucide/vue';
+  import { link, type Project } from '@/api';
   import { Button } from '@/components/ui/button';
   import { Card } from '@/components/ui/card';
-  import { toneText } from '@/lib/tones';
-  import { needsUpgrade, type PlanState, upgradeMark } from '@/lib/upgrade';
+  import { toneRule, toneText } from '@/lib/tones';
+  import { mergeWaitOf, needsUpgrade, type PlanState, upgradeMark } from '@/lib/upgrade';
   import AttentionItem from './AttentionItem.vue';
   import StateLine from './StateLine.vue';
   import UpgradePanel from './UpgradePanel.vue';
@@ -22,6 +23,9 @@
   }>();
 
   const mark = computed(() => upgradeMark(props.project));
+  const merge = computed(() => mergeWaitOf(props.project));
+  // Check merge while the upgrade waits and nothing runs on the card.
+  const checkable = computed(() => merge.value !== undefined && props.project.upgrade?.state !== 'running' && !props.held);
   // Offered on a project with an upgrade to make — now, or after a self-update — and nothing about one on the card yet.
   const upgradable = computed(
     () => needsUpgrade(props.project, props.release ?? null) && !props.project.upgrade && !props.plan && !props.held,
@@ -34,6 +38,8 @@
     start: [];
     selfUpdate: [];
     upgrade: [];
+    /** Check merge: bring the upgrade here once its pull request is merged. */
+    land: [];
     close: [];
     dismiss: [];
   }>();
@@ -49,6 +55,22 @@
         <Button v-if="upgradable" variant="outline" size="xs" @click="$emit('start')">Upgrade…</Button>
         <Button v-if="project.upgrade?.state !== 'running'" variant="ghost" size="xs" @click="$emit('disconnect')">Disconnect</Button>
       </div>
+    </div>
+    <div v-if="merge" :class="toneRule.attention" class="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span>
+        {{ merge.state === 'open' ? 'The upgrade' : 'The merged upgrade' }}{{ merge.to ? ` to ${merge.to}` : '' }}
+        {{ merge.state === 'open' ? 'waits for its pull request to be merged.' : 'is not here yet.' }}
+      </span>
+      <a
+        v-if="link(merge.url)"
+        :href="link(merge.url)"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-1 underline underline-offset-2"
+      >
+        Open pull request<ExternalLink class="size-3" />
+      </a>
+      <Button v-if="checkable" variant="outline" size="xs" @click="$emit('land')">Check merge</Button>
     </div>
     <UpgradePanel
       v-if="project.upgrade || plan"

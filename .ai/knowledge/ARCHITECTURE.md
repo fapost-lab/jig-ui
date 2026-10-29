@@ -47,7 +47,7 @@ one line that brings its own (the install flow). Jig works exactly as before wit
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, the connected ids
   (`connected`), one project as the workspace shows it (`project`), a project's live tasks, one task in full, connect, disconnect, subscribe to changes, and the writes `move`,
   `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `planUpgrade`, `upgrade` and
-  `dismissUpgrade`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
+  `dismissUpgrade`, `land` and `landAll`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
   read), `incompatible` (a newer Jig's shape), `unreadable` (Jig refused, or `timeout`; its code only — **Read again** reads it at once) or
@@ -66,7 +66,7 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `POST /api/projects/:id/tasks` (adr-20261022-filing-a-task-carries-no-revision),
   `POST /api/projects/:id/upgrade/plan`, `POST` and `DELETE /api/projects/:id/upgrade`
   (adr-20261027-upgrading-a-project-runs-in-the-background), `POST /api/self-update`, `POST` and
-  `DELETE /api/upgrade-all` (adr-20261029-upgrade-all-and-self-update-from-the-page), connect /
+  `DELETE /api/upgrade-all` (adr-20261029-upgrade-all-and-self-update-from-the-page), `POST /api/projects/:id/upgrade/land` and `POST /api/upgrade/land-all` (adr-20261029-check-merge-lands-an-upgrade-through-jig), connect /
   disconnect under `/api/projects`, and `GET /api/events` — the SSE stream of "project X changed,
   revision R" — through the port only; responses name projects by id.
   Directions: `http/` → `board/`, `source/`; `board/` → `source/` (types); `source/` → `jig/`,

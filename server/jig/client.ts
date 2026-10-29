@@ -12,6 +12,12 @@ export const MIN_JIG_VERSION = '0.31.0';
 /** The first Jig whose `task resume` takes `--revision` and `--json` (fapost-lab/jig#295). */
 export const RESUME_JIG_VERSION = '0.35.0';
 
+/**
+ * The first Jig that remembers an upgrade's pull request (`upgrade-pull-request-*` in `jig status`) and lands it once
+ * merged (`jig upgrade --land`, fapost-lab/jig#352). The project's own Jig runs both, so they reach upgrades from it on.
+ */
+export const LAND_JIG_VERSION = '0.39.0';
+
 const SCRIPT = '.ai/scripts/jig';
 /** A read's limit: 10 s ran out with several projects read at once, each four Jig runs (task `read-timeout`). */
 const TIMEOUT_MS = 30_000;
@@ -130,6 +136,7 @@ const CODES = new Set([
   'wrong-checkout',
   'stash-conflict',
   'upgrade-blocked',
+  'not-merged',
   'failed',
 ]);
 
@@ -209,14 +216,25 @@ const Attention = z
     detail: maybe,
     todo: text,
     url: maybe,
-    // The project's Jig and the machine's. The one field left out: only `upgrade-available` carries it
-    // (Jig 0.34.0), and that item never without it.
+    // `upgrade-available` (Jig 0.34.0) carries the project's Jig and the machine's, and never goes without them; an
+    // upgrade's pull request (`upgrade-pull-request-*`, Jig 0.39.0) only the version its branch is named for.
     versions: z
-      .object({ from: text, to: text })
+      .object({ from: text.optional(), to: maybe })
       .nullish()
       .transform((v) => v ?? null),
+    // Only on the `upgrade-pull-request-*` kinds: the upgrade's branch, the base it goes into, `open` or `merged`.
+    pull_request: z.object({ branch: text, base: text, state: text, fetched_at: maybe }).nullish(),
   })
-  .refine((a) => a.kind !== 'upgrade-available' || a.versions !== null);
+  .refine((a) => a.kind !== 'upgrade-available' || (typeof a.versions?.from === 'string' && typeof a.versions.to === 'string'))
+  .refine((a) => !['upgrade-pull-request-waiting', 'upgrade-pull-request-merged'].includes(a.kind) || a.pull_request != null)
+  .transform(({ versions, pull_request, ...item }) => ({
+    ...item,
+    versions: item.kind === 'upgrade-available' && versions ? { from: versions.from as string, to: versions.to as string } : null,
+    // The upgrade's pull request, as the forge cache of the last `jig housekeeping` had it; only on its two kinds.
+    ...(pull_request
+      ? { pullRequest: { branch: pull_request.branch, base: pull_request.base, state: pull_request.state, to: versions?.to ?? null } }
+      : {}),
+  }));
 export type Attention = z.output<typeof Attention>;
 
 /**
@@ -592,9 +610,13 @@ const Upgrade = z
       .nullable(),
     manual_steps: z.array(text),
     would_stop: z.array(text),
+    // Only `--land` (Jig 0.39.0): the base checked out, and whether the upgrade's branch went here and on origin.
+    land: z.object({ base: text, branch_deleted: z.boolean(), origin_branch_deleted: z.boolean() }).nullish(),
   })
-  .transform(({ git, manual_steps, would_stop, ...rest }) => ({
+  .transform(({ git, manual_steps, would_stop, land, ...rest }) => ({
     ...rest,
+    // Present only on what `--land` answered.
+    ...(land ? { land: { base: land.base, branchDeleted: land.branch_deleted, originBranchDeleted: land.origin_branch_deleted } } : {}),
     git: git && {
       level: git.level,
       branch: git.branch,
@@ -614,6 +636,20 @@ export type Upgrade = z.output<typeof Upgrade>;
  */
 export async function planUpgrade(root: string, platform: NodeJS.Platform = process.platform): Promise<Upgrade> {
   return parsed(Upgrade, (await readJson(root, ['upgrade', '--dry-run'], platform, PLAN_TIMEOUT_MS)).data);
+}
+
+/** `jig upgrade --land` asks the forge, fetches and fast-forwards: network round trips, never a prompt. */
+const LAND_TIMEOUT_MS = 2 * 60_000;
+
+/**
+ * Brings an upgrade that ended in a pull request into the project's main checkout once the forge merged it
+ * (`jig upgrade --land`, Jig 0.39.0): checks the base branch out, fast-forwards it to origin's, lets the upgrade's
+ * branch go. Answers outcome `landed` or `nothing-to-do`; refused `not-merged` while the pull request is open, and
+ * `upgrade-blocked` with its reasons for a dirty tree, another branch checked out or a base that cannot fast-forward —
+ * nothing touched either way. It never stashes and never forces.
+ */
+export async function landUpgrade(root: string, platform: NodeJS.Platform = process.platform): Promise<Upgrade> {
+  return parsed(Upgrade, (await readJson(root, ['upgrade', '--land'], platform, LAND_TIMEOUT_MS)).data);
 }
 
 /**

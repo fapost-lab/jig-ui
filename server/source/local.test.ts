@@ -62,6 +62,8 @@ function project(
     plan?: unknown;
     /** What `upgrade` prints once a file `go` is in the project: an envelope's `data`, or a whole envelope as a string. */
     upgrade?: unknown;
+    /** What `upgrade --land --json` prints once no file `hold-land` is in the project: an envelope's `data`, or a whole envelope as a string (a refusal, with exit 1). */
+    land?: unknown;
     /** What `self-update` does once no file `hold-self` is in the project; given `statusAfter`, it also replaces status.json with it, as a new Jig would. */
     selfUpdate?: {
       out?: string;
@@ -96,6 +98,7 @@ function project(
   );
   writeFileSync(join(dir, 'plan.json'), envelope(answers.plan ?? {}));
   writeFileSync(join(dir, 'upgrade.json'), typeof answers.upgrade === 'string' ? answers.upgrade : envelope(answers.upgrade ?? {}));
+  writeFileSync(join(dir, 'land.json'), typeof answers.land === 'string' ? answers.land : envelope(answers.land ?? {}));
   const self = answers.selfUpdate ?? {};
   writeFileSync(join(dir, 'self.out'), self.out ?? 'self-update: already current');
   writeFileSync(join(dir, 'self.err'), self.err ?? '');
@@ -115,6 +118,7 @@ case "$*" in
   "task set "*) cat set.err >&2; exit ${answers.set?.code ?? 0} ;;
   "upgrade --dry-run --json") cat plan.json ;;
   "self-update") while [ -f hold-self ]; do sleep 0.05; done; cat self.out; echo; cat self.err >&2; if [ -f status-after.json ] && [ ${self.code ?? 0} -eq 0 ]; then cp status-after.json status.json; fi; exit ${self.code ?? 0} ;;
+  "upgrade --land --json") while [ -f hold-land ]; do sleep 0.05; done; cat land.json; if grep -q '"error"' land.json; then exit 1; fi ;;
   "upgrade --json") while [ ! -f go ]; do sleep 0.05; done; cat upgrade.json; if grep -q '"error"' upgrade.json; then exit 1; fi ;;
 esac
 `,
@@ -1231,7 +1235,7 @@ describe('localSource, self-update and Upgrade all', () => {
   }
 
   it('shows nothing of the machine before it does anything', () => {
-    expect(fresh().source.machine()).toEqual({ release: null, selfUpdate: null, upgradeAll: null });
+    expect(fresh().source.machine()).toEqual({ release: null, selfUpdate: null, upgradeAll: null, landingAll: false });
   });
 
   describe('self-update', () => {
@@ -1525,10 +1529,10 @@ describe('localSource, self-update and Upgrade all', () => {
       await ended(source);
       expect(source.machine().upgradeAll?.state).toBe('done');
       source.dismissUpgradeAll();
-      expect(source.machine()).toEqual({ release: null, selfUpdate: null, upgradeAll: null });
+      expect(source.machine()).toEqual({ release: null, selfUpdate: null, upgradeAll: null, landingAll: false });
       // Dismissing nothing is harmless.
       source.dismissUpgradeAll();
-      expect(source.machine()).toEqual({ release: null, selfUpdate: null, upgradeAll: null });
+      expect(source.machine()).toEqual({ release: null, selfUpdate: null, upgradeAll: null, landingAll: false });
       expect(await source.upgradeAll()).toEqual({ state: 'started' });
       await ended(source);
     });
@@ -1554,6 +1558,412 @@ describe('localSource, self-update and Upgrade all', () => {
       await source.upgradeAll();
       await ended(source);
       expect(changes.length).toBeGreaterThan(before);
+      unsubscribe();
+    });
+  });
+});
+
+describe('localSource, checking the merge of an upgrade pull request', () => {
+  const waitingItem = {
+    kind: 'upgrade-pull-request-waiting',
+    subject: { type: 'project', id: null },
+    tasks: [],
+    title: 'An upgrade of Jig waits for its pull request to be merged',
+    detail: 'jig/upgrade-9.9.9 into main, open as of 2026-10-20T10:00:00Z',
+    todo: 'Review and merge the pull request, then run jig upgrade --land to bring it here.',
+    url: 'https://github.com/o/r/pull/12',
+    pull_request: { branch: 'jig/upgrade-9.9.9', base: 'main', state: 'open', fetched_at: '2026-10-20T10:00:00Z' },
+    versions: { to: '9.9.9' },
+  };
+  const waitingStatus = { attention: [waitingItem], housekeeping: null };
+  const landed = {
+    mode: 'copy',
+    dry_run: false,
+    from: '0.38.1',
+    to: '9.9.9',
+    outcome: 'landed',
+    files: null,
+    git: {
+      level: 'commit',
+      branch: 'jig/upgrade-9.9.9',
+      commit: 'af790d0',
+      pushed: true,
+      pull_request: 'https://github.com/example/example/pull/12',
+      merged: true,
+    },
+    land: { base: 'main', branch_deleted: true, origin_branch_deleted: false },
+    manual_steps: [],
+    would_stop: [],
+  };
+  const nothing = { ...landed, from: '9.9.9', outcome: 'nothing-to-do', git: null, land: null };
+  const refusal = (code: string, message: string) =>
+    JSON.stringify({ schema: 1, revision: 7, generated_at: 'x', error: { code, message } });
+  const notMerged = refusal(
+    'not-merged',
+    'upgrade --land: the pull request of jig/upgrade-9.9.9 is not merged yet; merge it. Nothing was changed',
+  );
+  const open = (name: string, more: Parameters<typeof project>[2] = {}, version = '0.39.0') =>
+    project(name, version, { status: waitingStatus, land: landed, ...more });
+  const log = (dir: string, call: string) => calls(dir).filter((c) => c === call).length;
+  let configs = 0;
+  function fresh() {
+    return localSource(join(root, `land-config-${configs++}`));
+  }
+  const upgradeOf = async (source: ReturnType<typeof localSource>, id: string) =>
+    (await source.workspace()).find((p) => p.id === id)?.upgrade;
+
+  it('lands a project whose status names an upgrade pull request, and keeps what Jig answered', async () => {
+    const source = fresh();
+    const dir = open('land-ok');
+    await source.connect(dir);
+    const reads = log(dir, 'status --json');
+    expect(await source.land('land-ok')).toEqual({ state: 'ended' });
+    expect(log(dir, 'upgrade --land --json')).toBe(1);
+    expect(log(dir, 'status --json')).toBeGreaterThan(reads);
+    expect(await upgradeOf(source, 'land-ok')).toEqual({
+      state: 'done',
+      at: expect.any(String),
+      upgrade: expect.objectContaining({ outcome: 'landed', from: '0.38.1', to: '9.9.9', land: expect.objectContaining({ base: 'main' }) }),
+    });
+  });
+
+  it('keeps an answer of nothing to do', async () => {
+    const source = fresh();
+    const dir = open('land-nothing', { land: nothing });
+    await source.connect(dir);
+    expect(await source.land('land-nothing')).toEqual({ state: 'ended' });
+    expect(await upgradeOf(source, 'land-nothing')).toMatchObject({ state: 'done', upgrade: { outcome: 'nothing-to-do' } });
+  });
+
+  it('shows the item with the pull request it carries', async () => {
+    const source = fresh();
+    await source.connect(open('land-item'));
+    const shown = (await source.workspace()).find((p) => p.id === 'land-item');
+    expect(shown).toMatchObject({
+      state: 'ready',
+      attention: [
+        expect.objectContaining({
+          kind: 'upgrade-pull-request-waiting',
+          pullRequest: { branch: 'jig/upgrade-9.9.9', base: 'main', state: 'open', to: '9.9.9' },
+        }),
+      ],
+    });
+  });
+
+  it('keeps a pull request that is not merged yet as a refusal with its code', async () => {
+    const source = fresh();
+    const dir = open('land-open', { land: notMerged });
+    await source.connect(dir);
+    expect(await source.land('land-open')).toEqual({ state: 'ended' });
+    expect(await upgradeOf(source, 'land-open')).toEqual({
+      state: 'refused',
+      at: expect.any(String),
+      code: 'not-merged',
+      reasons: expect.any(Array),
+    });
+  });
+
+  it('keeps a refusal to start, and a failure that is no refusal', async () => {
+    const source = fresh();
+    const blocked = open('land-blocked', {
+      land: refusal('upgrade-blocked', 'upgrade --land: nothing was changed:\n  - the working tree has uncommitted changes; commit them'),
+    });
+    await source.connect(blocked);
+    expect(await source.land('land-blocked')).toEqual({ state: 'ended' });
+    expect(await upgradeOf(source, 'land-blocked')).toEqual({
+      state: 'refused',
+      at: expect.any(String),
+      code: 'upgrade-blocked',
+      reasons: ['the working tree has uncommitted changes; commit them'],
+    });
+    const broken = open('land-broken', { land: 'not json at all' });
+    await source.connect(broken);
+    expect(await source.land('land-broken')).toEqual({ state: 'ended' });
+    expect(await upgradeOf(source, 'land-broken')).toMatchObject({ state: 'refused', code: 'failed' });
+  });
+
+  it('offers the landing after an upgrade of this page ended in an open pull request', async () => {
+    const source = fresh();
+    const item = {
+      kind: 'upgrade-available',
+      subject: { type: 'project', id: null },
+      tasks: [],
+      title: 't',
+      detail: null,
+      todo: 'jig upgrade',
+      url: null,
+      versions: { from: '0.39.0', to: '0.40.0' },
+    };
+    const git = { level: 'pr', branch: 'jig/upgrade-0.40.0', commit: 'abc', pushed: true, pull_request: 'https://x/pull/3', merged: false };
+    const upgraded = {
+      mode: 'copy',
+      dry_run: false,
+      from: '0.39.0',
+      to: '0.40.0',
+      outcome: 'upgraded',
+      files: null,
+      git,
+      manual_steps: [],
+      would_stop: [],
+    };
+    const dir = project('land-after-upgrade', '0.39.0', {
+      status: { attention: [item], housekeeping: null },
+      upgrade: upgraded,
+      land: landed,
+    });
+    writeFileSync(join(dir, 'go'), '');
+    await source.connect(dir);
+    await source.upgrade('land-after-upgrade');
+    for (let i = 0; i < 160 && (await upgradeOf(source, 'land-after-upgrade'))?.state !== 'done'; i++) await delay(25);
+    expect(await source.land('land-after-upgrade')).toEqual({ state: 'ended' });
+    expect(log(dir, 'upgrade --land --json')).toBe(1);
+    expect(await upgradeOf(source, 'land-after-upgrade')).toMatchObject({ state: 'done', upgrade: { outcome: 'landed' } });
+  });
+
+  it('keeps the wait after Not merged yet, until a landing brings it here, and shows it on the workspace', async () => {
+    const source = fresh();
+    const item = {
+      kind: 'upgrade-available',
+      subject: { type: 'project', id: null },
+      tasks: [],
+      title: 't',
+      detail: null,
+      todo: 'jig upgrade',
+      url: null,
+      versions: { from: '0.39.0', to: '0.40.0' },
+    };
+    const git = { level: 'pr', branch: 'jig/upgrade-0.40.0', commit: 'abc', pushed: true, pull_request: 'https://x/pull/3', merged: false };
+    const upgraded = {
+      mode: 'copy',
+      dry_run: false,
+      from: '0.39.0',
+      to: '0.40.0',
+      outcome: 'upgraded',
+      files: null,
+      git,
+      manual_steps: [],
+      would_stop: [],
+    };
+    // Housekeeping has not heard of the pull request: Jig still says `upgrade-available`, and no item names it.
+    const dir = project('land-kept', '0.39.0', { status: { attention: [item], housekeeping: null }, upgrade: upgraded, land: notMerged });
+    writeFileSync(join(dir, 'go'), '');
+    await source.connect(dir);
+    const shown = async () => (await source.workspace()).find((p) => p.id === 'land-kept');
+    expect((await shown())?.mergeWait).toBeUndefined();
+    await source.upgrade('land-kept');
+    for (let i = 0; i < 160 && (await shown())?.upgrade?.state !== 'done'; i++) await delay(25);
+    expect((await shown())?.mergeWait).toEqual({ state: 'open', to: '0.40.0', url: 'https://x/pull/3' });
+
+    expect(await source.land('land-kept')).toEqual({ state: 'ended' });
+    expect((await shown())?.upgrade).toMatchObject({ state: 'refused', code: 'not-merged' });
+    // Still waiting, still offered: no Upgrade… to cut a second branch.
+    expect((await shown())?.mergeWait).toEqual({ state: 'open', to: '0.40.0', url: 'https://x/pull/3' });
+    expect(await source.land('land-kept')).toEqual({ state: 'ended' });
+    expect(log(dir, 'upgrade --land --json')).toBe(2);
+
+    writeFileSync(join(dir, 'land.json'), JSON.stringify({ schema: 1, revision: 8, generated_at: 'x', data: landed }));
+    expect(await source.land('land-kept')).toEqual({ state: 'ended' });
+    expect((await shown())?.mergeWait).toBeUndefined();
+  });
+
+  it("shows Jig's item as the wait, open or merged, and none for a Jig before 0.39.0", async () => {
+    const source = fresh();
+    await source.connect(open('wait-open'));
+    const mergedItem = {
+      ...waitingItem,
+      kind: 'upgrade-pull-request-merged',
+      url: null,
+      pull_request: { ...waitingItem.pull_request, state: 'merged' },
+    };
+    await source.connect(project('wait-merged', '0.39.0', { status: { attention: [mergedItem], housekeeping: null } }));
+    await source.connect(open('wait-old', {}, '0.38.1'));
+    const waits = Object.fromEntries((await source.workspace()).map((p) => [p.id, p.mergeWait]));
+    expect(waits).toEqual({
+      'wait-open': { state: 'open', to: '9.9.9', url: 'https://github.com/o/r/pull/12' },
+      'wait-merged': { state: 'merged', to: '9.9.9', url: null },
+      'wait-old': undefined,
+    });
+  });
+
+  it('refuses a merged run, one without a pull request, and one already merged', async () => {
+    const item = {
+      kind: 'upgrade-available',
+      subject: { type: 'project', id: null },
+      tasks: [],
+      title: 't',
+      detail: null,
+      todo: 'jig upgrade',
+      url: null,
+      versions: { from: '0.39.0', to: '0.40.0' },
+    };
+    const gitOf = (more: Record<string, unknown>) => ({
+      level: 'pr',
+      branch: 'b',
+      commit: 'abc',
+      pushed: true,
+      pull_request: 'https://x/pull/3',
+      merged: false,
+      ...more,
+    });
+    for (const [name, git] of [
+      ['merged', gitOf({ merged: true })],
+      ['no-pr', gitOf({ pull_request: null })],
+      ['no-git', null],
+    ] as const) {
+      const source = fresh();
+      const upgraded = {
+        mode: 'copy',
+        dry_run: false,
+        from: '0.39.0',
+        to: '0.40.0',
+        outcome: 'upgraded',
+        files: null,
+        git,
+        manual_steps: [],
+        would_stop: [],
+      };
+      const dir = project(`land-no-${name}`, '0.39.0', { status: { attention: [item], housekeeping: null }, upgrade: upgraded });
+      writeFileSync(join(dir, 'go'), '');
+      await source.connect(dir);
+      await source.upgrade(`land-no-${name}`);
+      for (let i = 0; i < 160 && (await upgradeOf(source, `land-no-${name}`))?.state !== 'done'; i++) await delay(25);
+      expect(await source.land(`land-no-${name}`)).toEqual({ state: 'refused', code: 'not-found' });
+      expect(log(dir, 'upgrade --land --json')).toBe(0);
+    }
+  });
+
+  it('refuses where there is nothing to check, a Jig before 0.39.0, an unknown id and a project it cannot read', async () => {
+    const source = fresh();
+    const plain = project('land-plain', '0.39.0');
+    const old = open('land-old', {}, '0.38.1');
+    const unreadable = project('land-unreadable', '0.39.0', { status: 'garbage' });
+    await source.connect(plain);
+    await source.connect(old);
+    await source.connect(unreadable);
+    expect(await source.land('land-plain')).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.land('land-old')).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.land('land-unreadable')).toMatchObject({ state: 'unreadable' });
+    expect(await source.land('nobody')).toBeUndefined();
+    for (const dir of [plain, old, unreadable]) expect(calls(dir)).not.toContain('upgrade --land --json');
+  });
+
+  it('shows the run while Jig lands, refuses other starts meanwhile, and tells a listener', async () => {
+    const source = fresh();
+    const dir = open('land-hold');
+    await source.connect(dir);
+    const changes: Change[] = [];
+    const unsubscribe = source.subscribe((c) => changes.push(c));
+    await settled(dir, 200);
+    writeFileSync(join(dir, 'hold-land'), '');
+    const landing = source.land('land-hold');
+    await until(() => log(dir, 'upgrade --land --json') > 0);
+    expect(await upgradeOf(source, 'land-hold')).toEqual({ state: 'running', since: expect.any(String), to: '9.9.9', landing: true });
+    expect(await source.land('land-hold')).toEqual({ state: 'refused', code: 'running' });
+    expect(await source.upgrade('land-hold')).toEqual({ state: 'refused', code: 'running' });
+    expect(await source.landAll()).toEqual({ state: 'refused', code: 'running' });
+    expect(await source.upgradeAll()).toEqual({ state: 'refused', code: 'running' });
+    expect(await source.selfUpdate()).toEqual({ state: 'refused', code: 'running' });
+    expect(changes.filter((c) => c.id === 'land-hold').length).toBeGreaterThan(0);
+    rmSync(join(dir, 'hold-land'));
+    expect(await landing).toEqual({ state: 'ended' });
+    expect(log(dir, 'upgrade --land --json')).toBe(1);
+    expect((await upgradeOf(source, 'land-hold'))?.state).toBe('done');
+    unsubscribe();
+  });
+
+  it('is refused while a self-update or Upgrade all runs', async () => {
+    const source = fresh();
+    const dir = open('land-vs-machine', { selfUpdate: {} });
+    await source.connect(dir);
+    writeFileSync(join(dir, 'hold-self'), '');
+    const updating = source.selfUpdate();
+    await until(() => calls(dir).includes('self-update'));
+    expect(await source.land('land-vs-machine')).toEqual({ state: 'refused', code: 'running' });
+    expect(await source.landAll()).toEqual({ state: 'refused', code: 'running' });
+    rmSync(join(dir, 'hold-self'));
+    await updating;
+    expect(log(dir, 'upgrade --land --json')).toBe(0);
+  });
+
+  describe('Check all merges', () => {
+    it('lands each project in turn and tells which landed, which wait and which stopped', async () => {
+      const source = fresh();
+      const dirs = [
+        open('la-landed'),
+        open('la-waiting', { land: notMerged }),
+        open('la-stopped', { land: refusal('upgrade-blocked', 'upgrade --land: nothing was changed:\n  - dirty') }),
+        open('la-failed', { land: 'garbage' }),
+        project('la-plain', '0.39.0'),
+        open('la-old', {}, '0.38.0'),
+        project('la-unreadable', '0.39.0', { status: 'garbage' }),
+      ];
+      for (const dir of dirs) await source.connect(dir);
+      expect(source.machine().landingAll).toBe(false);
+      expect(await source.landAll()).toEqual({
+        state: 'ended',
+        landed: { landed: ['la-landed'], waiting: ['la-waiting'], stopped: ['la-stopped', 'la-failed'] },
+      });
+      expect(source.machine().landingAll).toBe(false);
+      for (const dir of dirs.slice(4)) expect(calls(dir)).not.toContain('upgrade --land --json');
+      for (const dir of dirs.slice(0, 4)) expect(log(dir, 'upgrade --land --json')).toBe(1);
+    });
+
+    it('ends with nothing landed when no project has a pull request', async () => {
+      const source = fresh();
+      expect(await source.landAll()).toEqual({ state: 'ended', landed: { landed: [], waiting: [], stopped: [] } });
+      await source.connect(project('la-none', '0.39.0'));
+      expect(await source.landAll()).toEqual({ state: 'ended', landed: { landed: [], waiting: [], stopped: [] } });
+    });
+
+    it('is under way for the machine, holds every upgrade, and lets go afterwards', async () => {
+      const source = fresh();
+      const one = open('lb-one');
+      const two = open('lb-two');
+      const behindItem = {
+        kind: 'upgrade-available',
+        subject: { type: 'project', id: null },
+        tasks: [],
+        title: 't',
+        detail: null,
+        todo: 'jig upgrade',
+        url: null,
+        versions: { from: '0.34.0', to: '0.35.0' },
+      };
+      const behind = project('lb-behind', '0.39.0', {
+        status: { attention: [behindItem], housekeeping: null },
+        plan: { ...nothing, dry_run: true, from: '0.34.0', to: '0.35.0', outcome: 'planned' },
+      });
+      await source.connect(one);
+      await source.connect(two);
+      await source.connect(behind);
+      writeFileSync(join(one, 'hold-land'), '');
+      const all = source.landAll();
+      await until(() => log(one, 'upgrade --land --json') > 0);
+      expect(source.machine().landingAll).toBe(true);
+      expect(log(two, 'upgrade --land --json')).toBe(0);
+      expect(await source.landAll()).toEqual({ state: 'refused', code: 'running' });
+      expect(await source.land('lb-two')).toEqual({ state: 'refused', code: 'running' });
+      expect(await source.upgrade('lb-behind')).toEqual({ state: 'refused', code: 'running' });
+      expect(await source.planUpgrade('lb-behind')).toEqual({ state: 'refused', code: 'running' });
+      expect(await source.upgradeAll()).toEqual({ state: 'refused', code: 'running' });
+      expect(await source.selfUpdate()).toEqual({ state: 'refused', code: 'running' });
+      rmSync(join(one, 'hold-land'));
+      expect(await all).toMatchObject({ state: 'ended', landed: { landed: ['lb-one', 'lb-two'] } });
+      expect(source.machine().landingAll).toBe(false);
+      expect(await source.planUpgrade('lb-behind')).toMatchObject({ state: 'planned' });
+    });
+
+    it('tells a listener when it starts and when it ends', async () => {
+      const source = fresh();
+      const dir = open('lc-told');
+      await source.connect(dir);
+      const seen: boolean[] = [];
+      const unsubscribe = source.subscribe(() => seen.push(source.machine().landingAll));
+      await settled(dir, 200);
+      seen.length = 0;
+      await source.landAll();
+      expect(seen).toContain(true);
+      expect(seen.at(-1)).toBe(false);
       unsubscribe();
     });
   });

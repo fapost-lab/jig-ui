@@ -28,7 +28,11 @@
 
 <template>
   <section :aria-label="`Upgrade Jig in ${project}`" class="flex flex-col gap-2">
-    <p v-if="run?.state === 'running'" :class="toneRule.quiet">
+    <p v-if="run?.state === 'running' && run.landing" :class="toneRule.quiet">
+      Checking the merge… If it is merged, Jig checks the base branch out and brings it up to origin's.
+    </p>
+
+    <p v-else-if="run?.state === 'running'" :class="toneRule.quiet">
       Upgrading to {{ run.to }}… started {{ ago(run.since, minute.getTime()) }}. Where the project lets Jig merge, it waits for CI first.
     </p>
 

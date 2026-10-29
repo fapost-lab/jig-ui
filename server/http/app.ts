@@ -325,6 +325,23 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
         return upgradeRefused(c, started.code);
       })
 
+      // Answered once Jig has checked the pull request and, merged, brought the upgrade here: the card shows the outcome.
+      .post('/api/projects/:id/upgrade/land', async (c) => {
+        const landed = await source.land(c.req.param('id'));
+        if (landed === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        if (landed.state === 'ended') return c.json({ ended: true as const }, 200);
+        if (landed.state !== 'refused') return c.json({ project: landed }, 200);
+        if (landed.code === 'running') return refuse(c, 409, landed.code, 'An upgrade is under way; try again once it ends.');
+        return refuse(c, 404, landed.code, 'This project shows no upgrade pull request to check.');
+      })
+
+      // Every project's upgrade pull request in turn; each card shows its outcome.
+      .post('/api/upgrade/land-all', async (c) => {
+        const all = await source.landAll();
+        if (all.state === 'ended') return c.json({ landed: all.landed }, 200);
+        return refuse(c, 409, all.code, 'An upgrade is under way; try again once it ends.');
+      })
+
       .delete('/api/projects/:id/upgrade', async (c) => {
         if (!(await source.dismissUpgrade(c.req.param('id')))) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
         return c.body(null, 204);

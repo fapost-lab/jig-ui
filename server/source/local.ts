@@ -6,6 +6,8 @@ import {
   hasJig,
   JigRefusal,
   JigShapeError,
+  LAND_JIG_VERSION,
+  landUpgrade,
   jigVersion,
   MIN_JIG_VERSION,
   moveInQueue,
@@ -34,6 +36,8 @@ import type {
   Attention,
   Change,
   FinishedTask,
+  LandedAll,
+  MergeWait,
   Machine,
   ProjectSource,
   ProjectSpecs,
@@ -293,6 +297,14 @@ interface Entry {
   upgrade?: UpgradeRun;
   /** The writes under way: an upgrade starts once they have ended. */
   writes: Set<Promise<void>>;
+  /**
+   * The pull request the page's last upgrade left open, kept until a landing brings it here: before housekeeping hears
+   * of it, it is all that says the project waits — a `not-merged` Check merge must not forget it.
+   */
+  openPullRequest?: {
+    to: string | null;
+    url: string;
+  };
 }
 
 export interface LocalOptions {
@@ -317,7 +329,9 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     return done;
   }
   /** The runs that change this machine's Jig or every project, kept until dismissed or the next one starts. */
-  const machine: Omit<Machine, 'release'> = { selfUpdate: null, upgradeAll: null };
+  const machine: Omit<Machine, 'release' | 'landingAll'> = { selfUpdate: null, upgradeAll: null };
+  /** Check all merges is under way. */
+  let landingAll = false;
 
   /** The newest release any connected project's last read names. */
   function newestRelease(): string | null {
@@ -403,6 +417,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
 
   /** A self-update, an Upgrade all or a project's upgrade is under way: the next one waits for it to end. */
   const anyRunning = (): boolean =>
+    landingAll ||
     machine.selfUpdate?.state === 'running' ||
     machine.upgradeAll?.state === 'running' ||
     [...entries.values()].some((e) => e.upgrade?.state === 'running');
@@ -512,11 +527,97 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     if (read.view.state !== 'ready') return read.view;
     const entry = entryOf(project);
     // One upgrade at a time on this machine: a self-update or an Upgrade all under way holds every project's.
-    if (entry.upgrade?.state === 'running' || machine.selfUpdate?.state === 'running' || machine.upgradeAll?.state === 'running') {
+    if (
+      entry.upgrade?.state === 'running' ||
+      machine.selfUpdate?.state === 'running' ||
+      machine.upgradeAll?.state === 'running' ||
+      landingAll
+    ) {
       return { state: 'refused', code: 'running' };
     }
     const to = upgradeTo(read);
     return to === undefined ? { state: 'refused', code: 'not-found' } : { entry, to };
+  }
+
+  /**
+   * The project's upgrade that waits for its pull request: Jig's item for it (the project's own Jig, 0.39.0), or the pull
+   * request the page's last upgrade left open — before housekeeping hears of it. None when the project's Jig cannot land.
+   */
+  function mergeWaitOf(read: Read, entry: Entry): MergeWait | undefined {
+    if (read.view.state !== 'ready' || !supports(read.view.jigVersion, LAND_JIG_VERSION)) return undefined;
+    const item = read.view.attention.find((a) => a.kind === 'upgrade-pull-request-waiting' || a.kind === 'upgrade-pull-request-merged');
+    if (item?.pullRequest)
+      return { state: item.kind === 'upgrade-pull-request-merged' ? 'merged' : 'open', to: item.pullRequest.to, url: item.url };
+    return entry.openPullRequest && { state: 'open', ...entry.openPullRequest };
+  }
+
+  /** The project when its upgrade pull request may be checked now, marked running before the first await by the caller. */
+  async function landable(
+    id: string,
+    checkAll: boolean,
+  ): Promise<
+    | {
+        entry: Entry;
+        to: string;
+      }
+    | {
+        state: 'refused';
+        code: string;
+      }
+    | NotReady
+    | undefined
+  > {
+    const project = (await readProjects(configDir)).find((p) => p.id === id);
+    if (!project) return undefined;
+    const read = await shown(project);
+    if (read.view.state !== 'ready') return read.view;
+    const entry = entryOf(project);
+    const busy = entry.upgrade?.state === 'running' || machine.selfUpdate?.state === 'running' || machine.upgradeAll?.state === 'running';
+    if (busy || (!checkAll && landingAll)) return { state: 'refused', code: 'running' };
+    const wait = mergeWaitOf(read, entry);
+    return wait === undefined ? { state: 'refused', code: 'not-found' } : { entry, to: wait.to ?? '' };
+  }
+
+  /** Lands the upgrade, then keeps what it came to — refused `not-merged` included — and reads the project again. */
+  async function landing(entry: Entry): Promise<Exclude<UpgradeRun, { state: 'running' }>> {
+    await Promise.allSettled([entry.reading, ...entry.writes]);
+    let run: Exclude<UpgradeRun, { state: 'running' }>;
+    try {
+      run = { state: 'done', at: '', upgrade: await landUpgrade(entry.project.path) };
+    } catch (error) {
+      run =
+        error instanceof JigRefusal
+          ? { state: 'refused', at: '', code: error.code, reasons: error.reasons }
+          : { state: 'refused', at: '', code: 'failed', reasons: [] };
+    }
+    run = { ...run, at: new Date().toISOString() };
+    entry.upgrade = run;
+    // Brought here, or nothing left to bring: the pull request no longer waits. A refusal leaves it waiting.
+    if (run.state === 'done') entry.openPullRequest = undefined;
+    await refresh(entry);
+    signalUpgrade(entry);
+    return run;
+  }
+
+  /** Marks the project landing and starts it; one at a time with upgrade starts and disconnects. */
+  function startLanding(id: string, checkAll = false) {
+    return oneAtATime(
+      async (): Promise<
+        | { run: ReturnType<typeof landing> }
+        | {
+            state: 'refused';
+            code: string;
+          }
+        | NotReady
+        | undefined
+      > => {
+        const found = await landable(id, checkAll);
+        if (!found || !('entry' in found)) return found;
+        found.entry.upgrade = { state: 'running', since: new Date().toISOString(), to: found.to, landing: true };
+        signalUpgrade(found.entry);
+        return { run: landing(found.entry) };
+      },
+    );
   }
 
   /** Runs the upgrade to its end, then keeps what it came to and reads the project again. */
@@ -533,6 +634,8 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
           : { state: 'refused', at: '', code: 'failed', reasons: [] };
     }
     entry.upgrade = { ...run, at: new Date().toISOString() };
+    const git = run.state === 'done' ? run.upgrade.git : null;
+    if (run.state === 'done' && git?.pullRequest && !git.merged) entry.openPullRequest = { to: run.upgrade.to, url: git.pullRequest };
     await refresh(entry);
     signalUpgrade(entry);
   }
@@ -641,10 +744,12 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
   }
 
   /** A project as the workspace shows it: what its read says, and the upgrade started from the page. */
-  const listed = async (project: Project): Promise<WorkspaceProject> => ({
-    ...(await shown(project)).view,
-    upgrade: entryOf(project).upgrade ?? null,
-  });
+  const listed = async (project: Project): Promise<WorkspaceProject> => {
+    const read = await shown(project);
+    const entry = entryOf(project);
+    const wait = mergeWaitOf(read, entry);
+    return { ...read.view, upgrade: entry.upgrade ?? null, ...(wait ? { mergeWait: wait } : {}) };
+  };
 
   return {
     async workspace() {
@@ -747,6 +852,36 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
         return { state: 'started' } as const;
       });
     },
+    async land(id) {
+      const started = await startLanding(id);
+      if (!started || !('run' in started)) return started;
+      await started.run;
+      return { state: 'ended' } as const;
+    },
+    async landAll() {
+      // Marked in turn with the other runs' starts: a self-update between its check and its mark cannot slip past.
+      const started = await oneAtATime(async () => {
+        if (anyRunning()) return false;
+        landingAll = true;
+        return true;
+      });
+      if (!started) return { state: 'refused', code: 'running' } as const;
+      signalMachine();
+      const landed: LandedAll = { landed: [], waiting: [], stopped: [] };
+      try {
+        for (const project of await readProjects(configDir).catch(() => [])) {
+          const started = await startLanding(project.id, true);
+          if (!started || !('run' in started)) continue; // nothing to check there, or it cannot be read
+          const run = await started.run;
+          if (run.state === 'done') landed.landed.push(project.id);
+          else (run.code === 'not-merged' ? landed.waiting : landed.stopped).push(project.id);
+        }
+      } finally {
+        landingAll = false;
+        signalMachine();
+      }
+      return { state: 'ended', landed } as const;
+    },
     async dismissUpgrade(id) {
       const project = (await readProjects(configDir)).find((p) => p.id === id);
       if (!project) return false;
@@ -758,7 +893,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       return true;
     },
     machine() {
-      return { ...machine, release: newestRelease() };
+      return { ...machine, release: newestRelease(), landingAll };
     },
     async selfUpdate() {
       // Started in turn with upgrade starts and disconnects, and awaited after it: a call meanwhile is refused, not queued.

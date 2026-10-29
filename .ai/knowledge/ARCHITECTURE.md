@@ -7,7 +7,8 @@ does not belong here.
 
 Jig UI is an optional local control center for Jig projects: one page in the browser shows every
 task and epic of every connected project, and later lets a person order, prioritise and file
-them. It is for developers with a terminal and Node.js. Jig works exactly as before without it
+them. It is for people with a terminal: a developer starts it with their own Node.js, anyone else with
+one line that brings its own (the install flow). Jig works exactly as before without it
 (adr-20261014-jig-ui-is-an-optional-layer-over-jig).
 
 ## Built
@@ -106,9 +107,16 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   (adr-20261027-upgrading-a-project-runs-in-the-background). Upgrade all runs those upgrades one at
   a time, after `jig self-update` when a release is out; a self-update only after the person confirms
   it (adr-20261029-upgrade-all-and-self-update-from-the-page).
+- **Install flow.** `install.sh`, fetched by one line from the latest GitHub Release, uses a
+  Node.js 24 or later already on PATH; otherwise it puts the official Node.js 24 from nodejs.org,
+  its SHA-256 sum checked and the binary run once, in Jig UI's own data folder. Then it writes a
+  `jig-ui` command that runs `npx @fapost/jig-ui` with that Node.js, so the package updates as it
+  does for npx and running the line again updates Node.js. It runs from a terminal, Git Bash on
+  Windows; what it may write is a rule in `RULES.md`.
 - **Release flow.** A merge to `main` runs the CI matrix, builds `dist/` in a job without
   credentials, and publishes `<version>-next.<run>` under npm's `next` tag; a `v*` tag on a
-  commit of `main` publishes `latest`. Details in `RELEASING.md`.
+  commit of `main` publishes `latest`, runs `install.sh` on each OS against it, and then creates
+  the GitHub Release that carries `install.sh`. Details in `RELEASING.md`.
 
 ## Intended — not built yet
 

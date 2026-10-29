@@ -13,7 +13,8 @@ export const MIN_JIG_VERSION = '0.31.0';
 export const RESUME_JIG_VERSION = '0.35.0';
 
 const SCRIPT = '.ai/scripts/jig';
-const TIMEOUT_MS = 10_000;
+/** A read's limit: 10 s ran out with several projects read at once, each four Jig runs (task `read-timeout`). */
+const TIMEOUT_MS = 30_000;
 /** A dry run compares every framework file; a real upgrade at `agent.git: merge` also waits for CI. */
 const PLAN_TIMEOUT_MS = 60_000;
 const UPGRADE_TIMEOUT_MS = 30 * 60_000;
@@ -78,16 +79,30 @@ export const hasJig = (root: string): boolean => existsSync(join(root, SCRIPT));
  * The project's Jig version, `undefined` when the checkout has no Jig. Throws when Jig is there but
  * does not answer with a version.
  */
-export async function jigVersion(root: string, platform: NodeJS.Platform = process.platform): Promise<string | undefined> {
+export async function jigVersion(
+  root: string,
+  platform: NodeJS.Platform = process.platform,
+  timeout = TIMEOUT_MS,
+): Promise<string | undefined> {
   if (!existsSync(join(root, SCRIPT))) return undefined;
-  const match = /^jig (\d+\.\d+\.\d+)\b/.exec((await jig(root, ['--version'], platform)).trim());
+  let out: string;
+  try {
+    out = await jig(root, ['--version'], platform, timeout);
+  } catch (error) {
+    if (timedOut(error)) throw new JigRefusal('timeout');
+    throw error;
+  }
+  const match = /^jig (\d+\.\d+\.\d+)\b/.exec(out.trim());
   if (!match?.[1]) throw new Error('jig --version did not print a version');
   return match[1];
 }
 
+/** Node stopped the run at its limit: Jig did not answer in time. */
+const timedOut = (error: unknown): boolean => (error as { killed?: boolean }).killed === true;
+
 /**
  * Why a JSON read was refused: Jig's failure code (`failed` for one this Jig UI does not know, or a shape it cannot
- * read), and for `upgrade-blocked` every reason Jig gave, without a path.
+ * read; `timeout` when Jig did not answer within the limit), and for `upgrade-blocked` every reason Jig gave, without a path.
  */
 export class JigRefusal extends Error {
   constructor(
@@ -146,6 +161,7 @@ async function readJson(
   try {
     stdout = await jig(root, [...args, '--json'], platform, timeout);
   } catch (error) {
+    if (timedOut(error)) throw new JigRefusal('timeout');
     // A refusal is an envelope too, printed before the non-zero exit.
     stdout = (error as { stdout?: string }).stdout ?? '';
   }
@@ -222,12 +238,13 @@ const Status = z.object({
 export async function readStatus(
   root: string,
   platform: NodeJS.Platform = process.platform,
+  timeout = TIMEOUT_MS,
 ): Promise<{
   revision: number;
   attention: Attention[];
   housekeepingStale: boolean;
 }> {
-  const { revision, data } = await readJson(root, ['status'], platform);
+  const { revision, data } = await readJson(root, ['status'], platform, timeout);
   const { attention, housekeeping } = parsed(Status, data);
   return { revision, attention, housekeepingStale: housekeeping?.stale === true };
 }

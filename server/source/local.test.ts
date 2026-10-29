@@ -818,6 +818,22 @@ describe('localSource, following changes', () => {
     await until(() => changes.length > 1);
   });
 
+  it('reads a project again when asked, with no change under .ai/ to set it off', async () => {
+    await settled(live.dir);
+    changes.length = 0;
+    live.answer(4, [task('a', 'ready')], true);
+    touch(live.dir);
+    await settled(live.dir);
+    touch(live.dir);
+    await until(() => changes.length > 0);
+    live.answer(4, [task('a', 'ready')]);
+    await settled(live.dir);
+    expect((await source.workspace())[0]).toMatchObject({ id: 'live', state: 'unreadable' });
+    expect(await source.readAgain('live')).toMatchObject({ id: 'live', state: 'ready' });
+    expect((await source.workspace())[0]).toMatchObject({ id: 'live', state: 'ready' });
+    expect(await source.readAgain('nobody')).toBeUndefined();
+  });
+
   it('signals a project connected and one disconnected', async () => {
     const other = liveProject('other');
     changes.length = 0;

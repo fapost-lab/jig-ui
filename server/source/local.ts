@@ -51,10 +51,12 @@ import type {
 } from './project-source.js';
 
 /** Jig's version in the checkout: `null` when Jig is there but names no version Jig UI can read. */
+/** The project's Jig version; `null` when Jig names none. A Jig too slow to answer throws its JigRefusal. */
 async function version(root: string): Promise<string | null | undefined> {
   try {
     return await jigVersion(root);
-  } catch {
+  } catch (error) {
+    if (error instanceof JigRefusal) throw error;
     return null;
   }
 }
@@ -68,7 +70,7 @@ async function connectable(path: string): Promise<{ root: string } | Refusal> {
   if (checkout.kind === 'worktree') {
     return { code: 'worktree', message: "This is a worktree. Connect its clone's main checkout instead." };
   }
-  if ((await version(checkout.root)) === undefined) {
+  if (!hasJig(checkout.root)) {
     return { code: 'no-jig', message: 'There is no Jig in this repository. Run jig init in it first.' };
   }
   return { root: checkout.root };
@@ -198,7 +200,12 @@ const details = (t: Live, q: QueueItem | undefined, queue: ShownQueue, attention
  */
 async function reading<T>({ id, path }: Project, read: (root: string, jigVersion: string) => Promise<T>): Promise<T | NotReady> {
   if (!existsSync(path)) return { id, state: 'unavailable', reason: 'missing' };
-  const v = await version(path);
+  let v: string | null | undefined;
+  try {
+    v = await version(path);
+  } catch (error) {
+    return { id, state: 'unreadable', code: (error as JigRefusal).code };
+  }
   if (v === undefined) return { id, state: 'unavailable', reason: 'no-jig' };
   if (v === null || !supports(v)) return { id, state: 'unsupported', jigVersion: v, minimum: MIN_JIG_VERSION };
   try {
@@ -665,6 +672,13 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     async specs(id) {
       const project = (await readProjects(configDir)).find((p) => p.id === id);
       return project && (await shown(project)).specs;
+    },
+    async readAgain(id) {
+      const project = (await readProjects(configDir)).find((p) => p.id === id);
+      if (!project) return undefined;
+      const entry = entryOf(project);
+      await refresh(entry);
+      return (entry.shown as Read).view;
     },
     move(id, taskId, place, revision) {
       const named = typeof place === 'object' ? [taskId, 'after' in place ? place.after : place.before] : [taskId];

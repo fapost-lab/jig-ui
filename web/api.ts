@@ -76,8 +76,13 @@ export async function readTask(project: string, task: string): Promise<TaskDetai
   return (await res.json()).error.code === 'not-found' ? 'not-found' : 'not-connected';
 }
 
+/** Reads a project through Jig now (Read again); `false` when the request did not get through. */
+export async function readAgain(project: string): Promise<boolean> {
+  return (await call(() => client.api.projects[':id'].read.$post({ param: { id: encodeURIComponent(project) } }))) !== undefined;
+}
+
 /** A project's state as every read of it reports it, without the upgrade the workspace adds. */
-type ProjectState<P = Project> = P extends unknown ? Omit<P, 'upgrade'> : never;
+export type ProjectState<P = Project> = P extends unknown ? Omit<P, 'upgrade'> : never;
 
 /** What a project's state means, for a person. */
 export function describe(project: ProjectState): string {
@@ -89,7 +94,10 @@ export function describe(project: ProjectState): string {
   if (project.state === 'incompatible') {
     return `Jig ${project.jigVersion} answers in a form this Jig UI does not read. Update Jig UI: npx @fapost/jig-ui@latest, or jig-ui if it was installed without Node.js.`;
   }
-  if (project.state === 'unreadable') return `Jig could not be read (${project.code}). It is tried again on the next change.`;
+  if (project.state === 'unreadable') {
+    const why = project.code === 'timeout' ? 'Jig did not answer within 30 s' : `Jig could not be read (${project.code})`;
+    return `${why}. It is read again on the next change, every minute, or with Read again.`;
+  }
   return project.reason === 'missing' ? 'The project directory is not there any more.' : 'There is no Jig in the project any more.';
 }
 

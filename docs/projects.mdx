@@ -73,7 +73,8 @@ project whose state is not readable shows why:
 | --- | --- |
 | `Jig 0.31.0` | The project is connected and readable. |
 | Answers in a form this Jig UI does not read | The project's Jig is newer than this Jig UI understands. Update Jig UI: `npx @fapost/jig-ui@latest`, or `jig-ui` if you [installed it without Node.js](/installation#without-nodejs). |
-| Jig could not be read | Jig refused the read — for example while an agent is writing to the project. The code in brackets is Jig's; the next change in the project tries again. |
+| Jig did not answer within 30 s | Each Jig run of a read has 30 seconds; a busy machine reading several projects at once can run past that. **Read again** reads it now; the next change in the project, or the read every minute, does too. |
+| Jig could not be read | Jig refused the read — for example while an agent is writing to the project. The code in brackets is Jig's. **Read again** reads it now; the next change in the project, or the read every minute, does too. |
 | Jig UI needs 0.31.0 or later | The project's Jig is older than Jig UI reads. Run `jig upgrade` in the project; it is shown as readable once the upgrade lands, without connecting it again. |
 | The project directory is not there any more | The folder was moved or deleted. Disconnect it, then connect its new path. |
 | There is no Jig in the project any more | Jig was removed from the project. |

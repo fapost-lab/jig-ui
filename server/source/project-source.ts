@@ -316,6 +316,8 @@ export interface ProjectSource {
   task(id: string, taskId: string): Promise<ProjectTask | undefined>;
   /** A connected project's specs with their roadmaps; `undefined` when no project has that id. */
   specs(id: string): Promise<ProjectSpecs | undefined>;
+  /** Reads a connected project through Jig now, as a person's Read again asks; `undefined` when no project has that id. */
+  readAgain(id: string): Promise<ProjectView | undefined>;
   /**
    * Moves a live task in its project's queue, against the revision of the read it was based on; `place.after`
    * names another live task. `undefined` when no project has that id.

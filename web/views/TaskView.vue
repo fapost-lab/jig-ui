@@ -1,10 +1,11 @@
 <script setup lang="ts">
   import { ArrowLeft } from '@lucide/vue';
   import { computed, onUnmounted, ref } from 'vue';
-  import { describe, onChange, readTask, type TaskDetails } from '@/api';
+  import { onChange, readAgain, readTask, type TaskDetails } from '@/api';
   import ActionList from '@/components/ActionList.vue';
   import AttentionItem from '@/components/AttentionItem.vue';
   import CopyButton from '@/components/CopyButton.vue';
+  import StateLine from '@/components/StateLine.vue';
   import TaskFacts from '@/components/TaskFacts.vue';
   import { Badge } from '@/components/ui/badge';
   import { lastWins } from '@/lib/last-wins';
@@ -22,6 +23,16 @@
     () => readTask(props.project, props.task),
     (read) => (details.value = read),
   );
+
+  /** Read again is under way. */
+  const reading = ref(false);
+
+  async function reread(): Promise<void> {
+    reading.value = true;
+    const read = await readAgain(props.project);
+    reading.value = false;
+    if (read) await load();
+  }
 
   const note = computed(() => (typeof details.value === 'object' && details.value.state === 'ready' ? waits(details.value) : undefined));
 
@@ -46,7 +57,7 @@
     <p v-else-if="details === 'not-found'" role="alert" class="text-destructive">
       {{ project }} has no live task called {{ task }}. A finished task is not shown.
     </p>
-    <p v-else-if="details.state !== 'ready'">{{ describe(details) }}</p>
+    <p v-else-if="details.state !== 'ready'"><StateLine :project="details" :reading="reading" @read-again="reread" /></p>
     <template v-else>
       <p v-if="details.goal">{{ details.goal }}</p>
       <p v-if="note" :class="toneRule[note.tone]">{{ note.text }}</p>

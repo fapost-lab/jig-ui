@@ -675,6 +675,13 @@ describe('a refused read', () => {
     await expect(readTasks(answering(`case-${cases++}`, out, status))).rejects.toEqual(refusal('failed'));
   });
 
+  it('is timeout when Jig does not answer within the limit, its version read too', async () => {
+    const slow = checkout('slow', 'jig 0.38.1');
+    writeFileSync(join(slow, '.ai', 'scripts', 'jig'), '#!/usr/bin/env bash\nsleep 5\n');
+    await expect(readStatus(slow, process.platform, 200)).rejects.toEqual(refusal('timeout'));
+    await expect(jigVersion(slow, process.platform, 200)).rejects.toEqual(refusal('timeout'));
+  });
+
   it('is a shape error for another schema', async () => {
     const out = '{"schema":2,"revision":1,"generated_at":"x","data":{"tasks":[]}}';
     await expect(readTasks(answering(`case-${cases++}`, out))).rejects.toBeInstanceOf(JigShapeError);

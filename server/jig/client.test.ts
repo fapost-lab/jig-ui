@@ -352,11 +352,17 @@ describe('readQueue', () => {
     expect(await readQueue(answering('queue', 'queue-list.json'))).toEqual({
       revision: 1792656228,
       items: [
-        { id: 'beta', level: null, position: 100, priority: null },
-        { id: 'alpha', level: null, position: 200, priority: 1 },
-        { id: 'booking-form', level: 'epic:booking', position: 100, priority: null },
+        { id: 'beta', level: null, position: 100, priority: null, dependsOn: [] },
+        { id: 'alpha', level: null, position: 200, priority: 1, dependsOn: [] },
+        {
+          id: 'booking-form',
+          level: 'epic:booking',
+          position: 100,
+          priority: null,
+          dependsOn: [{ on: 'task:beta', reason: 'Quotes the form' }],
+        },
       ],
-      epics: [{ id: 'booking', level: null, position: 300, priority: 0 }],
+      epics: [{ id: 'booking', level: null, position: 300, priority: 0, dependsOn: [] }],
     });
   });
 
@@ -364,6 +370,7 @@ describe('readQueue', () => {
     ['a priority above 5', (d: Record<string, any>) => (d.items[1].priority = 6)],
     ['a position that is no integer', (d: Record<string, any>) => (d.items[0].position = '100')],
     ['an item without its level, which may only be null', (d: Record<string, any>) => delete d.items[0].level],
+    ['a dependency without its reason', (d: Record<string, any>) => delete d.items[3].depends_on[0].reason],
   ])('refuses %s', async (_, change) => {
     await expect(readQueue(answering(`case-${cases++}`, changed('queue-list.json', change)))).rejects.toBeInstanceOf(JigShapeError);
   });

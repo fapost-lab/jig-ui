@@ -179,13 +179,22 @@ const base = {
   run: null,
   housekeepingFlags: [],
   attention: [],
+  place: null,
+  dependsOn: [],
 };
 
-/** Details with everything a task can carry, and with as little as a task not started. */
+/** Details with everything a task can carry, one queued at the top, and one with as little as a task not started. */
 export const details: ReadyDetails[] = [
   {
     ...base,
     ...tasks[2]!,
+    priority: 1,
+    queue: { level: 'epic:booking', position: 200 },
+    place: { rank: 2, of: 3 },
+    dependsOn: [
+      { on: 'task:design-system', reason: 'Its card takes the new tokens', through: null },
+      { on: 'epic:refunds', reason: 'A refund pauses the booking', through: 'epic:booking' },
+    ],
     gate: 'approved',
     gateBy: 'human',
     branch: 'task/pause-request',
@@ -203,6 +212,14 @@ export const details: ReadyDetails[] = [
     housekeepingFlags: ['needs-consolidation'],
     attention: [attention[0]!],
     actions,
+    column: { id: 'needs-you', title: 'Needs you' },
+  },
+  {
+    ...base,
+    ...tasks[1]!,
+    place: { rank: 2, of: 4 },
+    branch: 'task/registry-schema',
+    actions: [{ id: 'pause', command: 'jig task pause registry-schema' }],
     column: { id: 'needs-you', title: 'Needs you' },
   },
   {

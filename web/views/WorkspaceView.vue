@@ -1,14 +1,21 @@
 <script setup lang="ts">
   import { computed, onUnmounted, ref, watch } from 'vue';
+  import { useRoute, useRouter } from 'vue-router';
   import { call, client, type Machine, onChange, type Project } from '@/api';
   import ConnectForm from '@/components/ConnectForm.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
+  import ProjectList from '@/components/ProjectList.vue';
   import { Button } from '@/components/ui/button';
   import { lastWins } from '@/lib/last-wins';
+  import { chosen } from '@/lib/projects';
   import { toneRule, toneText } from '@/lib/tones';
   import { machineBusy, machineLine, type PlanState, releaseOf, upgradeAllPlan, upgradeLine, upgradeOf } from '@/lib/upgrade';
 
+  const route = useRoute();
+  const router = useRouter();
   const projects = ref<Project[]>();
+  /** The project whose card is shown beside the list: `?project=` in the address, else the one `chosen` picks. */
+  const shown = computed(() => chosen(projects.value ?? [], typeof route.query.project === 'string' ? route.query.project : undefined));
   const machine = ref<Machine>();
   const path = ref('');
   const refusal = ref<string>();
@@ -55,6 +62,8 @@
       return;
     }
     path.value = '';
+    // The project just connected is the one shown, wherever it falls in the list.
+    await router.replace({ query: { project: (await res.json()).project.id } });
     await load();
   }
 
@@ -139,7 +148,7 @@
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-4xl flex-col gap-4 p-4">
+  <div class="mx-auto flex max-w-6xl flex-col gap-4 p-4">
     <div class="flex items-center gap-3">
       <h1 class="font-semibold tracking-wider uppercase">Projects</h1>
       <Button v-if="offerAll && !confirmingAll" variant="outline" size="xs" class="ml-auto" @click="confirmingAll = true">
@@ -178,20 +187,23 @@
     <p v-else-if="projects.length === 0" class="text-muted-foreground">
       No projects yet. Paste the path of a project's main checkout above.
     </p>
-    <ProjectCard
-      v-for="project in projects"
-      v-else
-      :key="project.id"
-      :project="project"
-      :plan="plans[project.id]"
-      :held="held"
-      :release="release"
-      @disconnect="disconnect(project.id)"
-      @start="start(project)"
-      @self-update="selfUpdate(project.id)"
-      @upgrade="upgrade(project.id)"
-      @close="delete plans[project.id]"
-      @dismiss="dismiss(project.id)"
-    />
+    <!-- One column on a narrow screen: the list above the card. -->
+    <div v-else-if="shown" class="flex flex-col gap-4 md:flex-row md:items-start">
+      <ProjectList :projects="projects" :chosen="shown.id" class="md:w-64 md:shrink-0" />
+      <ProjectCard
+        :key="shown.id"
+        :project="shown"
+        :plan="plans[shown.id]"
+        :held="held"
+        :release="release"
+        class="min-w-0 flex-1"
+        @disconnect="disconnect(shown.id)"
+        @start="start(shown)"
+        @self-update="selfUpdate(shown.id)"
+        @upgrade="upgrade(shown.id)"
+        @close="delete plans[shown.id]"
+        @dismiss="dismiss(shown.id)"
+      />
+    </div>
   </div>
 </template>

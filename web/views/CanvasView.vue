@@ -10,10 +10,13 @@
   import ConnectForm from '@/components/ConnectForm.vue';
   import FinishedList from '@/components/FinishedList.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
+  import CopyButton from '@/components/CopyButton.vue';
   import CopyCommand from '@/components/CopyCommand.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProgressBar from '@/components/ProgressBar.vue';
-  import ProjectTabs from '@/components/ProjectTabs.vue';
+  import ProjectList from '@/components/ProjectList.vue';
+  import ProjectMark from '@/components/ProjectMark.vue';
+  import ProjectSwitcher from '@/components/ProjectSwitcher.vue';
   import EpicMenu from '@/components/EpicMenu.vue';
   import QueueMenu from '@/components/QueueMenu.vue';
   import SpecCard from '@/components/SpecCard.vue';
@@ -144,10 +147,28 @@
 
     <h2 class="border-b px-4 py-2 font-bold tracking-widest uppercase">components</h2>
 
-    <CanvasSection title="ProjectTabs" note="on the workspace; on a project; empty">
-      <ProjectTabs :projects="projects" version="0.1.0"><ThemeToggle /></ProjectTabs>
-      <ProjectTabs :projects="projects" current="jig-ui" version="0.1.0" />
-      <ProjectTabs :projects="[]" />
+    <CanvasSection title="ProjectSwitcher" note="on the workspace; on a project (open it to search); no projects">
+      <ProjectSwitcher :projects="projects" version="0.1.0"><ThemeToggle /></ProjectSwitcher>
+      <ProjectSwitcher :projects="projects" current="jig-ui" version="0.1.0" />
+      <ProjectSwitcher :projects="[]" />
+    </CanvasSection>
+
+    <CanvasSection title="ProjectList" note="one chosen, a project in each state; type to search">
+      <ProjectList :projects="projects" chosen="jig-ui" class="w-64" />
+    </CanvasSection>
+
+    <CanvasSection title="ProjectMark" note="things that need you; not readable; nothing">
+      <div class="flex gap-4">
+        <ProjectMark
+          v-for="p in [
+            projects[0]!,
+            projects.find((q) => q.state !== 'ready')!,
+            projects.find((q) => q.state === 'ready' && q.attention.length === 0)!,
+          ]"
+          :key="p.id"
+          :project="p"
+        />
+      </div>
     </CanvasSection>
 
     <CanvasSection title="ThemeToggle" note="switches the whole page; the icon is the theme it switches to">
@@ -289,17 +310,27 @@
       <FinishedList :tasks="finished" class="border" />
     </CanvasSection>
 
-    <CanvasSection title="TaskFacts" note="everything a task can carry; a task not started">
+    <CanvasSection
+      title="TaskFacts"
+      note="everything a task can carry, in an epic and waiting for two; queued at the top; a task not started"
+    >
       <TaskFacts v-for="d in details" :key="d.id" :details="d" class="border-b pb-3" />
     </CanvasSection>
 
-    <CanvasSection title="TaskBrief" note="facts, actions and the link to the full page">
+    <CanvasSection title="TaskBrief" note="the facts, the link to the full page and the id to copy; no actions">
       <TaskBrief project="jig-ui" :task="details[1]!.id" :details="details[1]" />
     </CanvasSection>
 
     <CanvasSection title="ActionList" note="Jig's offers, one unknown id; none">
       <ActionList :actions="actions" />
       <ActionList :actions="[]" />
+    </CanvasSection>
+
+    <CanvasSection title="CopyButton" note="copy; copy id">
+      <div class="flex gap-2">
+        <CopyButton text="jig task pause design-system" />
+        <CopyButton text="design-system" label="copy id" />
+      </div>
     </CanvasSection>
 
     <CanvasSection title="CopyCommand" note="short; long enough to be cut">

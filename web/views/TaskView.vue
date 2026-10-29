@@ -4,6 +4,7 @@
   import { describe, onChange, readTask, type TaskDetails } from '@/api';
   import ActionList from '@/components/ActionList.vue';
   import AttentionItem from '@/components/AttentionItem.vue';
+  import CopyButton from '@/components/CopyButton.vue';
   import TaskFacts from '@/components/TaskFacts.vue';
   import { Badge } from '@/components/ui/badge';
   import { lastWins } from '@/lib/last-wins';
@@ -37,6 +38,7 @@
     </RouterLink>
     <div class="flex items-center gap-3">
       <h1 class="text-sm font-bold break-all">{{ task }}</h1>
+      <CopyButton :text="task" label="copy id" />
       <Badge v-if="typeof details === 'object' && details.state === 'ready' && details.class" variant="outline">{{ details.class }}</Badge>
     </div>
     <p v-if="details === undefined" class="text-muted-foreground">Reading the task…</p>

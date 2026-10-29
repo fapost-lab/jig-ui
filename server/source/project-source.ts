@@ -203,6 +203,17 @@ export interface TaskDetails extends Task {
   }[];
   /** What needs the person about this task, from Jig's attention items. */
   attention: Attention[];
+  /** Its place among the items of its level in the queue, tasks and epics alike, 1 the first; `null` when not queued. */
+  place: {
+    rank: number;
+    of: number;
+  } | null;
+  /** What it waits for in Jig's queue: another item (`task:<id>`, `epic:<spec>`) and the reason given, listed as declared, met or not. `through` names the epic whose dependency it inherits, `null` for its own. */
+  dependsOn: {
+    on: string;
+    reason: string;
+    through: string | null;
+  }[];
 }
 
 /** A task that is closed or abandoned, as long as Jig keeps its workspace: housekeeping moves a closed one's to trash once it sees it merged, an abandoned one's after a while. */

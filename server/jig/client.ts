@@ -390,16 +390,20 @@ export async function readSpecs(
   return { revision, specs: parsed(SpecList, data).specs };
 }
 
-/** A task or an epic in Jig's queue: its level (`null` the top, `epic:<spec>` an open epic's), its place there, its priority. */
-const QueueItem = z.object({
-  kind: text,
-  id: text,
-  level: maybe,
-  /** Sparse; compared only within one level. */
-  position: z.int(),
-  /** 0, the most urgent, to 5; `null` unset. A label: the order is `position`'s. */
-  priority: z.int().min(0).max(5).nullable(),
-});
+/** A task or an epic in Jig's queue: its level (`null` the top, `epic:<spec>` an open epic's), its place there, its priority, what it waits for. */
+const QueueItem = z
+  .object({
+    kind: text,
+    id: text,
+    level: maybe,
+    /** Sparse; compared only within one level. */
+    position: z.int(),
+    /** 0, the most urgent, to 5; `null` unset. A label: the order is `position`'s. */
+    priority: z.int().min(0).max(5).nullable(),
+    /** Another item (`task:<id>`, `epic:<spec>`) and the reason given (`jig queue depend`). */
+    depends_on: z.array(z.object({ on: text, reason: text })),
+  })
+  .transform(({ depends_on, ...item }) => ({ ...item, dependsOn: depends_on }));
 export type QueueItem = Omit<z.output<typeof QueueItem>, 'kind'>;
 
 const Queue = z.object({ items: z.array(QueueItem) });
@@ -416,7 +420,9 @@ export async function readQueue(
   const { revision, data } = await readJson(root, ['queue', 'list'], platform);
   const all = parsed(Queue, data).items;
   const of = (kind: string) =>
-    all.filter((i) => i.kind === kind).map(({ id, level, position, priority }) => ({ id, level, position, priority }));
+    all
+      .filter((i) => i.kind === kind)
+      .map(({ id, level, position, priority, dependsOn }) => ({ id, level, position, priority, dependsOn }));
   return { revision, items: of('task'), epics: of('epic') };
 }
 

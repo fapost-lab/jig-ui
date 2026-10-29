@@ -119,14 +119,31 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
 - The repository is `fapost-lab/jig-ui` (maintainer, 2026-10-14).
 - The first version is for a developer with a terminal. Node.js installed on the machine is a
   documented requirement, not something Jig UI bundles (maintainer, 2026-10-14). Rejected for
-  now: a single self-contained binary for people without a development environment — it stays
-  the Phase 3 fog item on installation.
+  now: a single self-contained binary for people without a development environment — it was
+  the Phase 3 fog item on installation, lifted below (2026-10-29).
 - Installing and starting Jig UI is one command, `npx @fapost/jig-ui`; what matters is that
   installation is very simple, not that a separate installer exists (maintainer, 2026-10-14).
   The package is scoped because `jig-ui` on npm belongs to an unrelated project; the `@fapost`
   scope is the maintainer's, and `@jig` is held by someone else (checked 2026-10-14). Rejected: a
   git-clone installer like Jig's own, which builds on the user's machine and adds a script to
   maintain on two platforms; it comes back only if `npx` proves not simple enough.
+- A person without Node.js installs Jig UI with one line in a terminal — Git Bash on Windows,
+  which Jig needs anyway — that puts the official Node.js in Jig UI's own folder, no system
+  install and no administrator, and a `jig-ui` command that starts Jig UI with it (maintainer,
+  2026-10-29). What stops that person is Node.js alone: they already run Jig, from Git Bash or
+  through an agent, and can paste a line, but do not install a runtime for one page. Rejected: one
+  executable built with Node's SEA — ~90 MB per platform, a code-signing certificate or
+  SmartScreen's "Windows protected your PC", Apple's notarization on macOS, and an update path of
+  its own. Rejected: a documentation page with `winget install` or a request for the agent —
+  Node.js still lands system-wide, behind an administrator prompt, so the barrier stays.
+  The shape (maintainer, 2026-10-29): `jig-ui` runs `npx @fapost/jig-ui` with that Node.js, so Jig
+  UI updates as it does for everyone, and running the line again updates Node.js — rejected: a
+  pinned Jig UI in the folder, a second update path to keep. A Node.js 24 or later already on the
+  machine is used and nothing is downloaded — rejected: a portable copy always, ~30 MB for nothing.
+  The line takes the script from the latest stable release
+  (`https://github.com/fapost-lab/jig-ui/releases/latest/download/install.sh`), so what people run
+  changes with a release, as `latest` on npm does — rejected: the script on `main`, changed by every
+  merge. One bash script serves Windows (Git Bash), checked first, and macOS and Linux.
 - Jig UI reads and writes Jig only through the contracts of Jig's `contract-extensions` spec,
   and development does not start before those contracts are in a Jig release (maintainer,
   2026-10-14). The wait is per phase: Phase 1 here starts once Phase 1 of `contract-extensions`
@@ -214,3 +231,6 @@ them to Decisions.
 - That a file watcher over many repositories, and a `jig` run per change, stay cheap in one
   process — measured by the live updates item, with several agents in several projects.
 - That a derived column is enough and no stored board column is ever needed — tested by use.
+- That Git Bash on Windows can unpack Node.js's `.zip` (its `unzip`, or Windows' own `tar.exe`),
+  and that a `jig-ui` in `~/bin` is on the PATH of Git Bash and of an agent's shell — checked by
+  the installation item, on a Windows machine without Node.js.

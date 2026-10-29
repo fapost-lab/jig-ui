@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import {
   cancelPause,
   fileTask,
+  hasJig,
   JigRefusal,
   JigShapeError,
   jigVersion,
@@ -17,6 +18,7 @@ import {
   RESUME_JIG_VERSION,
   resumeTask,
   runUpgrade,
+  selfUpdate as runSelfUpdate,
   setPriority,
   supports,
   type TaskSummary,
@@ -30,11 +32,13 @@ import type {
   Attention,
   Change,
   FinishedTask,
+  Machine,
   ProjectSource,
   ProjectSpecs,
   ProjectTasks,
   ProjectView,
   Refusal,
+  SelfUpdateRun,
   ShownSpec,
   Spec,
   Task,
@@ -208,6 +212,9 @@ function ordered(specs: Spec[], epics: QueueItem[]): ShownSpec[] {
 const upgradeTo = (read: Read): string | undefined =>
   read.view.state === 'ready' ? (read.view.attention.find((a) => a.kind === 'upgrade-available')?.versions?.to ?? undefined) : undefined;
 
+/** Jig says a newer release than this machine's is out: `jig self-update` comes before the project's upgrade. */
+const releaseOut = (read: Read): boolean => read.view.state === 'ready' && read.view.attention.some((a) => a.kind === 'release-available');
+
 /** A read that may have caught Jig mid-write: worth one more try before it is believed. */
 const torn = (read: Read): boolean => read.view.state === 'unreadable' || read.view.state === 'incompatible';
 
@@ -253,6 +260,8 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     changing = done.catch(() => undefined);
     return done;
   }
+  /** The runs that change this machine's Jig or every project, kept until dismissed or the next one starts. */
+  const machine: Machine = { selfUpdate: null, upgradeAll: null };
   const listeners = new Set<(change: Change) => void>();
   let rescan: NodeJS.Timeout | undefined;
   /** Counts the times following started; a read that finishes after a stop belongs to none. */
@@ -321,6 +330,98 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     if (following() && entries.get(entry.project.id) === entry) signal({ id: entry.project.id, revision: entry.shown?.revision ?? null });
   }
 
+  /** A self-update, an Upgrade all or a project's upgrade is under way: the next one waits for it to end. */
+  const anyRunning = (): boolean =>
+    machine.selfUpdate?.state === 'running' ||
+    machine.upgradeAll?.state === 'running' ||
+    [...entries.values()].some((e) => e.upgrade?.state === 'running');
+
+  /** Tells the listeners that the machine's runs changed: through every project followed, the page reads the workspace. */
+  function signalMachine(): void {
+    if (!following()) return;
+    for (const [id, entry] of entries) signal({ id, revision: entry.shown?.revision ?? null });
+  }
+
+  /**
+   * The main checkout whose Jig hands `jig self-update` to the machine's: one whose last read says a release is out —
+   * a Jig that knows the command — else the first connected project with a Jig.
+   */
+  async function selfUpdateRoot(): Promise<string | undefined> {
+    const projects = (await readProjects(configDir).catch(() => [])).filter((p) => hasJig(p.path));
+    const saysRelease = (id: string): boolean => {
+      const read = entries.get(id)?.shown;
+      return read !== undefined && releaseOut(read);
+    };
+    return (projects.find((p) => saysRelease(p.id)) ?? projects[0])?.path;
+  }
+
+  /**
+   * Updates this machine's Jig through the project in `root`, then reads every connected project again: each now shows
+   * the upgrade the new Jig makes. The run is marked at once, before the first await.
+   */
+  async function updatingMachine(root: string): Promise<Exclude<SelfUpdateRun, { state: 'running' }>> {
+    machine.selfUpdate = { state: 'running', since: new Date().toISOString() };
+    signalMachine();
+    let run: Exclude<SelfUpdateRun, { state: 'running' }>;
+    try {
+      run = { state: 'done', at: '', said: await runSelfUpdate(root) };
+    } catch (error) {
+      run = { state: 'failed', at: '', reasons: error instanceof JigRefusal ? error.reasons : [] };
+    }
+    run = { ...run, at: new Date().toISOString() };
+    machine.selfUpdate = run;
+    const projects = await readProjects(configDir).catch(() => []);
+    await Promise.allSettled(projects.map((p) => refresh(entryOf(p))));
+    signalMachine();
+    return run;
+  }
+
+  /** Upgrades every connected project that shows an upgrade, one at a time, after this machine's Jig when a release is out. */
+  async function upgradingAll(): Promise<void> {
+    const upgraded: string[] = [];
+    const skipped: string[] = [];
+    let failed: string[] | null = null;
+    const since = machine.upgradeAll?.state === 'running' ? machine.upgradeAll.since : new Date().toISOString();
+    const progress = (current: string): void => {
+      machine.upgradeAll = { state: 'running', since, current, upgraded: [...upgraded] };
+      signalMachine();
+    };
+    try {
+      const projects = await readProjects(configDir).catch(() => []);
+      if ((await Promise.all(projects.map(shown))).some(releaseOut)) {
+        const root = await selfUpdateRoot();
+        const run = root ? await updatingMachine(root) : undefined;
+        if (!run) failed = ['No connected project has a Jig to run jig self-update through.'];
+        else if (run.state === 'failed') failed = run.reasons.length ? run.reasons : ['jig self-update failed.'];
+      }
+      if (!failed) {
+        for (const project of projects) {
+          // Picked in turn with disconnects, as a single upgrade starts: one disconnected meanwhile is never upgraded,
+          // and one marked running cannot be disconnected.
+          const entry = await oneAtATime(async () => {
+            if (!(await readProjects(configDir).catch(() => [])).some((p) => p.id === project.id)) return undefined;
+            const picked = entryOf(project);
+            const to = upgradeTo(await shown(project));
+            if (to === undefined || picked.upgrade?.state === 'running') {
+              skipped.push(project.id);
+              return undefined;
+            }
+            progress(project.id);
+            picked.upgrade = { state: 'running', since: new Date().toISOString(), to };
+            signalUpgrade(picked);
+            return picked;
+          });
+          if (!entry) continue;
+          await upgrading(entry);
+          upgraded.push(project.id);
+        }
+      }
+    } finally {
+      machine.upgradeAll = { state: 'done', at: new Date().toISOString(), upgraded, skipped, failed };
+      signalMachine();
+    }
+  }
+
   /** The project's last read when an upgrade may start from it: ready and naming a version to upgrade to. */
   async function upgradable(id: string): Promise<
     | {
@@ -339,7 +440,10 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     const read = await shown(project);
     if (read.view.state !== 'ready') return read.view;
     const entry = entryOf(project);
-    if (entry.upgrade?.state === 'running') return { state: 'refused', code: 'running' };
+    // One upgrade at a time on this machine: a self-update or an Upgrade all under way holds every project's.
+    if (entry.upgrade?.state === 'running' || machine.selfUpdate?.state === 'running' || machine.upgradeAll?.state === 'running') {
+      return { state: 'refused', code: 'running' };
+    }
     const to = upgradeTo(read);
     return to === undefined ? { state: 'refused', code: 'not-found' } : { entry, to };
   }
@@ -550,6 +654,44 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
         signalUpgrade(entry);
       }
       return true;
+    },
+    machine() {
+      return { ...machine };
+    },
+    async selfUpdate() {
+      // Started in turn with upgrade starts and disconnects, and awaited after it: a call meanwhile is refused, not queued.
+      const started = await oneAtATime(
+        async (): Promise<
+          | { run: ReturnType<typeof updatingMachine> }
+          | {
+              state: 'refused';
+              code: string;
+            }
+        > => {
+          if (anyRunning()) return { state: 'refused', code: 'running' };
+          const root = await selfUpdateRoot();
+          if (!root) return { state: 'refused', code: 'not-found' };
+          return { run: updatingMachine(root) }; // marked running before its first await
+        },
+      );
+      if ('state' in started) return started;
+      const run = await started.run;
+      return run.state === 'done' ? { state: 'done', said: run.said } : { state: 'failed', reasons: run.reasons };
+    },
+    upgradeAll() {
+      return oneAtATime(async () => {
+        if (anyRunning()) return { state: 'refused', code: 'running' } as const;
+        machine.upgradeAll = { state: 'running', since: new Date().toISOString(), current: null, upgraded: [] };
+        signalMachine();
+        void upgradingAll().catch(() => undefined); // its `finally` has kept what it came to
+        return { state: 'started' } as const;
+      });
+    },
+    dismissUpgradeAll() {
+      if (machine.upgradeAll?.state === 'running' || machine.selfUpdate?.state === 'running') return;
+      machine.upgradeAll = null;
+      machine.selfUpdate = null;
+      signalMachine();
     },
     disconnect(id) {
       return oneAtATime(async () => {

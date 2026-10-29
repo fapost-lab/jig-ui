@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import type { Attention, Project } from '../api';
-import { agentRequest, upgradeLine, upgradeMark, upgradeOf, upgradeResult, type UpgradeRun } from './upgrade';
+import type { Attention, Machine, Project } from '../api';
+import {
+  agentRequest,
+  machineBusy,
+  machineLine,
+  needsUpgrade,
+  releaseOf,
+  upgradeAllPlan,
+  upgradeLine,
+  upgradeMark,
+  upgradeOf,
+  upgradeResult,
+  type UpgradeRun,
+} from './upgrade';
 
 const item = (kind: string, versions: Attention['versions'] = null): Attention => ({
   kind,
@@ -143,5 +155,71 @@ describe('upgradeResult', () => {
 describe('agentRequest', () => {
   it('names the project', () => {
     expect(agentRequest('shop')).toBe('Upgrade Jig in shop');
+  });
+});
+
+describe('releaseOf and needsUpgrade', () => {
+  const released = ready('released', [{ ...item('release-available'), title: 'jig v0.38.0 is out' }]);
+
+  it("reads Jig's line that a newer release is out", () => {
+    expect(releaseOf(released)).toBe('jig v0.38.0 is out');
+    expect(releaseOf(behind)).toBeUndefined();
+    expect(releaseOf(old)).toBeUndefined();
+  });
+
+  it('needs an upgrade behind the machine or behind a release, not where it cannot be read', () => {
+    expect(needsUpgrade(behind)).toBe(true);
+    expect(needsUpgrade(released)).toBe(true);
+    expect(needsUpgrade(ready('fresh'))).toBe(false);
+    expect(needsUpgrade(old)).toBe(false);
+  });
+
+  it('plans Upgrade all: a self-update only when a release is out, and every project with an upgrade', () => {
+    expect(upgradeAllPlan([behind, ready('fresh'), old])).toEqual({ selfUpdate: false, projects: ['behind'] });
+    expect(upgradeAllPlan([behind, released])).toEqual({ selfUpdate: true, projects: ['behind', 'released'] });
+  });
+});
+
+describe('machineLine', () => {
+  const at = '2026-10-29T10:00:00Z';
+  const m = (machine: Partial<Machine>): Machine => ({ selfUpdate: null, upgradeAll: null, ...machine });
+
+  it('says nothing when nothing ran', () => {
+    expect(machineLine(m({}))).toBeUndefined();
+    expect(machineLine(undefined)).toBeUndefined();
+    expect(machineBusy(m({}))).toBe(false);
+  });
+
+  it('follows Upgrade all through the self-update and each project', () => {
+    const updating = m({
+      selfUpdate: { state: 'running', since: at },
+      upgradeAll: { state: 'running', since: at, current: null, upgraded: [] },
+    });
+    expect(machineLine(updating)?.text).toBe('Upgrade all: updating Jig on this machine…');
+    expect(machineBusy(updating)).toBe(true);
+    const second = m({ upgradeAll: { state: 'running', since: at, current: 'b', upgraded: ['a'] } });
+    expect(machineLine(second)).toEqual({ text: 'Upgrade all: upgrading b… (done: a)', tone: 'quiet', reasons: [], ended: false });
+  });
+
+  it('says what Upgrade all came to, and why it stopped', () => {
+    const done = m({ upgradeAll: { state: 'done', at, upgraded: ['a', 'b'], skipped: ['c'], failed: null } });
+    expect(machineLine(done)?.text).toBe('Upgrade all ran the upgrade in a, b; left c alone. Each card says what its upgrade came to.');
+    expect(machineLine(done)?.ended).toBe(true);
+    const stopped = m({ upgradeAll: { state: 'done', at, upgraded: [], skipped: [], failed: ['cannot reach the remote'] } });
+    expect(machineLine(stopped)).toEqual({
+      text: 'Upgrade all stopped: Jig could not update itself on this machine.',
+      tone: 'bad',
+      reasons: ['cannot reach the remote'],
+      ended: true,
+    });
+  });
+
+  it('shows a self-update started from a card, over what an earlier Upgrade all came to', () => {
+    expect(machineLine(m({ selfUpdate: { state: 'running', since: at } }))?.text).toBe('Updating Jig on this machine…');
+    const after = m({
+      selfUpdate: { state: 'running', since: at },
+      upgradeAll: { state: 'done', at, upgraded: ['a'], skipped: [], failed: null },
+    });
+    expect(machineLine(after)).toMatchObject({ text: 'Updating Jig on this machine…', ended: false });
   });
 });

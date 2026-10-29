@@ -188,6 +188,7 @@ describe('/api/projects and /api/workspace', () => {
         { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0', upgrade: null },
         { id: 'broken', state: 'unreadable', code: 'failed', upgrade: null },
       ],
+      machine: { selfUpdate: null, upgradeAll: null },
     });
     expectNoPath(text);
     expect(text).not.toContain('"path"');
@@ -657,6 +658,75 @@ describe('/api/projects/:id/tasks', () => {
   it('is refused without the token and from another origin', async () => {
     expect((await post(app, { task: 'a', goal: 'g' }, {})).status).toBe(401);
     expect((await post(app, { task: 'a', goal: 'g' }, { cookie: COOKIE, origin: 'https://evil.example' })).status).toBe(403);
+  });
+});
+
+describe('/api/self-update and /api/upgrade-all', () => {
+  const base = localSource(join(webRoot, 'machine-config'));
+  const appOf = (over: Partial<ProjectSource>) => createApp({ port: PORT, token: TOKEN, source: { ...base, ...over }, webRoot });
+  const call = (target: Hono, method: string, path: string, headers: Record<string, string> = { cookie: COOKIE }) =>
+    target.request(path, { method, headers: { host: HOST, ...headers } });
+
+  it('shows what the machine is doing beside the projects', async () => {
+    const machine = {
+      selfUpdate: { state: 'failed' as const, at: 'x', reasons: ['no remote'] },
+      upgradeAll: { state: 'running' as const, since: 'y', current: 'a', upgraded: ['b'] },
+    };
+    const res = await call(appOf({ machine: () => machine }), 'GET', '/api/workspace');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ projects: [], machine });
+  });
+
+  it.each([
+    ['done', { state: 'done', said: 'self-update: updated 0.37.0 -> 0.38.0 (abc1234)' }, 200],
+    ['failed', { state: 'failed', reasons: ['cannot reach the remote'] as string[] }, 422],
+    ['running', { state: 'refused', code: 'running' }, 409],
+    ['not-found', { state: 'refused', code: 'not-found' }, 404],
+  ] as const)('answers a self-update that is %s', async (_, run, status) => {
+    const res = await call(appOf({ selfUpdate: () => Promise.resolve(run) }), 'POST', '/api/self-update');
+    expect(res.status).toBe(status);
+    const body = (await res.json()) as Record<string, any>;
+    if (run.state === 'done') expect(body).toEqual({ said: run.said });
+    else if (run.state === 'failed') expect(body).toEqual({ error: { code: 'failed', message: expect.any(String), reasons: run.reasons } });
+    else expect(body).toEqual({ error: { code: run.code, message: expect.any(String) } });
+  });
+
+  it.each([
+    ['started at once', { state: 'started' }, 202],
+    ['an upgrade under way', { state: 'refused', code: 'running' }, 409],
+  ] as const)('answers an Upgrade all %s', async (_, started, status) => {
+    const res = await call(appOf({ upgradeAll: () => Promise.resolve(started) }), 'POST', '/api/upgrade-all');
+    expect(res.status).toBe(status);
+    const body = (await res.json()) as Record<string, any>;
+    if (started.state === 'started') expect(body).toEqual({ started: true });
+    else expect(body).toEqual({ error: { code: 'running', message: expect.any(String) } });
+  });
+
+  it('forgets what Upgrade all came to', async () => {
+    const dismissed = vi.fn();
+    const res = await call(appOf({ dismissUpgradeAll: dismissed }), 'DELETE', '/api/upgrade-all');
+    expect(res.status).toBe(204);
+    expect(dismissed).toHaveBeenCalledTimes(1);
+  });
+
+  it('is refused without the token and from another origin, running nothing', async () => {
+    const selfUpdate = vi.fn();
+    const upgradeAll = vi.fn();
+    const dismissUpgradeAll = vi.fn();
+    const guarded = appOf({ selfUpdate, upgradeAll, dismissUpgradeAll });
+    const foreign = { cookie: COOKIE, origin: 'https://evil.example' };
+    expect((await call(guarded, 'GET', '/api/workspace', {})).status).toBe(401);
+    for (const [method, path] of [
+      ['POST', '/api/self-update'],
+      ['POST', '/api/upgrade-all'],
+      ['DELETE', '/api/upgrade-all'],
+    ] as const) {
+      expect((await call(guarded, method, path, {})).status).toBe(401);
+      expect((await call(guarded, method, path, foreign)).status).toBe(403);
+    }
+    expect(selfUpdate).not.toHaveBeenCalled();
+    expect(upgradeAll).not.toHaveBeenCalled();
+    expect(dismissUpgradeAll).not.toHaveBeenCalled();
   });
 });
 

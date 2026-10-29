@@ -18,6 +18,7 @@ import {
   requestPause,
   resumeTask,
   runUpgrade,
+  selfUpdate,
   setPriority,
   supports,
   withoutPaths,
@@ -524,6 +525,61 @@ describe('upgrading the project', () => {
     ['reasons that are not a list', (d: Record<string, any>) => (d.would_stop = 'x')],
   ])('refuses %s', async (_, change) => {
     await expect(runUpgrade(answering(`case-${cases++}`, changed('upgrade-commit.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+/** A checkout whose Jig logs its arguments, prints `out` and `err`, and exits with `code`. */
+function selfUpdating(name: string, out: string, err = '', code = 0): string {
+  const dir = join(root, name);
+  mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
+  writeFileSync(join(dir, 'out.txt'), out);
+  writeFileSync(join(dir, 'err.txt'), err);
+  writeFileSync(
+    join(dir, '.ai', 'scripts', 'jig'),
+    `#!/usr/bin/env bash\nprintf '%s\\n' "$@" > args.log\ncat out.txt\ncat err.txt >&2\nexit ${code}\n`,
+  );
+  return dir;
+}
+
+describe('selfUpdate', () => {
+  it('runs jig self-update as text and answers its last line', async () => {
+    const dir = selfUpdating(`case-${cases++}`, 'fetching\nself-update: updated 0.37.0 -> 0.38.0 (abc1234)\n');
+    expect(await selfUpdate(dir)).toBe('self-update: updated 0.37.0 -> 0.38.0 (abc1234)');
+    expect(args(dir)).toEqual(['self-update']);
+  });
+
+  it('cuts a path out of what it says', async () => {
+    const dir = selfUpdating(`case-${cases++}`, 'self-update: already current in /Users/me/jig/framework\n');
+    expect(await selfUpdate(dir)).toBe('self-update: already current in …');
+  });
+
+  it('answers an empty line when Jig prints nothing', async () => {
+    expect(await selfUpdate(selfUpdating(`case-${cases++}`, ''))).toBe('');
+  });
+
+  it('refuses as failed with the reasons of jig: error lines, with or without the self-update prefix and without a path', async () => {
+    const err = [
+      'noise on stderr',
+      'jig: error: self-update: cannot reach the remote',
+      'jig: error: checkout /Users/me/jig/framework has local changes',
+      'jig: error:',
+    ].join('\n');
+    const refused = await selfUpdate(selfUpdating(`case-${cases++}`, '', err, 1)).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(JigRefusal);
+    expect((refused as JigRefusal).code).toBe('failed');
+    expect((refused as JigRefusal).reasons).toEqual(['cannot reach the remote', 'checkout … has local changes']);
+  });
+
+  it('refuses as failed with no reasons when Jig explains nothing', async () => {
+    const refused = await selfUpdate(selfUpdating(`case-${cases++}`, '', '', 2)).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(JigRefusal);
+    expect((refused as JigRefusal).code).toBe('failed');
+    expect((refused as JigRefusal).reasons).toEqual([]);
+  });
+
+  it('refuses as failed when the checkout has no Jig', async () => {
+    mkdirSync(join(root, 'no-jig'), { recursive: true });
+    await expect(selfUpdate(join(root, 'no-jig'))).rejects.toEqual(refusal('failed'));
   });
 });
 

@@ -43,8 +43,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `jig upgrade`, its dry run and its run (from Jig 0.34.0), and `jig self-update` (its text line), each JSON answer checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
   fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue
   (convention-jig-client).
-- `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, a project's live
-  tasks, one task in full, connect, disconnect, subscribe to changes, and the writes `move`,
+- `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, the connected ids
+  (`connected`), one project as the workspace shows it (`project`), a project's live tasks, one task in full, connect, disconnect, subscribe to changes, and the writes `move`,
   `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `planUpgrade`, `upgrade` and
   `dismissUpgrade`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
@@ -55,7 +55,9 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   changed", knowing nothing of Jig (convention-watcher).
 - `server/board/` — a project's board: columns worked out from its tasks on every read
   (feature-board).
-- `server/http/` also serves `GET /api/workspace`, `GET /api/projects/:id/board`,
+- `server/http/` also serves `GET /api/workspace`, `GET /api/projects` (the connected ids, no Jig run) and
+  `GET /api/projects/:id` (one project as the workspace shows it) for the workspace's first load (feature-workspace),
+  `GET /api/projects/:id/board`,
   `GET /api/projects/:id/tasks/:task` (feature-task-details), `GET /api/projects/:id/specs`
   (feature-specs), `POST /api/projects/:id/queue/move`, `/queue/priority`, `/queue/epic/move`, `/queue/epic/priority`, `/queue/pause`,
   `/queue/pause/cancel`, `/tasks/resume` (adr-20261022-writes-carry-the-revision-of-their-read) and

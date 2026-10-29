@@ -36,7 +36,7 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, a project's live
   tasks, one task in full, connect, disconnect, subscribe to changes, and the writes `move`,
-  `prioritise`, `requestPause`, `cancelPause`, `resume` and `fileTask`, and `planUpgrade`, `upgrade` and
+  `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume` and `fileTask`, and `planUpgrade`, `upgrade` and
   `dismissUpgrade`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
@@ -48,7 +48,7 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
   (feature-board).
 - `server/http/` also serves `GET /api/workspace`, `GET /api/projects/:id/board`,
   `GET /api/projects/:id/tasks/:task` (feature-task-details), `GET /api/projects/:id/specs`
-  (feature-specs), `POST /api/projects/:id/queue/move`, `/queue/priority`, `/queue/pause`,
+  (feature-specs), `POST /api/projects/:id/queue/move`, `/queue/priority`, `/queue/epic/move`, `/queue/epic/priority`, `/queue/pause`,
   `/queue/pause/cancel` and `/tasks/resume` (adr-20261022-writes-carry-the-revision-of-their-read),
   `POST /api/projects/:id/tasks` (adr-20261022-filing-a-task-carries-no-revision),
   `POST /api/projects/:id/upgrade/plan`, `POST` and `DELETE /api/projects/:id/upgrade`

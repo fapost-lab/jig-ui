@@ -288,7 +288,7 @@ describe('readTasks, the list as a whole', () => {
 // open epic and one missing its files added in the shape Jig's producer (lib/spec.sh) prints.
 describe('readSpecs', () => {
   it("reads each spec with its phases and items, in Jig's order", async () => {
-    const [ui, billing, half] = await readSpecs(answering('specs', 'spec-list.json'));
+    const [ui, billing, half] = (await readSpecs(answering('specs', 'spec-list.json'))).specs;
     expect(ui).toMatchObject({
       id: 'jig-ui',
       title: 'Jig UI — a local control center for Jig projects',
@@ -314,7 +314,10 @@ describe('readSpecs', () => {
   });
 
   it('reads a project with no specs', async () => {
-    expect(await readSpecs(answering(`case-${cases++}`, '{"schema":1,"revision":1,"generated_at":"x","data":{"specs":[]}}'))).toEqual([]);
+    expect(await readSpecs(answering(`case-${cases++}`, '{"schema":1,"revision":1,"generated_at":"x","data":{"specs":[]}}'))).toEqual({
+      revision: 1,
+      specs: [],
+    });
   });
 
   it.each([
@@ -335,7 +338,7 @@ describe('readSpecs', () => {
 // queue-list.json is what Jig 0.31.0 printed for three tasks, two of them queued, with an epic and a task on it
 // added in the documented shape (Jig's docs/reading-jig-as-data.mdx); queue-move.json and queue-stale.json too.
 describe('readQueue', () => {
-  it("reads the queued tasks in Jig's order, without the epics", async () => {
+  it("reads the queued tasks and epics apart, each in Jig's order", async () => {
     expect(await readQueue(answering('queue', 'queue-list.json'))).toEqual({
       revision: 1792656228,
       items: [
@@ -343,6 +346,7 @@ describe('readQueue', () => {
         { id: 'alpha', level: null, position: 200, priority: 1 },
         { id: 'booking-form', level: 'epic:booking', position: 100, priority: null },
       ],
+      epics: [{ id: 'booking', level: null, position: 300, priority: 0 }],
     });
   });
 
@@ -370,8 +374,17 @@ describe('writing the queue', () => {
     ['bottom' as const, ['--bottom']],
   ])('moves a task %o against the revision it was read at', async (place, where) => {
     const dir = logging(`case-${cases++}`, 'queue-move.json');
-    await moveInQueue(dir, 'beta', place, 1792656222);
+    await moveInQueue(dir, 'task:beta', place, 1792656222);
     expect(args(dir)).toEqual(['queue', 'move', 'task:beta', ...where, '--revision', '1792656222', '--json']);
+  });
+
+  it.each([
+    [{ after: 'alpha' } as const, ['--after', 'epic:alpha']],
+    [{ before: 'alpha' } as const, ['--before', 'epic:alpha']],
+  ])('moves an epic %o among the epics', async (place, where) => {
+    const dir = logging(`case-${cases++}`, 'queue-move.json');
+    await moveInQueue(dir, 'epic:booking', place, 5);
+    expect(args(dir)).toEqual(['queue', 'move', 'epic:booking', ...where, '--revision', '5', '--json']);
   });
 
   it.each([
@@ -379,15 +392,19 @@ describe('writing the queue', () => {
     [null, 'none'],
   ])('sets priority %s', async (priority, value) => {
     const dir = logging(`case-${cases++}`, 'queue-move.json');
-    await setPriority(dir, 'beta', priority, 7);
+    await setPriority(dir, 'task:beta', priority, 7);
     expect(args(dir)).toEqual(['queue', 'set', 'task:beta', '--priority', value, '--revision', '7', '--json']);
+    await setPriority(dir, 'epic:booking', priority, 7);
+    expect(args(dir)).toEqual(['queue', 'set', 'epic:booking', '--priority', value, '--revision', '7', '--json']);
   });
 
   it('carries a stale revision as its code', async () => {
-    await expect(moveInQueue(answering(`case-${cases++}`, 'queue-stale.json', 1), 'beta', 'top', 1)).rejects.toEqual(
+    await expect(moveInQueue(answering(`case-${cases++}`, 'queue-stale.json', 1), 'task:beta', 'top', 1)).rejects.toEqual(
       refusal('stale-revision'),
     );
-    await expect(setPriority(answering(`case-${cases++}`, 'queue-stale.json', 1), 'beta', 2, 1)).rejects.toEqual(refusal('stale-revision'));
+    await expect(setPriority(answering(`case-${cases++}`, 'queue-stale.json', 1), 'epic:beta', 2, 1)).rejects.toEqual(
+      refusal('stale-revision'),
+    );
   });
 });
 

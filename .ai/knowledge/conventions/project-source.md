@@ -32,7 +32,9 @@ The port is `ProjectSource` in `server/source/project-source.ts` — the workspa
 live tasks and the finished ones Jig still keeps (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), its specs
 (`specs(id)`), connect,
 disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,
-`prioritise(id, taskId, priority, revision)`, `requestPause(id, taskId, revision)`,
+`prioritise(id, taskId, priority, revision)`, `moveEpic(id, specId, place, revision)` and
+`prioritiseEpic(id, specId, priority, revision)` — a spec's open epic, among the top level of the
+queue — `requestPause(id, taskId, revision)`,
 `cancelPause(id, taskId, revision)`, `resume(id, taskId, revision)` and `fileTask(id, taskId, goal)`, which answer `written`, `refused` with Jig's code,
 or the project's state when it is not `ready`; and the upgrade of a project's Jig — `planUpgrade(id)`,
 `upgrade(id)`, which answers `started` before Jig has run, and `dismissUpgrade(id)`; its local adapter

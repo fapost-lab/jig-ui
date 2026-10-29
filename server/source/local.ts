@@ -35,6 +35,8 @@ import type {
   ProjectTasks,
   ProjectView,
   Refusal,
+  ShownSpec,
+  Spec,
   Task,
   TaskCounts,
   TaskDetails,
@@ -185,9 +187,21 @@ async function readProject(project: Project): Promise<Read> {
     },
     tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id), resumes)), finished: finished.map(gone), revision },
     details: live.map((t) => details(t, queued.get(t.id), status.attention, resumes)),
-    specs: { state: 'ready', specs },
+    // The specs are read beside the queue: a write of an epic carries the older of the two reads, or of the board's.
+    specs: { state: 'ready', specs: ordered(specs.specs, queue.epics), revision: Math.min(revision, specs.revision) },
     revision,
   };
+}
+
+/** The specs as the page shows them (`ProjectSpecs`): the queued epics by position, then the other open epics, then the rest. */
+function ordered(specs: Spec[], epics: QueueItem[]): ShownSpec[] {
+  const queued = new Map(epics.map((e) => [e.id, e]));
+  const shown = specs.map((s) => {
+    const q = s.epic?.state === 'open' ? queued.get(s.id) : undefined;
+    return { ...s, queue: q ? { position: q.position, priority: q.priority } : null };
+  });
+  const rank = (s: ShownSpec) => (s.queue ? 0 : s.epic?.state === 'open' ? 1 : 2);
+  return shown.sort((a, b) => rank(a) - rank(b) || (a.queue && b.queue ? a.queue.position - b.queue.position : 0));
 }
 
 /** The version Jig's `upgrade-available` item in a read names for this machine; none without the item. */
@@ -414,12 +428,21 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
    * Jig itself listed reaches Jig's arguments; a new task's id names none, and the HTTP boundary checks it against
    * Jig's grammar instead — then reads the project again, refused or not: the page reads next.
    */
-  async function writing(id: string, taskIds: string[], write: (root: string) => Promise<void>): Promise<Written | undefined> {
+  /** A write naming `taskIds` among the live tasks of the last read, and `specIds` among its specs with an open epic. */
+  async function writing(
+    id: string,
+    taskIds: string[],
+    write: (root: string) => Promise<void>,
+    specIds: string[] = [],
+  ): Promise<Written | undefined> {
     const project = (await readProjects(configDir)).find((p) => p.id === id);
     if (!project) return undefined;
-    const { tasks } = await shown(project);
+    const { tasks, specs } = await shown(project);
     if (tasks.state !== 'ready') return tasks;
-    if (!taskIds.every((t) => tasks.tasks.some((live) => live.id === t))) return { state: 'refused', code: 'not-found' };
+    const open = specs.state === 'ready' ? specs.specs.filter((s) => s.epic?.state === 'open').map((s) => s.id) : [];
+    if (!taskIds.every((t) => tasks.tasks.some((live) => live.id === t)) || !specIds.every((s) => open.includes(s))) {
+      return { state: 'refused', code: 'not-found' };
+    }
     const entry = entryOf(project);
     // Jig replaces its own scripts while it upgrades: the write waits for the person to try again.
     if (entry.upgrade?.state === 'running') return { state: 'refused', code: 'upgrading' };
@@ -472,11 +495,18 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       return project && (await shown(project)).specs;
     },
     move(id, taskId, place, revision) {
-      const named = typeof place === 'object' ? [taskId, place.after] : [taskId];
-      return writing(id, named, (root) => moveInQueue(root, taskId, place, revision));
+      const named = typeof place === 'object' ? [taskId, 'after' in place ? place.after : place.before] : [taskId];
+      return writing(id, named, (root) => moveInQueue(root, `task:${taskId}`, place, revision));
+    },
+    moveEpic(id, specId, place, revision) {
+      const named = typeof place === 'object' ? [specId, 'after' in place ? place.after : place.before] : [specId];
+      return writing(id, [], (root) => moveInQueue(root, `epic:${specId}`, place, revision), named);
+    },
+    prioritiseEpic(id, specId, priority, revision) {
+      return writing(id, [], (root) => setPriority(root, `epic:${specId}`, priority, revision), [specId]);
     },
     prioritise(id, taskId, priority, revision) {
-      return writing(id, [taskId], (root) => setPriority(root, taskId, priority, revision));
+      return writing(id, [taskId], (root) => setPriority(root, `task:${taskId}`, priority, revision));
     },
     requestPause(id, taskId, revision) {
       return writing(id, [taskId], (root) => requestPause(root, taskId, revision));

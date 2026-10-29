@@ -292,6 +292,11 @@ export const plans: PlanState[] = [
     },
   },
   { state: 'refused', message: 'Jig refused the upgrade.' },
+  {
+    state: 'refused',
+    message: 'Jig refused the upgrade.',
+    reasons: ['cannot determine the framework source root; pass --from <dir>'],
+  },
 ];
 
 const git = {
@@ -324,6 +329,12 @@ export const runs: UpgradeRun[] = [
     ],
   },
   { state: 'refused', at: '2026-10-27T08:00:00Z', code: 'failed', reasons: [] },
+  {
+    state: 'refused',
+    at: '2026-10-27T08:00:00Z',
+    code: 'failed',
+    reasons: ['cannot determine the framework source root; pass --from <dir>'],
+  },
 ];
 
 export const specItems: SpecItem[] = [

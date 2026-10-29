@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { type ChildProcess, execFile, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -66,16 +66,90 @@ async function bash(platform: NodeJS.Platform): Promise<string> {
  * half as long again (CI, task `conflict-display`).
  */
 async function jig(root: string, args: string[], platform: NodeJS.Platform, timeout = TIMEOUT_MS): Promise<string> {
+  if (stopping) throw new Error('Jig UI is stopping');
   const argv = [SCRIPT, ...args];
-  const { stdout } =
+  // Elsewhere each run leads a process group of its own, so that stopping Jig UI can stop all of it (`stopJig`).
+  const running =
     platform === 'win32'
-      ? await run(await bash(platform), ['-c', `. ${argv.map((_, i) => `"$JIG_UI_ARG_${i}"`).join(' ')}`], {
+      ? run(await bash(platform), ['-c', `. ${argv.map((_, i) => `"$JIG_UI_ARG_${i}"`).join(' ')}`], {
           cwd: root,
           timeout,
           env: { ...process.env, ...Object.fromEntries(argv.map((arg, i) => [`JIG_UI_ARG_${i}`, arg])) },
         })
-      : await run(await bash(platform), argv, { cwd: root, timeout });
-  return stdout;
+      : leading(await bash(platform), argv, root, timeout);
+  runs.set(running.child, running);
+  try {
+    return (await running).stdout;
+  } finally {
+    runs.delete(running.child);
+  }
+}
+
+/**
+ * `execFile` for a run that leads a process group of its own — `execFile` does not hand `detached` on to `spawn` — so
+ * that the whole run, not only its bash, can be signalled. Answers as `execFile` does: `stdout` once the run closes with
+ * 0; otherwise an error carrying `stdout`, `stderr` and, past `timeout`, `killed`. Unlike `execFile`, its output has no
+ * size limit. The group has no controlling terminal: a prompt on `/dev/tty` fails instead of waiting in Jig UI's.
+ */
+function leading(file: string, args: string[], cwd: string, timeout: number): Promise<{ stdout: string }> & { child: ChildProcess } {
+  const child = spawn(file, args, { cwd, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  let [stdout, stderr, killed] = ['', '', false];
+  child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
+  child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
+  const answer = new Promise<{ stdout: string }>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      killed = true;
+      signalGroup(child, 'SIGTERM');
+    }, timeout);
+    child.once('error', (error) => {
+      clearTimeout(timer);
+      reject(Object.assign(error, { stdout, stderr, killed }));
+    });
+    child.once('close', (code, signal) => {
+      clearTimeout(timer);
+      if (code === 0) resolve({ stdout });
+      else reject(Object.assign(new Error(`${file} ended with ${signal ?? code}`), { code, signal, stdout, stderr, killed }));
+    });
+  });
+  return Object.assign(answer, { child });
+}
+
+/** Signals a run and all it started: its process group where it leads one (negative pid), else the run alone. */
+function signalGroup(child: ChildProcess, name: NodeJS.Signals): void {
+  try {
+    if (child.pid !== undefined && process.platform !== 'win32') process.kill(-child.pid, name);
+    else child.kill(name);
+  } catch {
+    // Already gone.
+  }
+}
+
+/** Every Jig run under way. */
+const runs = new Map<ChildProcess, Promise<unknown>>();
+
+/** Jig UI is stopping: a run asked for meanwhile is refused, not started and left behind. */
+let stopping = false;
+
+/**
+ * Stops every Jig run under way, as Ctrl+C in a terminal would: SIGINT to the run's whole process group — the script
+ * and the git, `gh` or CI wait it started — then SIGKILL to what has not ended within `graceMs`. Jig UI calls it as it
+ * stops, however it was stopped: an upgrade it started must not run on with nobody to read how it ended. `jig upgrade`
+ * stopped this way leaves its branch, and the next one says what to do.
+ */
+export async function stopJig(graceMs = 5_000): Promise<void> {
+  stopping = true;
+  await Promise.all(
+    [...runs].map(async ([child, ended]) => {
+      const kill = setTimeout(() => signalGroup(child, 'SIGKILL'), graceMs);
+      signalGroup(child, 'SIGINT');
+      // Over once its answer is in — nothing it started holds its output — or a second after the SIGKILL: a process that
+      // left the group (a daemon git or ssh started) may hold the output on, out of any signal's reach.
+      let deadline: NodeJS.Timeout | undefined;
+      await Promise.race([ended.catch(() => undefined), new Promise((done) => (deadline = setTimeout(done, graceMs + 1_000)))]);
+      clearTimeout(kill);
+      clearTimeout(deadline);
+    }),
+  );
 }
 
 /** The checkout has a Jig of its own to run. */
@@ -151,6 +225,20 @@ type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /**
+ * Why Jig refused, as it said it: each line of its message with `jig: error:` and the command's own `<command>:` cut off,
+ * and every absolute path cut out — `upgrade: cannot determine the framework source root; pass --from <dir>` becomes
+ * `cannot determine the framework source root; pass --from <dir>`. None without a message.
+ */
+function said(message: unknown, command: string | undefined): string[] {
+  if (typeof message !== 'string') return [];
+  return message.split('\n').flatMap((line) => {
+    let text = line.trim().replace(/^jig: error: /, '');
+    if (command && text.startsWith(`${command}: `)) text = text.slice(command.length + 2);
+    return text ? [withoutPaths(text)] : [];
+  });
+}
+
+/**
  * Runs a `--json` command and returns its `data` and the clone's revision — for a write, the one it was checked against. Jig's refusal throws
  * JigRefusal, as does output that is no JSON at all (a crash); an envelope of another shape throws
  * JigShapeError.
@@ -186,7 +274,7 @@ async function readJson(
       const reasons = message.split('\n').flatMap((line) => (line.startsWith('  - ') ? [withoutPaths(line.slice(4))] : []));
       throw new JigRefusal(code, reasons);
     }
-    throw new JigRefusal(typeof code === 'string' && CODES.has(code) ? code : 'failed');
+    throw new JigRefusal(typeof code === 'string' && CODES.has(code) ? code : 'failed', said(message, args[0]));
   }
   if (!isObject(envelope.data)) throw new JigShapeError();
   return { revision: envelope.revision, data: envelope.data };

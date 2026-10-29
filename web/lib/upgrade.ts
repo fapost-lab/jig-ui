@@ -138,6 +138,8 @@ export type PlanState =
   | {
       state: 'refused';
       message: string;
+      /** Jig's own reasons, when it gave any. */
+      reasons?: string[];
     };
 
 /** What a card says an upgrade came to: a line, how loud, its pull request, the steps left by hand, Jig's reasons. */
@@ -164,9 +166,11 @@ export function upgradeResult(run: Exclude<UpgradeRun, { state: 'running' }>): U
     if (run.code === 'upgrade-blocked') {
       return { text: 'Jig did not start the upgrade; nothing changed:', tone: 'attention', url: null, steps: [], reasons: run.reasons };
     }
-    const text =
-      'Jig could not finish the upgrade. If it got as far as a commit, the branch is there and the push or the pull request is left to you: run jig upgrade in the project to see why.';
-    return { text, tone: 'bad', url: null, steps: [], reasons: [] };
+    // Jig's own words, when it gave any, say why; without them the person runs it to see.
+    const text = run.reasons.length
+      ? 'Jig could not finish the upgrade. If it got as far as a commit, the branch is there and the push or the pull request is left to you. Jig said:'
+      : 'Jig could not finish the upgrade. If it got as far as a commit, the branch is there and the push or the pull request is left to you: run jig upgrade in the project to see why.';
+    return { text, tone: 'bad', url: null, steps: [], reasons: run.reasons };
   }
   const { outcome, git, manualSteps: steps } = run.upgrade;
   const to = run.upgrade.to ?? "this machine's Jig";

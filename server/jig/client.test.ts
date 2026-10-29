@@ -1,7 +1,8 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { setTimeout as delay } from 'node:timers/promises';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
   cancelPause,
   closeTask,
@@ -537,6 +538,18 @@ describe('upgrading the project', () => {
     expect((refused as JigRefusal).reasons).toEqual([expect.stringContaining('checked out here (record …); the upgrade would take')]);
   });
 
+  it("carries Jig's words with any other refusal, its own prefix and every path cut off", async () => {
+    const failed = (message: string) => JSON.stringify({ schema: 1, revision: 7, generated_at: 'x', error: { code: 'failed', message } });
+    const source = await planUpgrade(
+      answering(`case-${cases++}`, failed('upgrade: cannot determine the framework source root; pass --from <dir>'), 1),
+    ).catch((e: unknown) => e);
+    expect(source).toMatchObject({ code: 'failed', reasons: ['cannot determine the framework source root; pass --from <dir>'] });
+    const pathed = await runUpgrade(
+      answering(`case-${cases++}`, failed('jig: error: upgrade: no Jig at /Users/juve/.local/share/jig\nsecond line'), 1),
+    ).catch((e: unknown) => e);
+    expect(pathed).toMatchObject({ code: 'failed', reasons: ['no Jig at …', 'second line'] });
+  });
+
   it.each([
     ['an upgrade without its outcome', (d: Record<string, any>) => delete d.outcome],
     ['git without pushed', (d: Record<string, any>) => delete d.git.pushed],
@@ -747,5 +760,62 @@ describe("an upgrade's pull request", () => {
     const refused = await landUpgrade(answering('land-open', 'upgrade-land-not-merged.json', 1)).catch((e: unknown) => e);
     expect(refused).toBeInstanceOf(JigRefusal);
     expect(refused).toMatchObject({ code: 'not-merged' });
+  });
+});
+
+describe('stopJig', () => {
+  // A stop refuses every run after it: each case takes a client of its own.
+  const fresh = async () => {
+    vi.resetModules();
+    return import('./client.js');
+  };
+
+  it.skipIf(process.platform === 'win32')('stops an upgrade under way with everything it started, as Ctrl+C would', async () => {
+    const dir = join(root, 'stopped-upgrade');
+    mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
+    // An upgrade waiting for CI: the script waits on a child of its own, which writes its pid first.
+    writeFileSync(join(dir, '.ai', 'scripts', 'jig'), "#!/usr/bin/env bash\nbash -c 'echo $$ > waiter.pid; exec sleep 60'\n");
+    const client = await fresh();
+    const upgrade = client.runUpgrade(dir).catch((e: unknown) => e);
+    for (let waited = 0; !existsSync(join(dir, 'waiter.pid')) && waited < 5_000; waited += 25) await delay(25);
+    const waiter = Number(readFileSync(join(dir, 'waiter.pid'), 'utf8'));
+    const started = Date.now();
+    await client.stopJig(2_000);
+    expect(await upgrade).toBeInstanceOf(client.JigRefusal);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    // The child is gone too: signal 0 only asks whether the pid lives.
+    await delay(100);
+    expect(() => process.kill(waiter, 0)).toThrow();
+  });
+
+  it.skipIf(process.platform === 'win32')('gives up on a run whose output a process out of its group holds', async () => {
+    const dir = join(root, 'held-upgrade');
+    mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
+    // A daemon of the run's own (as ssh or git may leave) leaves the group and keeps the output open.
+    writeFileSync(
+      join(dir, '.ai', 'scripts', 'jig'),
+      "#!/usr/bin/env bash\nperl -MPOSIX -e 'POSIX::setsid(); exec qw(sleep 6)' &\nsleep 60\n",
+    );
+    const client = await fresh();
+    const upgrade = client.runUpgrade(dir).catch((e: unknown) => e);
+    await delay(300);
+    const started = Date.now();
+    await client.stopJig(200);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(1_000); // it waited for the run, past the SIGKILL
+    expect(Date.now() - started).toBeLessThan(3_000);
+    expect(await Promise.race([upgrade.then(() => 'answered'), delay(10, 'still held')])).toBe('still held');
+  });
+
+  it('refuses a run asked for once Jig UI is stopping', async () => {
+    const client = await fresh();
+    await client.stopJig(10);
+    const dir = answering('after-stop', 'upgrade-commit.json');
+    writeFileSync(join(dir, '.ai', 'scripts', 'jig'), '#!/usr/bin/env bash\ntouch ran\ncat out.json\n');
+    await expect(client.runUpgrade(dir)).rejects.toBeInstanceOf(client.JigRefusal);
+    expect(existsSync(join(dir, 'ran'))).toBe(false);
+  });
+
+  it('has nothing to stop when nothing runs', async () => {
+    await expect((await fresh()).stopJig(10)).resolves.toBeUndefined();
   });
 });

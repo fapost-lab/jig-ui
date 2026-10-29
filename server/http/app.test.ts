@@ -600,6 +600,7 @@ describe('/api/projects/:id/queue', () => {
     ['an upgrade under way', { state: 'refused', code: 'running' }, 409],
     ['no upgrade to make', { state: 'refused', code: 'not-found' }, 404],
     ["another refusal of Jig's", { state: 'refused', code: 'failed' }, 422],
+    ["a refusal with Jig's reasons", { state: 'refused', code: 'failed', reasons: ['pass --from <dir>'] as string[] }, 422],
     ['a project it cannot read', { id: 'x', state: 'unreadable', code: 'locked' }, 200],
     ['a project not connected', undefined, 404],
   ] as const)('answers a plan of an upgrade with %s', async (_, planned, status) => {
@@ -612,7 +613,13 @@ describe('/api/projects/:id/queue', () => {
         : planned.state === 'planned'
           ? { plan: planned.plan }
           : planned.state === 'refused'
-            ? { error: { code: planned.code, message: expect.any(String) } }
+            ? {
+                error: {
+                  code: planned.code,
+                  message: expect.any(String),
+                  ...('reasons' in planned ? { reasons: planned.reasons } : {}),
+                },
+              }
             : { project: planned },
     );
   });

@@ -327,3 +327,13 @@ describe('Check all merges', () => {
     );
   });
 });
+
+describe('upgradeResult, a run Jig could not finish', () => {
+  it('says what Jig said when it said why, and sends the person to the terminal when it did not', () => {
+    const at = '2026-10-29T10:00:00Z';
+    const said = upgradeResult({ state: 'refused', at, code: 'failed', reasons: ['pass --from <dir>'] });
+    expect(said).toMatchObject({ tone: 'bad', reasons: ['pass --from <dir>'] });
+    expect(said.text).toMatch(/Jig said:$/);
+    expect(upgradeResult({ state: 'refused', at, code: 'failed', reasons: [] }).text).toMatch(/run jig upgrade in the project/);
+  });
+});

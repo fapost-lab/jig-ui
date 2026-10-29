@@ -58,7 +58,7 @@ function project(
     queue?: unknown;
     /** What `queue move`, `set`, `request`, `cancel`, `task new` and `task resume` print, once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
     write?: unknown;
-    /** What `upgrade --dry-run` prints, as `data`. */
+    /** What `upgrade --dry-run` prints, as `data`, or a whole envelope as a string. */
     plan?: unknown;
     /** What `upgrade` prints once a file `go` is in the project: an envelope's `data`, or a whole envelope as a string. */
     upgrade?: unknown;
@@ -96,7 +96,7 @@ function project(
       ? JSON.stringify({ schema: 1, revision: 9, generated_at: 'x', error: { code: write, message: 'refused' } })
       : envelope(write),
   );
-  writeFileSync(join(dir, 'plan.json'), envelope(answers.plan ?? {}));
+  writeFileSync(join(dir, 'plan.json'), typeof answers.plan === 'string' ? answers.plan : envelope(answers.plan ?? {}));
   writeFileSync(join(dir, 'upgrade.json'), typeof answers.upgrade === 'string' ? answers.upgrade : envelope(answers.upgrade ?? {}));
   writeFileSync(join(dir, 'land.json'), typeof answers.land === 'string' ? answers.land : envelope(answers.land ?? {}));
   const self = answers.selfUpdate ?? {};
@@ -594,7 +594,7 @@ describe('localSource, writing the queue', () => {
     expect(writes(dir)).toEqual(['task resume a --revision 7 --json']);
     const stashed = project('stashed', '0.35.0', { tasks, write: 'wrong-checkout' });
     await source.connect(stashed);
-    expect(await source.resume('stashed', 'a', 7)).toEqual({ state: 'refused', code: 'wrong-checkout' });
+    expect(await source.resume('stashed', 'a', 7)).toEqual({ state: 'refused', code: 'wrong-checkout', reasons: ['refused'] });
   });
 
   describe('closing a ready task', () => {
@@ -687,7 +687,7 @@ describe('localSource, writing the queue', () => {
     const dir = project('stale', '0.31.0', { tasks, write: 'stale-revision' });
     await source.connect(dir);
     const from = calls(dir).length;
-    expect(await source.move('stale', 'a', 'top', 3)).toEqual({ state: 'refused', code: 'stale-revision' });
+    expect(await source.move('stale', 'a', 'top', 3)).toEqual({ state: 'refused', code: 'stale-revision', reasons: ['refused'] });
     const ran = since(dir, from);
     expect(ran.slice(ran.indexOf('queue move task:a --top --revision 3 --json') + 1)).toContain('task list --all --json');
   });
@@ -1121,6 +1121,23 @@ describe('localSource, upgrading a project', () => {
       code: 'upgrade-blocked',
       reasons: ['the working tree has uncommitted changes; commit them'],
     });
+  });
+
+  it("keeps Jig's words with a refusal of the plan and of the run, the paths cut out", async () => {
+    const refusal = JSON.stringify({
+      schema: 1,
+      revision: 7,
+      generated_at: 'x',
+      error: { code: 'failed', message: 'upgrade: cannot determine the framework source root (/Users/juve/x); pass --from <dir>' },
+    });
+    const lost = project('lost', '0.34.0', { status: { attention: [item], housekeeping: null }, plan: refusal, upgrade: refusal });
+    writeFileSync(join(lost, 'go'), '');
+    await source.connect(lost);
+    const reasons = ['cannot determine the framework source root (…); pass --from <dir>'];
+    expect(await source.planUpgrade('lost')).toEqual({ state: 'refused', code: 'failed', reasons });
+    await source.upgrade('lost');
+    await ended('lost');
+    expect(await upgradeOf('lost')).toEqual({ state: 'refused', at: expect.any(String), code: 'failed', reasons });
   });
 
   it('tells a listener when an upgrade starts and when it ends', async () => {

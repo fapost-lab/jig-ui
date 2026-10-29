@@ -13,10 +13,17 @@ them. It is for developers with a terminal and Node.js. Jig works exactly as bef
 ## Built
 
 - `server/cli.ts` — the `jig-ui` command. It imports nothing but the Node version check, so an
-  old Node prints the requirement instead of a stack trace, then loads `server/main.ts`.
+  old Node prints the requirement instead of a stack trace, then loads `server/main.ts`, which
+  dispatches the commands parsed in `args.ts`: none (the start flow below), `serve`, and `start`,
+  `stop`, `status`, `open`.
+- `server/service.ts` — the background instance: `start` runs the CLI itself as `serve` (the
+  server with no browser and no folder) detached, output in `server.log`, and waits for it to
+  answer; `stop` asks the instance over HTTP; `status` and `open` read and probe. A probe tells
+  `up`, `gone` (refused, or another's answer: a stale file) and `silent` (maybe busy: touched by
+  nothing). Its system calls are injected, so tests start and signal no process.
 - `server/http/` — the Hono app on 127.0.0.1: security headers, then the access guard in
   `access.ts` (local-only `Host`/`Origin`, then the per-start token swapped for a cookie;
-  convention-access-guard) before every route, `GET /api/instance`, and the built page from
+  convention-access-guard) before every route, `GET /api/instance`, `POST /api/instance/stop` (the same shutdown as SIGTERM, after its 202), and the built page from
   `dist/web`. The API's routes are chained in `apiRoutes()`, whose type `AppType` the page takes
   (adr-20261018-page-takes-api-types-through-hono-rpc). A route's refusal is
   `{ error: { code, message } }`, and so is what `onError` answers: Hono's own (a body that is no

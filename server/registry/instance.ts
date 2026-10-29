@@ -42,17 +42,39 @@ export async function removeInstance(dir: string, token: string): Promise<void> 
   await rm(join(dir, FILE), { force: true });
 }
 
+/**
+ * What a probe heard on the instance's port. `up`: the instance, with its token. `gone`: a refused
+ * connection, or an answer that is not the instance's — it is not there, and its file is stale.
+ * `silent`: no answer in time — it may be alive and busy, so nothing may treat its file as stale.
+ */
+export type Answer = 'up' | 'gone' | 'silent';
+
+const causeCode = (error: unknown): string | undefined => (error as { cause?: { code?: string } }).cause?.code;
+/** A connection refused outright: nothing listens on the port. */
+const refused = (error: unknown): boolean => causeCode(error) === 'ECONNREFUSED';
+
+export async function askInstance(info: Pick<InstanceInfo, 'port' | 'token'>, timeoutMs = 1000): Promise<Answer> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(`http://127.0.0.1:${info.port}/api/instance`, {
+        headers: { cookie: `${cookieName(info.port)}=${info.token}` },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      // An unread body holds the connection, and the next probe of a stop's wait would queue behind it.
+      await res.body?.cancel();
+      return res.ok ? 'up' : 'gone';
+    } catch (error) {
+      if (refused(error)) return 'gone';
+      // A kept-alive connection to a server that has since stopped is reset; a new one tells.
+      if (causeCode(error) === 'ECONNRESET' && attempt === 0) continue;
+      return 'silent';
+    }
+  }
+}
+
 /** True when an instance answers on its port with its token; a crash leaves the file behind. */
 export async function probeInstance(info: InstanceInfo, timeoutMs = 1000): Promise<boolean> {
-  try {
-    const res = await fetch(`http://127.0.0.1:${info.port}/api/instance`, {
-      headers: { cookie: `${cookieName(info.port)}=${info.token}` },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
+  return (await askInstance(info, timeoutMs)) === 'up';
 }
 
 /** What a connect through a running instance came to: the project's id, or the code and message it was refused with. */
@@ -67,7 +89,7 @@ export type Connected =
     };
 
 // An instance before 0.2.0 answers a failure it did not foresee in plain text: neither of these.
-const Answer = z.union([
+const Reply = z.union([
   z.object({ project: z.object({ id: z.string() }) }),
   z.object({ error: z.object({ code: z.string(), message: z.string() }) }),
 ]);
@@ -81,10 +103,34 @@ export async function connectThrough(info: Pick<InstanceInfo, 'port' | 'token'>,
       body: JSON.stringify({ path }),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    const body = Answer.safeParse(await res.json().catch(() => undefined)).data;
+    const body = Reply.safeParse(await res.json().catch(() => undefined)).data;
     if (body && 'project' in body) return { id: body.project.id, created: res.status === 201 };
     return body?.error ?? { code: 'unexpected', message: `Jig UI answered ${res.status}.` };
   } catch (error) {
     return { code: 'unreachable', message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * What a stop request came to. `unsupported`: an instance from before the endpoint existed (404).
+ * `unreachable`: nothing answered. Any other answer, or a connection cut after the request went
+ * out, is `stopping`: the server closes its sockets as it shuts down, so the caller waits on the
+ * probe to learn whether it really went.
+ */
+export type StopRequested = 'stopping' | 'unsupported' | 'unreachable';
+
+/** Asks the instance to shut down, as `connectThrough` asks it to connect: the token proves the instance is ours. */
+export async function requestStop(info: Pick<InstanceInfo, 'port' | 'token'>, timeoutMs = 5000): Promise<StopRequested> {
+  try {
+    const res = await fetch(`http://127.0.0.1:${info.port}/api/instance/stop`, {
+      method: 'POST',
+      headers: { cookie: `${cookieName(info.port)}=${info.token}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    await res.body?.cancel();
+    return res.status === 404 ? 'unsupported' : 'stopping';
+  } catch (error) {
+    // A timeout or reset after the request was sent may still be a server going down; a refusal is not.
+    return refused(error) ? 'unreachable' : 'stopping';
   }
 }

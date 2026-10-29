@@ -11,12 +11,30 @@ export type CliCommand =
       open: boolean;
     }
   | {
+      kind: 'start';
+      port: number;
+    }
+  | { kind: 'stop' }
+  | { kind: 'status' }
+  | { kind: 'open' }
+  | {
+      kind: 'serve';
+      port: number;
+    }
+  | {
       kind: 'error';
       message: string;
     };
 
+const SUBCOMMANDS = ['start', 'stop', 'status', 'open', 'serve'] as const;
+type Subcommand = (typeof SUBCOMMANDS)[number];
+
+/** Subcommands that listen on a port; the others only talk to the instance that does. */
+const TAKES_PORT: ReadonlySet<string> = new Set<Subcommand | 'run'>(['run', 'start', 'serve']);
+
 /** Parses the command line (without the node and script entries). Pure: it never exits or prints. */
 export function parseCliArgs(argv: string[]): CliCommand {
+  let positionals: string[];
   let values: {
     port?: string;
     'no-open'?: boolean;
@@ -24,10 +42,10 @@ export function parseCliArgs(argv: string[]): CliCommand {
     version?: boolean;
   };
   try {
-    ({ values } = parseArgs({
+    ({ values, positionals } = parseArgs({
       args: argv,
       strict: true,
-      allowPositionals: false,
+      allowPositionals: true,
       options: {
         port: { type: 'string' },
         'no-open': { type: 'boolean' },
@@ -41,12 +59,37 @@ export function parseCliArgs(argv: string[]): CliCommand {
 
   if (values.help) return { kind: 'help' };
   if (values.version) return { kind: 'version' };
-  const open = !values['no-open'];
-  if (values.port === undefined) return { kind: 'run', port: DEFAULT_PORT, open };
 
-  const port = /^\d+$/.test(values.port) ? Number(values.port) : Number.NaN;
-  if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    return { kind: 'error', message: `Invalid --port value: ${values.port}. Use a number from 1 to 65535.` };
+  const [name, ...rest] = positionals;
+  if (rest.length > 0) return { kind: 'error', message: `Unexpected argument: ${rest[0]}` };
+  if (name !== undefined && !(SUBCOMMANDS as readonly string[]).includes(name)) {
+    return { kind: 'error', message: `Unknown command: ${name}. Run jig-ui --help.` };
   }
-  return { kind: 'run', port, open };
+  const command = name ?? 'run';
+  if (values.port !== undefined && !TAKES_PORT.has(command)) {
+    return { kind: 'error', message: `--port does not apply to ${command}.` };
+  }
+  if (values['no-open'] && command !== 'run') {
+    return { kind: 'error', message: `--no-open does not apply to ${command}.` };
+  }
+
+  let port = DEFAULT_PORT;
+  if (values.port !== undefined) {
+    port = /^\d+$/.test(values.port) ? Number(values.port) : Number.NaN;
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      return { kind: 'error', message: `Invalid --port value: ${values.port}. Use a number from 1 to 65535.` };
+    }
+  }
+
+  switch (command) {
+    case 'start':
+    case 'serve':
+      return { kind: command, port };
+    case 'stop':
+    case 'status':
+    case 'open':
+      return { kind: command };
+    default:
+      return { kind: 'run', port, open: !values['no-open'] };
+  }
 }

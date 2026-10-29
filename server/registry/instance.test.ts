@@ -1,19 +1,22 @@
 import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { serve } from '@hono/node-server';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../http/app.js';
 import { localSource } from '../source/local.js';
 import type { ProjectSource } from '../source/project-source.js';
 import { configDir } from './config-dir.js';
 import {
+  askInstance,
   connectThrough,
   type InstanceInfo,
   OPEN_FILE,
   probeInstance,
   readInstance,
   removeInstance,
+  requestStop,
   writeConfigFile,
   writeInstance,
 } from './instance.js';
@@ -120,5 +123,83 @@ describe('connectThrough', () => {
       server.close();
     }
     expect(await connectThrough({ ...info, port, token }, '/p')).toMatchObject({ code: 'unreachable' });
+  });
+});
+
+/** A Jig UI server on a free port, as `main.ts` serves it. */
+async function listening(
+  token: string,
+  stop?: () => void,
+): Promise<{
+  port: number;
+  close: () => void;
+}> {
+  let port = 0;
+  const server = await new Promise<ReturnType<typeof serve>>((resolve) => {
+    const s = serve(
+      {
+        fetch: (req) => createApp({ port, token, source: localSource(root), version: '0.1.0', stop }).fetch(req),
+        hostname: '127.0.0.1',
+        port: 0,
+      },
+      () => resolve(s),
+    );
+  });
+  port = (server.address() as { port: number }).port;
+  // As `main.ts` stops: kept-alive connections go too, so the port refuses at once.
+  const close = () => {
+    server.close();
+    if ('closeAllConnections' in server) server.closeAllConnections();
+  };
+  return { port, close };
+}
+
+describe('askInstance', () => {
+  it('tells the instance from a port that refuses or answers as someone else', async () => {
+    const token = 'live-token';
+    const { port, close } = await listening(token);
+    try {
+      expect(await askInstance({ port, token })).toBe('up');
+      expect(await askInstance({ port, token: 'stale' })).toBe('gone');
+    } finally {
+      close();
+    }
+    expect(await askInstance({ port, token })).toBe('gone');
+  });
+
+  it('is silent, not gone, when the port takes the connection and never answers', async () => {
+    const server = createServer(() => {});
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const { port } = server.address() as { port: number };
+    try {
+      expect(await askInstance({ port, token: 't' }, 200)).toBe('silent');
+    } finally {
+      server.close();
+    }
+  });
+});
+
+describe('requestStop', () => {
+  it('asks the instance to stop with its token', async () => {
+    const token = 'live-token';
+    const stop = vi.fn();
+    const { port, close } = await listening(token, stop);
+    try {
+      expect(await requestStop({ port, token })).toBe('stopping');
+      await vi.waitFor(() => expect(stop).toHaveBeenCalledOnce());
+    } finally {
+      close();
+    }
+    expect(await requestStop({ port, token })).toBe('unreachable');
+  });
+
+  it('is unsupported where the instance has no such endpoint', async () => {
+    const token = 'live-token';
+    const { port, close } = await listening(token);
+    try {
+      expect(await requestStop({ port, token })).toBe('unsupported');
+    } finally {
+      close();
+    }
   });
 });

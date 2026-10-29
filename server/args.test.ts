@@ -34,4 +34,37 @@ describe('parseCliArgs', () => {
     expect(parseCliArgs(['--nope']).kind).toBe('error');
     expect(parseCliArgs(['extra']).kind).toBe('error');
   });
+
+  it('reads the subcommands', () => {
+    expect(parseCliArgs(['start'])).toEqual({ kind: 'start', port: DEFAULT_PORT });
+    expect(parseCliArgs(['start', '--port', '5000'])).toEqual({ kind: 'start', port: 5000 });
+    expect(parseCliArgs(['--port=5001', 'serve'])).toEqual({ kind: 'serve', port: 5001 });
+    expect(parseCliArgs(['serve'])).toEqual({ kind: 'serve', port: DEFAULT_PORT });
+    expect(parseCliArgs(['stop'])).toEqual({ kind: 'stop' });
+    expect(parseCliArgs(['status'])).toEqual({ kind: 'status' });
+    expect(parseCliArgs(['open'])).toEqual({ kind: 'open' });
+  });
+
+  it('lets help and version win over any subcommand', () => {
+    expect(parseCliArgs(['stop', '--help'])).toEqual({ kind: 'help' });
+    expect(parseCliArgs(['start', '-v'])).toEqual({ kind: 'version' });
+  });
+
+  it('rejects an unknown subcommand and a second positional', () => {
+    expect(parseCliArgs(['restart']).kind).toBe('error');
+    expect(parseCliArgs(['start', 'stop']).kind).toBe('error');
+  });
+
+  it('rejects a flag the subcommand does not take', () => {
+    expect(parseCliArgs(['stop', '--port', '5000']).kind).toBe('error');
+    expect(parseCliArgs(['status', '--port=5000']).kind).toBe('error');
+    expect(parseCliArgs(['open', '--port', '5000']).kind).toBe('error');
+    expect(parseCliArgs(['start', '--no-open']).kind).toBe('error');
+    expect(parseCliArgs(['serve', '--no-open']).kind).toBe('error');
+    expect(parseCliArgs(['stop', '--no-open']).kind).toBe('error');
+  });
+
+  it('rejects an invalid port for a subcommand', () => {
+    expect(parseCliArgs(['start', '--port', 'abc']).kind).toBe('error');
+  });
 });

@@ -35,6 +35,8 @@ export interface AppOptions {
   version?: string;
   /** Directory of the built page. */
   webRoot?: string;
+  /** Shuts the server down; `POST /api/instance/stop` calls it after answering. Without it the route is absent. */
+  stop?: () => void;
 }
 
 /** How often an idle stream sends a comment, so a closed tab is noticed and its subscription ends. */
@@ -98,10 +100,17 @@ function upgradeRefused(c: Context, code: string) {
  * The API, chained so that its type carries every route's answers: the page derives its types
  * from `AppType` and never declares them a second time.
  */
-function apiRoutes(source: ProjectSource, version: string) {
+function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
   return (
     new Hono()
       .get('/api/instance', (c) => c.json({ version }, 200))
+
+      .post('/api/instance/stop', (c) => {
+        if (!stop) return refuse(c, 404, 'not-found', 'This instance cannot be stopped from here.');
+        // After the reply is written, or the caller sees a cut connection instead of the 202.
+        setTimeout(stop, 50);
+        return c.json({ stopping: true }, 202);
+      })
 
       .get('/api/workspace', async (c) => c.json({ projects: await source.workspace(), machine: source.machine() }, 200))
 
@@ -337,7 +346,7 @@ function apiRoutes(source: ProjectSource, version: string) {
 /** The API's type, for the page; `import type` only, so no server code reaches its bundle. */
 export type AppType = ReturnType<typeof apiRoutes>;
 
-export function createApp({ port, token, source, version = readPackageVersion(), webRoot = DEFAULT_WEB_ROOT }: AppOptions): Hono {
+export function createApp({ port, token, source, version = readPackageVersion(), webRoot = DEFAULT_WEB_ROOT, stop }: AppOptions): Hono {
   const app = new Hono();
   // Before the guard, so its refusals carry them too; HSTS means nothing on http://127.0.0.1.
   app.use(secureHeaders({ strictTransportSecurity: false }));
@@ -352,7 +361,7 @@ export function createApp({ port, token, source, version = readPackageVersion(),
     return refuse(c, 500, 'internal', 'Jig UI hit an error it did not expect; its terminal says what.');
   });
 
-  app.route('/', apiRoutes(source, version));
+  app.route('/', apiRoutes(source, version, stop));
   app.all('/api/*', (c) => c.json({ error: 'not found' }, 404));
 
   if (existsSync(join(webRoot, 'index.html'))) {

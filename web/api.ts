@@ -7,6 +7,8 @@ type Api = typeof client.api;
 type Ok<R> = InferResponseType<R, 200>;
 
 export type Project = Ok<Api['workspace']['$get']>['projects'][number];
+/** The runs that change this machine's Jig or every project: a self-update, Upgrade all. */
+export type Machine = Ok<Api['workspace']['$get']>['machine'];
 export type Attention = Extract<Project, { state: 'ready' }>['attention'][number];
 export type Board = Ok<Api['projects'][':id']['board']['$get']>['board'];
 export type Column = Extract<Board, { state: 'ready' }>['columns'][number];

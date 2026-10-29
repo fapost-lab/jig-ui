@@ -13,8 +13,8 @@ inside it. Jig UI connects the project and opens its board, starting itself firs
 running. In a worktree it connects the clone's main checkout and says so. Run anywhere else, it
 only starts. Running it again in a connected project changes nothing; it opens the board.
 
-**From the page.** Paste the path of the project's **main checkout** — the folder you cloned — into the field on the
-page and choose **Connect**. A path inside the project works too; Jig UI connects the project's
+**From the page.** Paste the path of the project's **main checkout** — the folder you cloned — into the field at the
+top of the page, above the projects, and choose **Connect**. A path inside the project works too; Jig UI connects the project's
 root. `~/` stands for your home folder.
 
 The project needs [Jig 0.31.0 or later](/requirements). Each project gets a short id from its
@@ -53,7 +53,8 @@ switches it to light, and the browser remembers the choice. For a readable proje
 - **The newer Jig on this machine**, after the project's own version, when the project runs an
   older Jig than the one installed here: *0.34.0 → 0.35.0 on this machine*, and **Upgrade…** to
   upgrade it from the page ([Upgrading a project's Jig](#upgrading-a-projects-jig)). Above the
-  projects, a line counts how many need it.
+  projects, a line counts how many need it. A project whose Jig says a newer release is out —
+  *jig v0.38.0 is out* — gets **Upgrade…** too: it updates this machine's Jig first.
 
 The project's Jig says when it is behind, from Jig 0.34.0 on; a project on an older Jig shows only
 its version, so compare it with `jig --version` yourself.
@@ -71,6 +72,12 @@ project whose state is not readable shows why:
 | There is no Jig in the project any more | Jig was removed from the project. |
 
 ## Upgrading a project's Jig
+
+When Jig says a newer release is out and this machine's Jig is not on it yet, **Upgrade…** first
+asks to update this machine's Jig: **Update Jig on this machine** runs `jig self-update`, which
+moves the Jig installed here — the one every project upgrades from — to the newest release. It
+changes no project. Then the card goes on as below. If it fails, the card says why: a framework
+checkout with uncommitted changes, or a remote it cannot reach.
 
 **Upgrade…** on a marked project asks Jig what the upgrade would do — `jig upgrade --dry-run`,
 which changes nothing — and shows it on the card:
@@ -98,7 +105,18 @@ UI stops: it is not kept anywhere.
 - Stopping Jig UI with Ctrl+C while an upgrade runs stops the upgrade too; run `jig upgrade` in the
   project to carry it on.
 
-One project at a time: there is no "upgrade all".
+### Upgrade all
+
+**Upgrade all…** above the projects lists every project with an upgrade to make, and whether this
+machine's Jig is updated first. Confirmed, it runs `jig self-update` when a project says a release
+is out, then `jig upgrade` in each project in turn, one at a time, the order they were connected —
+without the dry run each card shows. Each card says *Upgrading…* and then what its upgrade came
+to, as above; the line above the projects names the project being upgraded and, at the end, which
+were upgraded and which were left alone: up to date, or not readable just then. If `jig self-update`
+fails, no project is upgraded and the line says why.
+
+While Upgrade all or a self-update runs, no card offers **Upgrade…**; and **Upgrade all…** is
+offered only while no project is being upgraded.
 
 ## The board
 

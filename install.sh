@@ -146,7 +146,7 @@ main() {
       if windows; then ran=$("$top/node" --version 2>/dev/null || true); else ran=$("$top/bin/node" --version 2>/dev/null || true); fi
       [ "$ran" = "$version" ] || fail "Node.js $version does not run on this system; nothing was installed. $MANUAL"
       if [ -e "$data/node" ]; then
-        mv "$data/node" "$tmp/old" || fail "$data/node is in use — stop Jig UI (Ctrl+C) and run the line again."
+        mv "$data/node" "$tmp/old" || fail "$data/node is in use — stop Jig UI (jig-ui stop, or Ctrl+C where it runs) and run the line again."
       fi
       if ! mv "$top" "$data/node"; then
         [ -e "$tmp/old" ] && mv "$tmp/old" "$data/node"

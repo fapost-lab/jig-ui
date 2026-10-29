@@ -87,7 +87,7 @@ export function describe(project: ProjectState): string {
     return `${found} — Jig UI needs ${project.minimum} or later. Run jig upgrade in the project.`;
   }
   if (project.state === 'incompatible') {
-    return `Jig ${project.jigVersion} answers in a form this Jig UI does not read. Update Jig UI: npx @fapost/jig-ui@latest.`;
+    return `Jig ${project.jigVersion} answers in a form this Jig UI does not read. Update Jig UI: npx @fapost/jig-ui@latest, or jig-ui if it was installed without Node.js.`;
   }
   if (project.state === 'unreadable') return `Jig could not be read (${project.code}). It is tried again on the next change.`;
   return project.reason === 'missing' ? 'The project directory is not there any more.' : 'There is no Jig in the project any more.';

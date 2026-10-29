@@ -19,7 +19,8 @@
   /** Upgrade all's confirmation is open. */
   const confirmingAll = ref(false);
   const allRefusal = ref<string>();
-  const allPlan = computed(() => upgradeAllPlan(projects.value ?? []));
+  const release = computed(() => machine.value?.release ?? null);
+  const allPlan = computed(() => upgradeAllPlan(projects.value ?? [], release.value));
   /** No card starts an upgrade while a self-update or Upgrade all runs. */
   const held = computed(() => machineBusy(machine.value));
   // Upgrade all waits for every upgrade under way: they run one at a time.
@@ -66,8 +67,8 @@
 
   /** Upgrade on a card: Jig's plan when the machine's Jig is ahead, or first the question to update it when a release is out. */
   function start(project: Project): void {
-    const release = releaseOf(project);
-    if (upgradeOf(project) === undefined && release !== undefined) plans.value[project.id] = { state: 'confirm-self-update', release };
+    const out = releaseOf(project, release.value);
+    if (upgradeOf(project) === undefined && out !== undefined) plans.value[project.id] = { state: 'confirm-self-update', release: out };
     else void plan(project.id);
   }
 
@@ -184,6 +185,7 @@
       :project="project"
       :plan="plans[project.id]"
       :held="held"
+      :release="release"
       @disconnect="disconnect(project.id)"
       @start="start(project)"
       @self-update="selfUpdate(project.id)"

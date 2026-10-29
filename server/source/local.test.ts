@@ -1012,7 +1012,7 @@ describe('localSource, self-update and Upgrade all', () => {
     kind: 'release-available',
     subject: { type: 'project', id: null },
     tasks: [],
-    title: 'A newer Jig is out',
+    title: 'jig v0.36.0 is out',
     detail: null,
     todo: 'jig self-update',
     url: null,
@@ -1056,7 +1056,7 @@ describe('localSource, self-update and Upgrade all', () => {
   }
 
   it('shows nothing of the machine before it does anything', () => {
-    expect(fresh().source.machine()).toEqual({ selfUpdate: null, upgradeAll: null });
+    expect(fresh().source.machine()).toEqual({ release: null, selfUpdate: null, upgradeAll: null });
   });
 
   describe('self-update', () => {
@@ -1180,6 +1180,18 @@ describe('localSource, self-update and Upgrade all', () => {
       expect(calls(two)).not.toContain('self-update');
       expect(log(one, 'upgrade --json')).toBe(1);
       expect(log(two, 'upgrade --json')).toBe(1);
+    });
+
+    it("names the newest release any project's last read names, for every project", async () => {
+      const { source } = fresh();
+      await source.connect(project('rel-heard', '0.35.0', { status: { attention: [release], housekeeping: null } }));
+      await source.connect(
+        project('rel-newer', '0.35.0', { status: { attention: [{ ...release, title: 'jig v0.36.1 is out' }], housekeeping: null } }),
+      );
+      // Its housekeeping has not heard of either.
+      await source.connect(project('rel-deaf', '0.35.0'));
+      await source.workspace();
+      expect(source.machine().release).toBe('0.36.1');
     });
 
     it('never upgrades a project disconnected while it waits its turn, and keeps the one being upgraded', async () => {
@@ -1338,10 +1350,10 @@ describe('localSource, self-update and Upgrade all', () => {
       await ended(source);
       expect(source.machine().upgradeAll?.state).toBe('done');
       source.dismissUpgradeAll();
-      expect(source.machine()).toEqual({ selfUpdate: null, upgradeAll: null });
+      expect(source.machine()).toEqual({ release: null, selfUpdate: null, upgradeAll: null });
       // Dismissing nothing is harmless.
       source.dismissUpgradeAll();
-      expect(source.machine()).toEqual({ selfUpdate: null, upgradeAll: null });
+      expect(source.machine()).toEqual({ release: null, selfUpdate: null, upgradeAll: null });
       expect(await source.upgradeAll()).toEqual({ state: 'started' });
       await ended(source);
     });

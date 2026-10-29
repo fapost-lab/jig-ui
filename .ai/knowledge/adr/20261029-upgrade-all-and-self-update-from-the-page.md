@@ -36,6 +36,11 @@ checkout of the newest release tag). It prints text, not JSON.
   fetch, two minutes at most — and every project is read again. The card then asks for the dry run
   as before. Decided with the maintainer, 2026-10-29: the confirmation, not a separate machine-wide
   button.
+- **A release is the machine's, not one project's.** Jig learns of a release per project, at that
+  project's own `jig housekeeping` (`.ai/runtime/latest-release`), so one project can say
+  *jig v0.38.0 is out* while another on the same Jig, its housekeeping older, says nothing. The
+  workspace carries `machine.release` — the newest release any connected project names — and the
+  page offers **Upgrade…** on every project on an older Jig. Task `release-for-every-project`.
 - **Upgrade all.** `POST /api/upgrade-all` answers `202` at once; in the server's background it
   self-updates first when any project shows `release-available` (a failure stops it before any
   project), then runs `jig upgrade` in each connected project that shows `upgrade-available`, in

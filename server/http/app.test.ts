@@ -44,6 +44,27 @@ describe('createApp', () => {
   });
 });
 
+describe('stop', () => {
+  const post = (target: Hono, headers: Record<string, string>) => target.request('/api/instance/stop', { method: 'POST', headers });
+
+  it('answers 202 and then stops, for the cookie only', async () => {
+    const stop = vi.fn();
+    const stoppable = createApp({ port: PORT, token: TOKEN, source: localSource(join(webRoot, 'config')), webRoot, stop });
+    expect((await post(stoppable, { host: HOST })).status).toBe(401);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(stop).not.toHaveBeenCalled();
+
+    const res = await post(stoppable, { host: HOST, cookie: COOKIE });
+    expect(res.status).toBe(202);
+    expect(await res.json()).toEqual({ stopping: true });
+    await vi.waitFor(() => expect(stop).toHaveBeenCalledTimes(1));
+  });
+
+  it('answers 404 when the app cannot stop', async () => {
+    expect((await post(app, { host: HOST, cookie: COOKIE })).status).toBe(404);
+  });
+});
+
 describe('token', () => {
   it('swaps the right token for a cookie and redirects to /', async () => {
     const res = await get(`/?token=${TOKEN}`, { host: HOST });
@@ -188,7 +209,7 @@ describe('/api/projects and /api/workspace', () => {
         { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0', upgrade: null },
         { id: 'broken', state: 'unreadable', code: 'failed', upgrade: null },
       ],
-      machine: { selfUpdate: null, upgradeAll: null },
+      machine: { release: null, selfUpdate: null, upgradeAll: null },
     });
     expectNoPath(text);
     expect(text).not.toContain('"path"');
@@ -669,6 +690,7 @@ describe('/api/self-update and /api/upgrade-all', () => {
 
   it('shows what the machine is doing beside the projects', async () => {
     const machine = {
+      release: '0.38.0',
       selfUpdate: { state: 'failed' as const, at: 'x', reasons: ['no remote'] },
       upgradeAll: { state: 'running' as const, since: 'y', current: 'a', upgraded: ['b'] },
     };

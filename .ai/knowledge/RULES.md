@@ -10,7 +10,9 @@ are added as sections of this file.
   (spec `jig-ui`; adr-20261014-jig-ui-is-an-optional-layer-over-jig. Checked in review: no file
   write outside the config directory.)
 - Jig UI stores nothing but its project registry, interface settings and the running instance's
-  `instance.json` and `open.html`, in the user's config directory, written atomically. A
+  `instance.json` and `open.html`, in the user's config directory, written atomically — and the
+  background instance's `server.log` there, its output, overwritten by each `jig-ui start`
+  (task background-service). A
   preference of one browser — the theme, Board or List — is that browser's `localStorage`, not
   a file. (adr-20261014-local-server-access-guard,
   adr-20261017-browser-opens-through-a-redirect-file, adr-20261018-page-built-from-shadcn-vue-with-router-and-canvas. Checked in review.)
@@ -19,7 +21,7 @@ are added as sections of this file.
 - Only `server/jig/` runs `jig` or knows the shape of its output.
   (convention-jig-client. Checked in review: nothing outside `server/jig/` spawns `jig` or names
   Jig's fields; the only other `child_process` uses are `server/open-browser.ts` starting the
-  system browser opener, `git rev-parse` and `git worktree list` in `server/source/` telling a main
+  system browser opener, `server/service.ts` starting the CLI itself detached as `serve`, `git rev-parse` and `git worktree list` in `server/source/` telling a main
   checkout from a worktree and finding a worktree's main checkout, and `git --exec-path` in `server/jig/` finding Git's bash on Windows.)
 - `install.sh` writes only Jig UI's Node.js folder and its own `jig-ui` command, never over a
   command it did not write, and installs Node.js only after its SHA-256 sum matched nodejs.org's; it
@@ -29,6 +31,11 @@ are added as sections of this file.
   (adr-20261014-project-source-port-keeps-hosting-open. Checked by tests on the API responses.)
 - The server binds 127.0.0.1 unless a guard other than the local token is in place, refuses a
   foreign `Host` or `Origin`, and refuses every API call without the token.
+- `jig-ui stop` never signals a pid read from `instance.json` on its own word: it asks the instance
+  over `POST /api/instance/stop` with the token, and sends SIGTERM only to an older instance that
+  answered the probe with its token and has no such route. A file whose port refuses is removed
+  with no signal; one whose port stays silent is left alone, as the instance may only be busy.
+  (task background-service. Checked by tests in `server/service.test.ts`.)
   (adr-20261014-local-server-access-guard. Checked by tests.)
 
 ## Rules

@@ -8,7 +8,7 @@ paths:
   - "server/http/**"
   - "server/registry/**"
   - server/main.ts
-summary: 127.0.0.1 with Host/Origin checks, a per-start token, one instance, registry in the user's config dir
+summary: 127.0.0.1 with Host/Origin checks, a token kept across starts (adr-20261029-the-token-outlives-a-start), one instance, registry in the user's config dir
 ---
 # The local server is reachable only from the user's browser on this machine
 
@@ -22,7 +22,8 @@ requests, DNS rebinding) or another user on the machine must not be able to driv
 
 - The server listens on 127.0.0.1 by default and refuses a request whose `Host` or `Origin` is not
   that local address. No CORS.
-- Each start makes a random token. The browser is opened on a link that carries it, the server
+- A random token (kept across starts since adr-20261029-the-token-outlives-a-start; each start
+  made a new one before). The browser is opened on a link that carries it, the server
   swaps it for a cookie, and every API call without it is refused.
 - One instance: a fixed default port, changed by a flag. The running instance records its port and
   token in the config directory; a second start checks that the instance answers with that token,
@@ -42,4 +43,5 @@ requests, DNS rebinding) or another user on the machine must not be able to driv
 
 - The token does not keep out processes of the same user, agents included: they can read it. They
   can run `jig` in those projects directly anyway; the guard claims no more than that.
-- A bookmark of the page stops working after a restart; the start command reopens it.
+- A bookmark of the page stopped working after a restart; since
+  adr-20261029-the-token-outlives-a-start it keeps working until the token is reset.

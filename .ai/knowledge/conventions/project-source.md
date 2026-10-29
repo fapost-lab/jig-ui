@@ -28,7 +28,9 @@ Why:      a later remote adapter (a connector on the projects' machine) must fit
 
 Callers (`board/`, and `http/` for task details and the change stream) depend on the port, never on `jig/` or `watch/` directly.
 
-The port is `ProjectSource` in `server/source/project-source.ts` — the workspace, a project's
+The port is `ProjectSource` in `server/source/project-source.ts` — the workspace, the connected ids
+(`connected()`, read from the registry without running Jig) and one project as the workspace shows it
+(`project(id)`), for a page that lists the projects before their reads land, a project's
 live tasks and the finished ones Jig still keeps (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), its specs
 (`specs(id)`), `readAgain(id)` — the project read through Jig now, for a person's Read again — connect,
 disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,

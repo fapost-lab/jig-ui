@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
 import { serve } from '@hono/node-server';
@@ -8,6 +7,7 @@ import { stopJig } from './jig/client.js';
 import { openBrowser } from './open-browser.js';
 import { configDir } from './registry/config-dir.js';
 import { connectThrough, type InstanceInfo, probeInstance, readInstance, removeInstance, writeInstance } from './registry/instance.js';
+import { loadToken, resetToken } from './registry/token.js';
 import { mainCheckout } from './source/checkout.js';
 import { instanceStatus, startInstance, stopInstance } from './service.js';
 import { localSource } from './source/local.js';
@@ -15,21 +15,22 @@ import { localSource } from './source/local.js';
 const HOST = '127.0.0.1';
 
 const HELP = `Usage: jig-ui [options]
-       jig-ui start [--port <n>]
-       jig-ui stop | status | open
+       jig-ui start [--port <n>] [--no-open]
+       jig-ui stop | status | open | reset-token
 
 Run without a command, Jig UI runs in this terminal and opens the browser.
 
 Commands:
-  start          Start Jig UI in the background
+  start          Start Jig UI in the background and open the browser
   stop           Stop the running Jig UI
   status         Say whether Jig UI is running (exit code 3 when it is not)
   open           Open the running Jig UI in the browser
+  reset-token    Make the next start use a new token: pages opened with the old one are refused
   serve          Run in this terminal without a browser or a folder: what start runs
 
 Options:
   --port <n>     Port to listen on (default 4870); run, start and serve
-  --no-open      Print the link instead of opening the browser; run only
+  --no-open      Print the link instead of opening the browser; run and start
   -v, --version  Print the version and exit
   -h, --help     Print this help and exit
 `;
@@ -123,10 +124,13 @@ async function runServer(command: Extract<CliCommand, { kind: 'run' | 'serve' }>
   }
 
   const version = readPackageVersion();
-  const token = randomBytes(32).toString('base64url');
+  // Kept across starts, so that a page left open still works after a restart (reset-token forgets it).
+  const token = await loadToken(dir).catch((error: unknown) =>
+    fail(`Could not read or write the token in ${dir}: ${error instanceof Error ? error.message : String(error)}`),
+  );
   const shutdown = (): void => {
     // A Jig run under way — an upgrade above all — ends with Jig UI, however Jig UI was stopped.
-    void Promise.allSettled([stopJig(), removeInstance(dir, token)]).finally(() => {
+    void Promise.allSettled([stopJig(), removeInstance(dir, { token, pid: process.pid })]).finally(() => {
       server.close(() => process.exit(0));
       if ('closeAllConnections' in server) server.closeAllConnections();
     });
@@ -161,7 +165,7 @@ async function runServer(command: Extract<CliCommand, { kind: 'run' | 'serve' }>
   process.on('SIGHUP', shutdown);
 }
 
-async function startBackground(port: number, dir: string): Promise<void> {
+async function startBackground({ port, open }: Extract<CliCommand, { kind: 'start' }>, dir: string): Promise<void> {
   const result = await startInstance(dir, port);
   if (result.kind === 'failed') {
     console.error(`Could not start Jig UI. The end of ${result.log}:\n${result.tail}`);
@@ -171,12 +175,20 @@ async function startBackground(port: number, dir: string): Promise<void> {
   if (result.kind === 'already-running') {
     console.log(`Jig UI is already running on port ${result.info.port}.`);
     if (port !== result.info.port && port !== DEFAULT_PORT) console.log(`--port ${port} is ignored.`);
-    console.log(`Open it at ${link(result.info)}`);
-    return;
+    return show(result.info, open, dir);
   }
   console.log(`Jig UI ${result.info.version} is running at http://${HOST}:${result.info.port}/ in the background.`);
-  console.log(`Open it at ${link(result.info)}`);
   console.log(`Log: ${result.log}`);
+  await show(result.info, open, dir);
+}
+
+async function resetTokenOf(dir: string): Promise<void> {
+  await resetToken(dir);
+  console.log('The token is reset: the next start makes a new one, and pages opened with the old one are refused.');
+  const status = await instanceStatus(dir);
+  if (status.kind === 'running' || status.kind === 'not-answering') {
+    console.log('The running Jig UI keeps the old token until it stops: jig-ui stop && jig-ui start');
+  }
 }
 
 async function stopBackground(dir: string): Promise<void> {
@@ -247,13 +259,15 @@ export async function main(): Promise<void> {
   const dir = configDir(process.env, process.platform, homedir());
   switch (command.kind) {
     case 'start':
-      return startBackground(command.port, dir);
+      return startBackground(command, dir);
     case 'stop':
       return stopBackground(dir);
     case 'status':
       return statusOf(dir);
     case 'open':
       return openRunning(dir);
+    case 'reset-token':
+      return resetTokenOf(dir);
     default:
       return runServer(command, dir);
   }

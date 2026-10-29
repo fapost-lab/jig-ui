@@ -45,7 +45,10 @@ remembers the choice.
 
 Below, the connected projects in a list, in the order you connected them, with a search and the same
 counts. Choose one to see its card beside the list (above it on a narrow screen); the address keeps
-the choice. Until you choose, the first project that needs you is shown, or else the first. A
+the choice. Until you choose, the first project that needs you is shown, or else the first. When the
+page opens, the list is there at once and each project fills in as Jig answers for it, `…` until
+then, under a bar that counts the projects read: one slow project holds none of the others. The
+card waits for every read before it picks a project for you, and **Upgrade all…** waits too. A
 readable project's card shows:
 
 - **Its live tasks counted** — `active`, `paused` and `ready` (finished tasks are not counted).
@@ -317,7 +320,9 @@ A read that fails while an agent is in the middle of writing does not blank the 
 good read stays until the next one. A project that keeps failing shows why, as in the table above.
 
 Watching stops when the last page closes; watching writes nothing in the project. If the page says its
-session has ended, Jig UI was restarted: run `npx @fapost/jig-ui` again to reopen it.
+session has ended, the browser was closed since the page was opened, the token was reset, or Jig UI
+now runs on another port: run
+`jig-ui open`, or `npx @fapost/jig-ui`, to reopen it. A restart of Jig UI does not end it.
 
 ## Disconnect a project
 

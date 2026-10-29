@@ -13,9 +13,10 @@ It checks Node.js, starts a server on `127.0.0.1:4870` and opens Jig UI in your 
 a Jig project's folder and it connects that project and opens its board; then
 [connect your other projects](/projects).
 
-The link it opens and prints carries a token made fresh at every start, so only your browser can
-use Jig UI. A bookmark of the page stops working after a restart: run the command again to reopen
-it.
+The link it opens and prints carries a token, so only your browser can use Jig UI. The token is
+kept in Jig UI's config folder, readable only by you, so a page left open keeps working when Jig UI
+is restarted. Once the browser is closed, reopen the page with the command, or with `jig-ui open`
+while Jig UI runs. [Reset the token](#resetting-the-token) to shut out every page opened with it.
 
 ## Without Node.js
 
@@ -59,15 +60,17 @@ To keep Jig UI running without a terminal window, start it in the background:
 npx @fapost/jig-ui start
 ```
 
-It starts the server detached from the terminal and prints the link; it neither opens the browser
-nor connects a folder. Then:
+It starts the server detached from the terminal and opens the browser on it; it connects no folder.
+With `--no-open` it only prints the link — for a script, an agent or a machine without a browser.
+Then:
 
 | Command | What it does |
 | --- | --- |
-| `npx @fapost/jig-ui start [--port <n>]` | Start it in the background. If it is already running, it says so and prints the link. |
+| `npx @fapost/jig-ui start [--port <n>] [--no-open]` | Start it in the background and open the browser. If it is already running, it says so and opens that one. |
 | `npx @fapost/jig-ui stop` | Stop the running Jig UI, however it was started. A leftover file of an instance that is gone is removed; no process is signalled for it. |
 | `npx @fapost/jig-ui status` | Say whether it is running, on which port and with which pid. |
 | `npx @fapost/jig-ui open` | Open the running one in the browser. |
+| `npx @fapost/jig-ui reset-token` | [Reset the token](#resetting-the-token). |
 
 `status` and `open` exit with code 3 when Jig UI is not running, so a script can tell. `stop` exits
 with 1 if the server did not stop within about ten seconds. A server that takes its connection but
@@ -79,12 +82,23 @@ overwrites it, but while the server runs the log keeps growing: it is not rotate
 fails to start, the end of the log is printed. To connect a project afterwards, run
 `npx @fapost/jig-ui` in its folder, or [connect it from the page](/projects).
 
+## Resetting the token
+
+```bash
+npx @fapost/jig-ui reset-token
+```
+
+It forgets the token in Jig UI's config folder (the file `token`; deleting it does the same): the
+next start makes a new one, and every page opened with the old one is refused and says its session
+has ended. A Jig UI that is running keeps the old token until it stops, so restart it —
+`jig-ui stop`, then `jig-ui start` — for the reset to take effect at once.
+
 ## Options
 
 | Option | What it does |
 | --- | --- |
 | `--port <n>` | Listen on another port than 4870; `start` takes it too. |
-| `--no-open` | Print the link instead of opening the browser, for example over SSH; only without a command. |
+| `--no-open` | Print the link instead of opening the browser, for example over SSH; without a command and with `start`. |
 
 ## Development channel
 

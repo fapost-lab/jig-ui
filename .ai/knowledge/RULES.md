@@ -9,7 +9,8 @@ are added as sections of this file.
 - Jig UI never writes a file inside a connected project; every change is a `jig` command.
   (spec `jig-ui`; adr-20261014-jig-ui-is-an-optional-layer-over-jig. Checked in review: no file
   write outside the config directory.)
-- Jig UI stores nothing but its project registry, interface settings and the running instance's
+- Jig UI stores nothing but its project registry, interface settings, the access `token` (kept
+  across starts, removed only by `jig-ui reset-token`) and the running instance's
   `instance.json` and `open.html`, in the user's config directory, written atomically — and the
   background instance's `server.log` there, its output, overwritten by each `jig-ui start`
   (task background-service). A

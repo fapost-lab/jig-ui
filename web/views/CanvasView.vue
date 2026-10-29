@@ -42,6 +42,7 @@
     columns,
     details,
     emptyBoard,
+    epics,
     finished,
     plans,
     projects,
@@ -211,6 +212,18 @@
           {{ t.id }}<QueueMenu :task="t" :cards="tasks" />
         </span>
         <span class="flex items-center gap-1">{{ tasks[1]!.id }}<QueueMenu :task="tasks[1]!" :cards="tasks" disabled /></span>
+      </div>
+    </CanvasSection>
+
+    <CanvasSection
+      title="EpicMenu"
+      note="press to open: To top, Up, Down, To bottom, Priority — first queued (no Up), in the middle (Up and Down), last queued (no Down: the next one is not queued), not queued (Up joins the queued ones), while its change is on its way"
+    >
+      <div class="flex flex-wrap items-center gap-6">
+        <span v-for="spec in epics" :key="spec.id" class="flex items-center gap-1"
+          >{{ spec.id }}<EpicMenu :spec="spec" :specs="epics"
+        /></span>
+        <span class="flex items-center gap-1">{{ epics[1]!.id }}<EpicMenu :spec="epics[1]!" :specs="epics" disabled /></span>
       </div>
     </CanvasSection>
 

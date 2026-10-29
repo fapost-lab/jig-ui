@@ -11,6 +11,7 @@ const task = (id: string, pauseRequestable: boolean, resumesTo: Task['resumesTo'
   pauseRequest: null,
   pauseRequestable,
   resumable: resumesTo !== null,
+  closable: false,
   resumesTo,
   started: true,
   gate: null,

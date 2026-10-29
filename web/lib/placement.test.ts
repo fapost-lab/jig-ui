@@ -11,6 +11,7 @@ const task = (id: string, level?: string | null, position = 100): Task => ({
   pauseRequest: null,
   pauseRequestable: true,
   resumable: false,
+  closable: false,
   resumesTo: null,
   started: false,
   gate: null,

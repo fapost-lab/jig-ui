@@ -38,13 +38,14 @@ one line that brings its own (the install flow). Jig works exactly as before wit
 - `server/jig/` — JigClient: the project's Jig version against `MIN_JIG_VERSION`, the JSON
   reads `jig status` (what needs the person), `jig task list`, `jig queue list` and `jig spec list`
   (feature-specs), and the writes `jig queue move`, `jig queue set --priority`, `jig queue request`
-  and `cancel` (a pause), `jig task new` and `jig task resume` (from Jig 0.35.0), and
+  and `cancel` (a pause), `jig task new` and `jig task resume` (from Jig 0.35.0), `jig task set <id>
+  status consolidated` (a close, text, checked against a revision read first), and
   `jig upgrade`, its dry run and its run (from Jig 0.34.0), and `jig self-update` (its text line), each JSON answer checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
   fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue
   (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, a project's live
   tasks, one task in full, connect, disconnect, subscribe to changes, and the writes `move`,
-  `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume` and `fileTask`, `planUpgrade`, `upgrade` and
+  `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `planUpgrade`, `upgrade` and
   `dismissUpgrade`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
@@ -57,7 +58,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
 - `server/http/` also serves `GET /api/workspace`, `GET /api/projects/:id/board`,
   `GET /api/projects/:id/tasks/:task` (feature-task-details), `GET /api/projects/:id/specs`
   (feature-specs), `POST /api/projects/:id/queue/move`, `/queue/priority`, `/queue/epic/move`, `/queue/epic/priority`, `/queue/pause`,
-  `/queue/pause/cancel` and `/tasks/resume` (adr-20261022-writes-carry-the-revision-of-their-read),
+  `/queue/pause/cancel`, `/tasks/resume` (adr-20261022-writes-carry-the-revision-of-their-read) and
+  `/tasks/close` (adr-20261029-close-a-ready-task-from-the-board),
   `POST /api/projects/:id/tasks` (adr-20261022-filing-a-task-carries-no-revision),
   `POST /api/projects/:id/upgrade/plan`, `POST` and `DELETE /api/projects/:id/upgrade`
   (adr-20261027-upgrading-a-project-runs-in-the-background), `POST /api/self-update`, `POST` and
@@ -99,7 +101,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   the conflict: what changed between the board the write was made on and that read, its cards
   marked (adr-20261022-writes-carry-the-revision-of-their-read, feature-board). Built for the
   queue: order, priority and pause requests; and for a resume
-  (adr-20261026-a-drop-out-of-paused-resumes-at-once). Filing a task is the one write with no revision: it
+  (adr-20261026-a-drop-out-of-paused-resumes-at-once); and for closing a ready task as done, after the
+  person confirms, its refusal shown in Jig's words (adr-20261029-close-a-ready-task-from-the-board). Filing a task is the one write with no revision: it
   names a new id, which Jig claims or refuses `already-exists`
   (adr-20261022-filing-a-task-carries-no-revision). Upgrading a project's Jig is the one write that
   outlives its request: after a dry run, `jig upgrade` runs in the server's background, its state in

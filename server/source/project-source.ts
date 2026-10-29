@@ -157,6 +157,12 @@ export interface Task {
   pauseRequestable: boolean;
   /** Paused, and resumable from the page: Jig offers its `resume` action and takes `task resume --revision` (0.35.0). */
   resumable: boolean;
+  /**
+   * Ready, and closable as done from the page: Jig offers its `close` action, or withholds it only because its forge
+   * cache has not heard of a merge — the knowledge decision is recorded and the pull request is not closed unmerged.
+   * Jig itself asks the forge when it closes.
+   */
+  closable: boolean;
   started: boolean;
   gate: string | null;
   autopilot: string | null;
@@ -278,6 +284,8 @@ export type Written =
   | {
       state: 'refused';
       code: string;
+      /** Jig's own reasons, without a path, where a command's refusal carries them (closing a task). */
+      reasons?: string[];
     }
   | Exclude<ProjectView, { state: 'ready' }>;
 
@@ -325,6 +333,11 @@ export interface ProjectSource {
   cancelPause(id: string, taskId: string, revision: number): Promise<Written | undefined>;
   /** Resumes a paused live task in the project's main checkout, as `move` writes; a stash its pause kept is applied there. */
   resume(id: string, taskId: string, revision: number): Promise<Written | undefined>;
+  /**
+   * Closes a closable live task as done, as `move` writes; any other is refused `not-found` without running Jig. Jig's
+   * refusal — the pull request not merged, the knowledge decision not recorded — comes back with its reasons.
+   */
+  close(id: string, taskId: string, revision: number): Promise<Written | undefined>;
   /**
    * Files a new task with only its goal, then reads the project again. No revision: it writes nothing that exists, and
    * a taken id is Jig's `already-exists`. `undefined` when no project has that id.

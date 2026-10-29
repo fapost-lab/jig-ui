@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import {
   cancelPause,
+  closeTask,
   fileTask,
   jigVersion,
   JigRefusal,
@@ -556,6 +557,55 @@ function selfUpdating(name: string, out: string, err = '', code = 0): string {
   );
   return dir;
 }
+
+/** A checkout whose Jig answers `queue list --json` at `revision` and `task set` with `err` and `code`, logging every call. */
+function closing(name: string, revision: number, err = '', code = 0): string {
+  const dir = join(root, name);
+  mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
+  writeFileSync(join(dir, 'err.txt'), err);
+  writeFileSync(
+    join(dir, '.ai', 'scripts', 'jig'),
+    `#!/usr/bin/env bash
+echo "$*" >> calls.log
+case "$*" in
+  "queue list --json") echo '{"schema":1,"revision":${revision},"generated_at":"x","data":{"items":[]}}' ;;
+  "task set "*) cat err.txt >&2; exit ${code} ;;
+esac
+`,
+  );
+  return dir;
+}
+const closeCalls = (dir: string) => readFileSync(join(dir, 'calls.log'), 'utf8').trim().split('\n');
+
+describe('closeTask', () => {
+  it("reads the clone's revision, then runs the command of Jig's close action", async () => {
+    const dir = closing(`case-${cases++}`, 41);
+    await closeTask(dir, 'beta', 41);
+    expect(closeCalls(dir)).toEqual(['queue list --json', 'task set beta status consolidated']);
+  });
+
+  it('refuses a revision the clone has moved past, running nothing', async () => {
+    const dir = closing(`case-${cases++}`, 42);
+    await expect(closeTask(dir, 'beta', 41)).rejects.toEqual(refusal('stale-revision'));
+    expect(closeCalls(dir)).toEqual(['queue list --json']);
+  });
+
+  it("carries Jig's refusal as its reasons, without a path", async () => {
+    const err = [
+      'jig: error: task set: status consolidated requires knowledge_consolidated true; record the knowledge decision first: jig task set beta knowledge_consolidated true',
+      'jig: error: task set: cannot write /Users/me/project/.ai/workspace/tasks/beta/state',
+      'a line that is not an error',
+    ].join('\n');
+    const dir = closing(`case-${cases++}`, 41, err, 1);
+    await expect(closeTask(dir, 'beta', 41)).rejects.toMatchObject({
+      code: 'failed',
+      reasons: [
+        'status consolidated requires knowledge_consolidated true; record the knowledge decision first: jig task set beta knowledge_consolidated true',
+        'cannot write …',
+      ],
+    });
+  });
+});
 
 describe('selfUpdate', () => {
   it('runs jig self-update as text and answers its last line', async () => {

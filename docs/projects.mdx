@@ -93,7 +93,7 @@ which changes nothing — and shows it on the card:
   checked out in the project's main checkout, `jig verify` running. Deal with them and open it
   again;
 - otherwise **Upgrade**, and the steps the release asks you to do by hand, if any;
-- and a request to copy for your agent — *Upgrade Jig in <project>* — which upgrades the project
+- and a request to copy for your agent — *Upgrade Jig in &lt;project&gt;* — which upgrades the project
   and does those steps too. Jig UI runs no agent.
 
 **Upgrade** runs `jig upgrade` in the project's main checkout, as you would in a terminal: Jig cuts
@@ -226,6 +226,26 @@ Resuming from the board needs Jig 0.35.0 or later in the project. With an older 
 how to resume it — run `jig task resume <id>` in the project — and **Resume** is off.
 
 A drop on any other column does nothing.
+
+## Closing a task
+
+A card in **Ready** whose task can be closed carries a **✕** beside its ⋯ menu. Press it,
+then **Close task** in the question below it, to close the task as done: Jig UI runs
+`jig task set <id> status consolidated` — the command Jig's own `close` action names — in the
+project, after a read shows that nothing was written there since the board you saw. The card leaves the
+board and shows in the list of finished tasks.
+
+Jig decides whether the task may close, not Jig UI. It closes a task only once its knowledge
+decision is recorded and its pull request has merged, and it asks the forge about the merge as it
+closes. When it refuses — the pull request is still open, say — the line above the board says why
+in Jig's words, and the card stays.
+
+The ✕ is shown on a ready task whose knowledge decision is recorded and whose pull request is not
+known to have closed unmerged. What Jig knows of pull requests between commands comes from
+`jig housekeeping`; in a project where it has not run since the merge, Jig itself does not offer
+to close the task yet, and the ✕ is there anyway, since closing asks the forge. A task without a
+recorded knowledge decision has no ✕: record it first (the `jig-consolidate` skill). Closing cannot
+be undone from the board.
 
 ## Specs
 

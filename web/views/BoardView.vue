@@ -15,7 +15,7 @@
   import { conflict } from '@/lib/conflict';
   import { movable } from '@/lib/epics';
   import { lastWins } from '@/lib/last-wins';
-  import { refusal } from '@/lib/refusal';
+  import { closeRefusal, refusal } from '@/lib/refusal';
   import { toneText } from '@/lib/tones';
 
   const props = defineProps<{
@@ -114,15 +114,22 @@
 
   /**
    * Sends one change with the revision of the board it was made on, then reads the board again whatever came of it:
-   * the card moves when Jig's order does, never before.
+   * the card moves when Jig's order does, never before. `explain` words a refusal with the reasons Jig gave, where the
+   * change has any to show.
    */
-  async function write(task: string, doing: string, send: (revision: number) => Promise<Written>): Promise<void> {
+  async function write(
+    task: string,
+    doing: string,
+    send: (revision: number) => Promise<Written>,
+    explain?: (code: string, reasons: string[]) => string | undefined,
+  ): Promise<void> {
     const shown = board.value;
     if (typeof shown !== 'object' || shown.state !== 'ready' || pending.value !== undefined) return;
     pending.value = task;
     notice.value = undefined;
     const res = await call(() => send(shown.revision));
-    const code = res && res.status !== 200 ? (await res.json()).error.code : undefined;
+    const error = res && res.status !== 200 ? (await res.json()).error : undefined;
+    const code = error?.code;
     // The read this change started, not what the board shows: a read started after it may land in its place.
     const read = await load();
     if (code === 'stale-revision') {
@@ -131,7 +138,14 @@
         text: `The project changed while you were ${doing} ${task}${seen ? ` — ${seen.said}` : ''}. Try again on the board as it is now.`,
         changed: seen?.changed ?? [],
       };
-    } else if (code !== undefined) notice.value = { text: refusal(code, doing, task), changed: [] };
+    } else if (error !== undefined) {
+      notice.value = {
+        text:
+          explain?.(error.code, 'reasons' in error && Array.isArray(error.reasons) ? error.reasons.map(String) : []) ??
+          refusal(error.code, doing, task),
+        changed: [],
+      };
+    }
     pending.value = undefined;
   }
 
@@ -147,6 +161,15 @@
 
   const resume = (task: string) =>
     write(task, 'resuming', (revision) => client.api.projects[':id'].tasks.resume.$post({ param, json: { task, revision } }));
+
+  /** Closes a ready task as done; Jig's refusal — its pull request not merged, say — is shown in its own words. */
+  const close = (task: string) =>
+    write(
+      task,
+      'closing',
+      (revision) => client.api.projects[':id'].tasks.close.$post({ param, json: { task, revision } }),
+      (code, reasons) => closeRefusal(code, reasons, task),
+    );
 
   /** The spec whose epic's change is on its way to Jig; the notice says what Jig refused, as for a task. */
   const pendingEpic = ref<string>();
@@ -277,6 +300,7 @@
       @prioritise="prioritise"
       @pause="pause"
       @resume="resume"
+      @close="close"
     />
 
     <div v-else-if="view === 'specs'" class="min-h-0 flex-1 overflow-y-auto">
@@ -314,6 +338,7 @@
       @prioritise="prioritise"
       @pause="pause"
       @resume="resume"
+      @close="close"
     />
   </div>
 </template>

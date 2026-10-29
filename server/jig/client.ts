@@ -531,6 +531,31 @@ export async function fileTask(root: string, id: string, goal: string, platform:
   await readJson(root, ['task', 'new', id, '--goal', goal], platform);
 }
 
+/** Closing asks the forge whether the task's pull request merged: a network round trip. */
+const CLOSE_TIMEOUT_MS = 60_000;
+
+/**
+ * Closes a task as done (`jig task set <id> status consolidated`, the command of Jig's `close` action). Jig lets it
+ * through only when the knowledge decision is recorded and the pull request, asked of the forge now, has merged — a
+ * forge cache that has not heard of the merge yet withholds the action, never the command. The command takes no
+ * `--revision` and prints no JSON (Jig 0.38.1): the clone's revision is read first, and a write since `revision` is
+ * refused as `stale-revision` with nothing run — a read, not a claim: a write between it and the close is not seen; Jig's own refusal throws JigRefusal `failed` with its error lines,
+ * without a path.
+ */
+export async function closeTask(root: string, task: string, revision: number, platform: NodeJS.Platform = process.platform): Promise<void> {
+  if ((await readJson(root, ['queue', 'list'], platform)).revision !== revision) throw new JigRefusal('stale-revision');
+  try {
+    await jig(root, ['task', 'set', task, 'status', 'consolidated'], platform, CLOSE_TIMEOUT_MS);
+  } catch (error) {
+    const stderr = (error as { stderr?: string }).stderr ?? '';
+    const reasons = stderr.split('\n').flatMap((line) => {
+      const m = /^jig: error: (?:task set: )?(.+)$/.exec(line.trim());
+      return m?.[1] ? [withoutPaths(m[1])] : [];
+    });
+    throw new JigRefusal('failed', reasons);
+  }
+}
+
 /** What `jig upgrade --json` did, or for `--dry-run` would do (Jig 0.34.0): Jig's texts without a path. */
 const Upgrade = z
   .object({

@@ -11,6 +11,7 @@ const task = (more: Partial<Task> = {}): Task => ({
   pauseRequest: null,
   pauseRequestable: true,
   resumable: false,
+  closable: false,
   resumesTo: null,
   started: true,
   gate: null,

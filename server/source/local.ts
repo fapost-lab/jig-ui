@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import {
   cancelPause,
+  closeTask,
   fileTask,
   hasJig,
   JigRefusal,
@@ -105,6 +106,18 @@ const gone = (t: Finished): FinishedTask => ({
 });
 
 /**
+ * Ready and closable as done: Jig offers `close`, or the only thing between them is its forge cache — the knowledge
+ * decision is recorded and the pull request is not known to be closed unmerged. The cache is written only by
+ * `jig housekeeping`, so a project that has not run it lately offers no close for a merged task; the command asks the
+ * forge itself and refuses one that has not merged.
+ */
+function closable(t: Live): boolean {
+  if (t.status !== 'ready') return false;
+  if (t.actions.some((a) => a.id === 'close' && a.offered)) return true;
+  return t.knowledgeConsolidated && t.pullRequest !== null && t.pullRequest.state !== 'closed';
+}
+
+/**
  * A live task as a board's card shows it, with its place in the queue if it has one; `resumes` when the project's Jig
  * takes `task resume --revision`.
  */
@@ -117,6 +130,7 @@ const card = (t: Live, q: QueueItem | undefined, resumes: boolean): Task => ({
   pauseRequest: t.pauseRequest,
   pauseRequestable: t.actions.some((a) => a.id === 'request-pause' && a.offered),
   resumable: resumes && t.actions.some((a) => a.id === 'resume' && a.offered),
+  closable: closable(t),
   started: t.branch !== null,
   gate: t.gate?.state ?? null,
   autopilot: t.autopilot?.state ?? null,
@@ -580,21 +594,22 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
   /**
    * Runs a write in a project once every task it names is live in what the project shows — so nothing but an id
    * Jig itself listed reaches Jig's arguments; a new task's id names none, and the HTTP boundary checks it against
-   * Jig's grammar instead — then reads the project again, refused or not: the page reads next.
+   * Jig's grammar instead — then reads the project again, refused or not: the page reads next. `taskIds` are among
+   * the live tasks of the last read and pass `allowed` there, `specIds` among its specs with an open epic.
    */
-  /** A write naming `taskIds` among the live tasks of the last read, and `specIds` among its specs with an open epic. */
   async function writing(
     id: string,
     taskIds: string[],
     write: (root: string) => Promise<void>,
     specIds: string[] = [],
+    allowed: (task: Task) => boolean = () => true,
   ): Promise<Written | undefined> {
     const project = (await readProjects(configDir)).find((p) => p.id === id);
     if (!project) return undefined;
     const { tasks, specs } = await shown(project);
     if (tasks.state !== 'ready') return tasks;
     const open = specs.state === 'ready' ? specs.specs.filter((s) => s.epic?.state === 'open').map((s) => s.id) : [];
-    if (!taskIds.every((t) => tasks.tasks.some((live) => live.id === t)) || !specIds.every((s) => open.includes(s))) {
+    if (!taskIds.every((t) => tasks.tasks.some((live) => live.id === t && allowed(live))) || !specIds.every((s) => open.includes(s))) {
       return { state: 'refused', code: 'not-found' };
     }
     const entry = entryOf(project);
@@ -606,8 +621,11 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     try {
       await run;
     } catch (error) {
-      // Only the code goes on: Jig's message may name a path.
-      written = { state: 'refused', code: error instanceof JigRefusal ? error.code : 'failed' };
+      // Only the code goes on, and reasons Jig UI cut the paths out of: Jig's message may name a path.
+      written =
+        error instanceof JigRefusal && error.reasons.length > 0
+          ? { state: 'refused', code: error.code, reasons: error.reasons }
+          : { state: 'refused', code: error instanceof JigRefusal ? error.code : 'failed' };
     } finally {
       entry.writes.delete(run);
     }
@@ -670,6 +688,15 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     },
     resume(id, taskId, revision) {
       return writing(id, [taskId], (root) => resumeTask(root, taskId, revision));
+    },
+    close(id, taskId, revision) {
+      return writing(
+        id,
+        [taskId],
+        (root) => closeTask(root, taskId, revision),
+        [],
+        (t) => t.closable,
+      );
     },
     fileTask(id, taskId, goal) {
       // A new id names no live task: Jig itself refuses a taken one.

@@ -194,6 +194,20 @@ describe('localSource', () => {
     expect(calls(old)).not.toContain('spec list --json');
   });
 
+  it('names the connected projects without running Jig, and reads one on its own', async () => {
+    const before = calls(busy).length;
+    expect(await source.connected()).toEqual(['busy', 'old', 'broken']);
+    expect(calls(busy)).toHaveLength(before);
+    expect(await source.project('old')).toEqual({
+      id: 'old',
+      state: 'unsupported',
+      jigVersion: '0.26.0',
+      minimum: '0.31.0',
+      upgrade: null,
+    });
+    expect(await source.project('nobody')).toBeUndefined();
+  });
+
   it("serves a project's specs, read with its board, and the project's state when it cannot be read", async () => {
     const spec = {
       id: 'billing',

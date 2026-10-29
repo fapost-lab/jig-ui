@@ -14,7 +14,7 @@ reviewed_at: 2026-10-17
 
 ## Context
 
-The start command opens the browser on a link that carries the per-start token
+The start command opens the browser on a link that carries the access token
 (adr-20261014-local-server-access-guard). Handing that link to `open`, `xdg-open` or
 `explorer.exe` puts the token in a process's arguments, and `ps` shows every user of the machine
 the arguments of every process on Linux and macOS — while the ADR says another user must not reach

@@ -306,6 +306,10 @@ export type Change = {
 export interface ProjectSource {
   /** Every connected project, in the order it was connected. */
   workspace(): Promise<WorkspaceProject[]>;
+  /** The ids of the connected projects, in the order they were connected, without reading any. */
+  connected(): Promise<string[]>;
+  /** One connected project as the workspace shows it; `undefined` when no project has that id. */
+  project(id: string): Promise<WorkspaceProject | undefined>;
   /** Connects the project a path names; one already connected keeps its id. */
   connect(path: string): Promise<
     | {

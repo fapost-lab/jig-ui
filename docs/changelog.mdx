@@ -10,6 +10,8 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 - When Jig refuses an upgrade for a reason of its own, the card says what Jig said — for example
   `cannot determine the framework source root; pass --from <dir>` — not only *Jig refused the upgrade*.
+- The Projects page lists every project at once when it opens and fills each in as it is read, under
+  a bar that counts them: a slow project no longer holds the page.
 - A project Jig is slow to read gets 30 seconds instead of 10, and says so when Jig still does not
   answer, with **Read again** to read it now; so does a project Jig refused to read.
 - The Projects page lists the projects on the left, with a search, and shows the chosen one's card
@@ -21,6 +23,11 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 - [Close a task from the board](/projects#closing-a-task): a card in Ready carries a ✕ that closes
   the task as done through Jig, once you confirm. When Jig refuses —
   the pull request has not merged — the board says why.
+- A page left open keeps working when Jig UI is restarted: the token is kept in Jig UI's config
+  folder instead of being made at every start. [`jig-ui reset-token`](/installation#resetting-the-token)
+  makes a new one and shuts out every page opened with the old one.
+- [`jig-ui start`](/installation#running-it-in-the-background) opens the browser, as a start without
+  a command does, also when Jig UI is already running; `--no-open` only prints the link.
 
 ## 0.4.0 — 2026-10-29
 

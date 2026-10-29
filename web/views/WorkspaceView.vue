@@ -6,14 +6,19 @@
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProjectList from '@/components/ProjectList.vue';
   import { Button } from '@/components/ui/button';
+  import { Progress } from '@/components/ui/progress';
   import { lastWins } from '@/lib/last-wins';
-  import { chosen } from '@/lib/projects';
+  import { chosen, landed, type Listed, readOnes, readProgress } from '@/lib/projects';
   import { toneRule, toneText } from '@/lib/tones';
   import { machineBusy, machineLine, type PlanState, releaseOf, upgradeAllPlan, upgradeLine, upgradeOf } from '@/lib/upgrade';
 
   const route = useRoute();
   const router = useRouter();
-  const projects = ref<Project[]>();
+  /** The connected projects; on the first load each is listed before its read lands. */
+  const projects = ref<Listed[]>();
+  /** The projects read so far: what the upgrade lines and Upgrade all are worked out over. */
+  const read = computed(() => readOnes(projects.value ?? []));
+  const progress = computed(() => readProgress(projects.value ?? []));
   /** The project whose card is shown beside the list: `?project=` in the address, else the one `chosen` picks. */
   const shown = computed(() => chosen(projects.value ?? [], typeof route.query.project === 'string' ? route.query.project : undefined));
   const machine = ref<Machine>();
@@ -22,17 +27,17 @@
   const busy = ref(false);
   /** Each card's open upgrade panel, by project id, until the upgrade starts or the panel closes. */
   const plans = ref<Record<string, PlanState>>({});
-  const upgrades = computed(() => projects.value && upgradeLine(projects.value));
+  const upgrades = computed(() => projects.value && upgradeLine(read.value));
   /** Upgrade all's confirmation is open. */
   const confirmingAll = ref(false);
   const allRefusal = ref<string>();
   const release = computed(() => machine.value?.release ?? null);
-  const allPlan = computed(() => upgradeAllPlan(projects.value ?? [], release.value));
+  const allPlan = computed(() => upgradeAllPlan(read.value, release.value));
   /** No card starts an upgrade while a self-update or Upgrade all runs. */
   const held = computed(() => machineBusy(machine.value));
-  // Upgrade all waits for every upgrade under way: they run one at a time.
+  // Upgrade all waits for every upgrade under way: they run one at a time; and for every read, or its list is short.
   const offerAll = computed(
-    () => allPlan.value.projects.length > 0 && !held.value && !(projects.value ?? []).some((p) => p.upgrade?.state === 'running'),
+    () => allPlan.value.projects.length > 0 && !held.value && !progress.value && !read.value.some((p) => p.upgrade?.state === 'running'),
   );
 
   const said = computed(() => machineLine(machine.value));
@@ -50,6 +55,27 @@
       machine.value = read.machine;
     },
   );
+
+  /**
+   * The first load: the connected ids at once, then each project as its own read lands, so one slow project holds no
+   * other. The workspace read, for the machine's state, starts after them: it waits for the slowest project anyway, and
+   * a browser opens six connections to a site, two of them held that long by the stream and the header's read.
+   */
+  async function first(): Promise<void> {
+    const ids = (await (await call(() => client.api.projects.$get()))?.json())?.projects;
+    if (ids && !projects.value) {
+      projects.value = ids.map((id) => ({ id, state: 'reading' as const }));
+      await Promise.allSettled(
+        ids.map(async (id) => {
+          const res = await call(() => client.api.projects[':id'].$get({ param: { id: encodeURIComponent(id) } }));
+          if (res?.status !== 200) return;
+          const { project } = await res.json(); // before the list is read: another read may land while this body is parsed
+          projects.value = landed(projects.value ?? [], project);
+        }),
+      );
+    }
+    await load();
+  }
 
   async function connect(): Promise<void> {
     busy.value = true;
@@ -167,7 +193,7 @@
     if (await call(() => upgradeApi.$delete(param(id)))) await load();
   }
 
-  onUnmounted(onChange(() => void load()));
+  onUnmounted(onChange(() => void (projects.value === undefined ? first() : load())));
 </script>
 
 <template>
@@ -210,10 +236,16 @@
     <p v-else-if="projects.length === 0" class="text-muted-foreground">
       No projects yet. Paste the path of a project's main checkout above.
     </p>
+    <div v-if="progress" class="flex flex-col gap-1" role="status">
+      <p class="text-muted-foreground">Reading projects: {{ progress.read }} of {{ progress.of }}</p>
+      <Progress :model-value="(progress.read / progress.of) * 100" aria-label="Projects read" />
+    </div>
     <!-- One column on a narrow screen: the list above the card. -->
-    <div v-else-if="shown" class="flex flex-col gap-4 md:flex-row md:items-start">
-      <ProjectList :projects="projects" :chosen="shown.id" class="md:w-64 md:shrink-0" />
+    <div v-if="projects?.length" class="flex flex-col gap-4 md:flex-row md:items-start">
+      <ProjectList :projects="projects" :chosen="shown?.id" class="md:w-64 md:shrink-0" />
+      <p v-if="shown?.state === 'reading'" class="min-w-0 flex-1 text-muted-foreground">Reading {{ shown.id }}…</p>
       <ProjectCard
+        v-else-if="shown"
         :key="shown.id"
         :project="shown"
         :plan="plans[shown.id]"

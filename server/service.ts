@@ -206,7 +206,7 @@ export async function stopInstance(dir: string, deps: ServiceDeps = realDeps): P
   if (status.kind === 'not-running' || status.kind === 'not-answering') return status;
   const { info } = status;
   if (status.kind === 'stale') {
-    await removeInstance(dir, info.token);
+    await removeInstance(dir, info);
     return status;
   }
 
@@ -224,7 +224,7 @@ export async function stopInstance(dir: string, deps: ServiceDeps = realDeps): P
   while (deps.now() < deadline) {
     if ((await deps.probe(info, PROBE_MS)) === 'gone') {
       // The server removes its files itself; this covers a hard exit.
-      await removeInstance(dir, info.token);
+      await removeInstance(dir, info);
       return { kind: 'stopped', info };
     }
     await deps.delay(POLL_MS);

@@ -1,13 +1,12 @@
 <script setup lang="ts">
   import { computed, ref } from 'vue';
-  import type { Project } from '@/api';
   import { Input } from '@/components/ui/input';
-  import { matching } from '@/lib/projects';
+  import { type Listed, matching } from '@/lib/projects';
   import ProjectMark from './ProjectMark.vue';
 
-  /** The workspace's projects, each a link that shows its card beside the list; `chosen` is the one shown. */
+  /** The workspace's projects, read or still being read, each a link that shows its card beside the list; `chosen` is the one shown. */
   const props = defineProps<{
-    projects: Project[];
+    projects: Listed[];
     chosen?: string;
   }>();
 

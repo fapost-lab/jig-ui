@@ -36,13 +36,15 @@ describe('parseCliArgs', () => {
   });
 
   it('reads the subcommands', () => {
-    expect(parseCliArgs(['start'])).toEqual({ kind: 'start', port: DEFAULT_PORT });
-    expect(parseCliArgs(['start', '--port', '5000'])).toEqual({ kind: 'start', port: 5000 });
+    expect(parseCliArgs(['start'])).toEqual({ kind: 'start', port: DEFAULT_PORT, open: true });
+    expect(parseCliArgs(['start', '--port', '5000'])).toEqual({ kind: 'start', port: 5000, open: true });
+    expect(parseCliArgs(['start', '--no-open'])).toEqual({ kind: 'start', port: DEFAULT_PORT, open: false });
     expect(parseCliArgs(['--port=5001', 'serve'])).toEqual({ kind: 'serve', port: 5001 });
     expect(parseCliArgs(['serve'])).toEqual({ kind: 'serve', port: DEFAULT_PORT });
     expect(parseCliArgs(['stop'])).toEqual({ kind: 'stop' });
     expect(parseCliArgs(['status'])).toEqual({ kind: 'status' });
     expect(parseCliArgs(['open'])).toEqual({ kind: 'open' });
+    expect(parseCliArgs(['reset-token'])).toEqual({ kind: 'reset-token' });
   });
 
   it('lets help and version win over any subcommand', () => {
@@ -59,7 +61,8 @@ describe('parseCliArgs', () => {
     expect(parseCliArgs(['stop', '--port', '5000']).kind).toBe('error');
     expect(parseCliArgs(['status', '--port=5000']).kind).toBe('error');
     expect(parseCliArgs(['open', '--port', '5000']).kind).toBe('error');
-    expect(parseCliArgs(['start', '--no-open']).kind).toBe('error');
+    expect(parseCliArgs(['reset-token', '--port', '5000']).kind).toBe('error');
+    expect(parseCliArgs(['reset-token', '--no-open']).kind).toBe('error');
     expect(parseCliArgs(['serve', '--no-open']).kind).toBe('error');
     expect(parseCliArgs(['stop', '--no-open']).kind).toBe('error');
   });

@@ -13,10 +13,12 @@ export type CliCommand =
   | {
       kind: 'start';
       port: number;
+      open: boolean;
     }
   | { kind: 'stop' }
   | { kind: 'status' }
   | { kind: 'open' }
+  | { kind: 'reset-token' }
   | {
       kind: 'serve';
       port: number;
@@ -26,11 +28,13 @@ export type CliCommand =
       message: string;
     };
 
-const SUBCOMMANDS = ['start', 'stop', 'status', 'open', 'serve'] as const;
+const SUBCOMMANDS = ['start', 'stop', 'status', 'open', 'serve', 'reset-token'] as const;
 type Subcommand = (typeof SUBCOMMANDS)[number];
 
 /** Subcommands that listen on a port; the others only talk to the instance that does. */
 const TAKES_PORT: ReadonlySet<string> = new Set<Subcommand | 'run'>(['run', 'start', 'serve']);
+/** Commands that start an instance and open the browser on it unless told not to. */
+const OPENS: ReadonlySet<string> = new Set<Subcommand | 'run'>(['run', 'start']);
 
 /** Parses the command line (without the node and script entries). Pure: it never exits or prints. */
 export function parseCliArgs(argv: string[]): CliCommand {
@@ -69,7 +73,7 @@ export function parseCliArgs(argv: string[]): CliCommand {
   if (values.port !== undefined && !TAKES_PORT.has(command)) {
     return { kind: 'error', message: `--port does not apply to ${command}.` };
   }
-  if (values['no-open'] && command !== 'run') {
+  if (values['no-open'] && !OPENS.has(command)) {
     return { kind: 'error', message: `--no-open does not apply to ${command}.` };
   }
 
@@ -83,11 +87,13 @@ export function parseCliArgs(argv: string[]): CliCommand {
 
   switch (command) {
     case 'start':
+      return { kind: 'start', port, open: !values['no-open'] };
     case 'serve':
-      return { kind: command, port };
+      return { kind: 'serve', port };
     case 'stop':
     case 'status':
     case 'open':
+    case 'reset-token':
       return { kind: command };
     default:
       return { kind: 'run', port, open: !values['no-open'] };

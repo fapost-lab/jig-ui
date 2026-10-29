@@ -117,6 +117,15 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
 
       .get('/api/workspace', async (c) => c.json({ projects: await source.workspace(), machine: source.machine() }, 200))
 
+      // The page lists these at once and reads each on its own: one slow project no longer holds the others.
+      .get('/api/projects', async (c) => c.json({ projects: await source.connected() }, 200))
+
+      .get('/api/projects/:id', async (c) => {
+        const project = await source.project(c.req.param('id'));
+        if (project === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        return c.json({ project }, 200);
+      })
+
       // Moves this machine's Jig to its newest release and answers once it has: a git fetch, not minutes.
       .post('/api/self-update', async (c) => {
         const run = await source.selfUpdate();

@@ -54,7 +54,9 @@ switches it to light, and the browser remembers the choice. For a readable proje
   older Jig than the one installed here: *0.34.0 → 0.35.0 on this machine*, and **Upgrade…** to
   upgrade it from the page ([Upgrading a project's Jig](#upgrading-a-projects-jig)). Above the
   projects, a line counts how many need it. A project whose Jig says a newer release is out —
-  *jig v0.38.0 is out* — gets **Upgrade…** too: it updates this machine's Jig first.
+  *jig v0.38.0 is out* — gets **Upgrade…** too: it updates this machine's Jig first. So does every
+  other project on an older Jig: a project hears of a new release only when its own
+  `jig housekeeping` runs, and Jig UI takes the newest release any project has heard of.
 
 The project's Jig says when it is behind, from Jig 0.34.0 on; a project on an older Jig shows only
 its version, so compare it with `jig --version` yourself.

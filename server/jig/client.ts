@@ -203,6 +203,16 @@ const Attention = z
   .refine((a) => a.kind !== 'upgrade-available' || a.versions !== null);
 export type Attention = z.output<typeof Attention>;
 
+/**
+ * The release Jig's `release-available` item names, as `0.38.0`; none for another item. Jig gives it only in the title
+ * (`jig v0.38.0 is out`), and knows of it per project — from that project's last `jig housekeeping` — so one project
+ * may name a release another has not heard of yet.
+ */
+export function releaseNamed(item: Attention): string | undefined {
+  if (item.kind !== 'release-available') return undefined;
+  return /\bv(\d+\.\d+\.\d+)\b/.exec(item.title)?.[1];
+}
+
 const Status = z.object({
   attention: z.array(Attention),
   housekeeping: z.object({ stale: z.boolean() }).nullable(),

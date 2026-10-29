@@ -14,11 +14,15 @@
     plan?: PlanState;
     /** A self-update or Upgrade all is under way: no upgrade starts from the card meanwhile. */
     held?: boolean;
+    /** The newest Jig release a connected project names: a project older than it has an upgrade to make too. */
+    release?: string | null;
   }>();
 
   const mark = computed(() => upgradeMark(props.project));
   // Offered on a project with an upgrade to make — now, or after a self-update — and nothing about one on the card yet.
-  const upgradable = computed(() => needsUpgrade(props.project) && !props.project.upgrade && !props.plan && !props.held);
+  const upgradable = computed(
+    () => needsUpgrade(props.project, props.release ?? null) && !props.project.upgrade && !props.plan && !props.held,
+  );
 
   defineEmits<{
     disconnect: [];

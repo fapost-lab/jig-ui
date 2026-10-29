@@ -1,0 +1,1 @@
+{"schema":1,"revision":1793272519,"generated_at":"2026-10-29T12:15:45Z","data":{"attention":[{"kind":"release-available","subject":{"type":"project","id":null},"tasks":[],"title":"jig v0.38.0 is out","detail":null,"todo":"jig self-update, then jig upgrade","url":null}],"housekeeping":null,"knowledge_counts_at":"2026-10-29T12:13:56Z"}}

@@ -174,6 +174,15 @@ describe('releaseOf and needsUpgrade', () => {
     expect(needsUpgrade(old)).toBe(false);
   });
 
+  it('counts a project older than the newest release another project names, whatever it says itself', () => {
+    const deaf = ready('deaf');
+    expect(releaseOf(deaf, '0.38.0')).toBe('jig v0.38.0 is out');
+    expect(releaseOf(deaf, '0.34.0')).toBeUndefined();
+    expect(releaseOf(deaf)).toBeUndefined();
+    expect(needsUpgrade(deaf, '0.34.1')).toBe(true);
+    expect(upgradeAllPlan([deaf, old], '0.38.0')).toEqual({ selfUpdate: true, projects: ['deaf'] });
+  });
+
   it('plans Upgrade all: a self-update only when a release is out, and every project with an upgrade', () => {
     expect(upgradeAllPlan([behind, ready('fresh'), old])).toEqual({ selfUpdate: false, projects: ['behind'] });
     expect(upgradeAllPlan([behind, released])).toEqual({ selfUpdate: true, projects: ['behind', 'released'] });
@@ -182,7 +191,7 @@ describe('releaseOf and needsUpgrade', () => {
 
 describe('machineLine', () => {
   const at = '2026-10-29T10:00:00Z';
-  const m = (machine: Partial<Machine>): Machine => ({ selfUpdate: null, upgradeAll: null, ...machine });
+  const m = (machine: Partial<Machine>): Machine => ({ release: null, selfUpdate: null, upgradeAll: null, ...machine });
 
   it('says nothing when nothing ran', () => {
     expect(machineLine(m({}))).toBeUndefined();

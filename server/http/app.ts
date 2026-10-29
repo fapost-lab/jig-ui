@@ -161,6 +161,13 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
         return c.json({ specs: read }, 200);
       })
 
+      // Read again: a project Jig could not read, read now rather than on the next change or the minute's rescan.
+      .post('/api/projects/:id/read', async (c) => {
+        const project = await source.readAgain(c.req.param('id'));
+        if (project === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        return c.json({ project }, 200);
+      })
+
       // A write carries the revision of the board it was based on; Jig refuses it if anything was written since.
       .post(
         '/api/projects/:id/queue/move',

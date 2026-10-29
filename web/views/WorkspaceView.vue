@@ -1,7 +1,7 @@
 <script setup lang="ts">
   import { computed, onUnmounted, ref, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
-  import { call, client, type Machine, onChange, type Project } from '@/api';
+  import { call, client, type Machine, onChange, type Project, readAgain } from '@/api';
   import ConnectForm from '@/components/ConnectForm.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProjectList from '@/components/ProjectList.vue';
@@ -69,6 +69,16 @@
 
   async function disconnect(id: string): Promise<void> {
     if (await call(() => client.api.projects[':id'].$delete({ param: { id: encodeURIComponent(id) } }))) await load();
+  }
+
+  /** The projects whose Read again is under way. */
+  const reading = ref(new Set<string>());
+
+  async function reread(id: string): Promise<void> {
+    reading.value.add(id);
+    const read = await readAgain(id);
+    reading.value.delete(id);
+    if (read) await load();
   }
 
   const upgradeApi = client.api.projects[':id'].upgrade;
@@ -196,8 +206,10 @@
         :plan="plans[shown.id]"
         :held="held"
         :release="release"
+        :reading="reading.has(shown.id)"
         class="min-w-0 flex-1"
         @disconnect="disconnect(shown.id)"
+        @read-again="reread(shown.id)"
         @start="start(shown)"
         @self-update="selfUpdate(shown.id)"
         @upgrade="upgrade(shown.id)"

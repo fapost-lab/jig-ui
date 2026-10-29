@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-10-27
+reviewed_at: 2026-10-29
 ---
 # JigClient — the only module that knows Jig
 
@@ -51,7 +51,10 @@ A task-list read runs Jig's JSON task listing with `--all`, finished tasks inclu
 `TaskList` schema — the status among Jig's own words — and returns typed tasks. Jig's refusal throws `JigRefusal` with its code
 (an unknown code is `failed`); an envelope of another shape throws `JigShapeError`, which the
 project shows as `incompatible` ("update Jig UI"), never half-parsed. Each read has a contract
-test over a fixture in `server/jig/fixtures/`.
+test over a fixture in `server/jig/fixtures/`. Each Jig run of a read, `--version` included, has
+30 s (`TIMEOUT_MS`); a run Node stops at the limit throws `JigRefusal('timeout')`, not `failed`,
+so the page can say Jig was slow rather than that it refused. 10 s ran out with several projects
+read at once, each four Jig runs of about 1 s on an idle machine (task `read-timeout`).
 
 A write — `moveInQueue`, `setPriority`, `requestPause`, `cancelPause` — names a task as
 `task:<id>`, passes `--revision <n>` and `--json`, and goes through the same envelope check:

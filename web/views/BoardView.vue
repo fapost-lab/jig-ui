@@ -1,13 +1,14 @@
 <script setup lang="ts">
   import { Columns3, Milestone, Plus, Rows3 } from '@lucide/vue';
   import { computed, onUnmounted, ref, watch } from 'vue';
-  import { type Board, call, client, describe, onChange, type Place, readTask, type ReadyDetails, type Specs, type Written } from '@/api';
+  import { type Board, call, client, onChange, type Place, readAgain, readTask, type ReadyDetails, type Specs, type Written } from '@/api';
   import BoardColumns from '@/components/BoardColumns.vue';
   import BoardList from '@/components/BoardList.vue';
   import EpicMenu from '@/components/EpicMenu.vue';
   import FinishedList from '@/components/FinishedList.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
   import SpecCard from '@/components/SpecCard.vue';
+  import StateLine from '@/components/StateLine.vue';
   import { Button } from '@/components/ui/button';
   import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
   import { Toggle } from '@/components/ui/toggle';
@@ -42,6 +43,16 @@
     },
     (read) => (board.value = read),
   );
+
+  /** Read again is under way. */
+  const reading = ref(false);
+
+  async function reread(): Promise<void> {
+    reading.value = true;
+    const read = await readAgain(props.id);
+    reading.value = false;
+    if (read) await Promise.all([load(), loadSpecs()]);
+  }
 
   const specs = ref<Specs | 'not-connected'>();
   const loadSpecs = lastWins(
@@ -285,7 +296,7 @@
 
     <p v-if="board === undefined" class="p-3 text-muted-foreground">Reading the board…</p>
     <p v-else-if="board === 'not-connected'" role="alert" class="p-3 text-destructive">No connected project is called {{ id }}.</p>
-    <p v-else-if="board.state !== 'ready'" class="p-3">{{ describe(board) }}</p>
+    <p v-else-if="board.state !== 'ready'" class="p-3"><StateLine :project="board" :reading="reading" @read-again="reread" /></p>
 
     <BoardColumns
       v-else-if="view === 'board'"
@@ -306,7 +317,7 @@
     <div v-else-if="view === 'specs'" class="min-h-0 flex-1 overflow-y-auto">
       <p v-if="specs === undefined" class="p-3 text-muted-foreground">Reading the specs…</p>
       <p v-else-if="specs === 'not-connected'" role="alert" class="p-3 text-destructive">No connected project is called {{ id }}.</p>
-      <p v-else-if="specs.state !== 'ready'" class="p-3">{{ describe(specs) }}</p>
+      <p v-else-if="specs.state !== 'ready'" class="p-3"><StateLine :project="specs" :reading="reading" @read-again="reread" /></p>
       <p v-else-if="specs.specs.length === 0" class="p-3 text-muted-foreground">
         No specs in this project. A spec is written with the <code>jig-idea</code> skill and kept in <code>.ai/specs/</code>.
       </p>

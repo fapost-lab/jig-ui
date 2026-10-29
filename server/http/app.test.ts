@@ -621,6 +621,20 @@ describe('/api/projects/:id/queue', () => {
     if (started?.state === 'started') expect(await res.json()).toEqual({ started: true });
   });
 
+  it('reads a project again, says when none has the id, and is refused without the token', async () => {
+    const view = { id: 'x', state: 'unreadable', code: 'timeout' } as const;
+    const source: ProjectSource = {
+      ...localSource(join(webRoot, 'fake-config')),
+      readAgain: (id) => Promise.resolve(id === 'x' ? view : undefined),
+    };
+    const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
+    const res = await post(fake, '/api/projects/x/read', {});
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ project: view });
+    expect((await post(fake, '/api/projects/y/read', {})).status).toBe(404);
+    expect((await post(fake, '/api/projects/x/read', {}, {})).status).toBe(401);
+  });
+
   it('forgets what an upgrade came to, refuses a disconnect while one runs, and is refused without the token', async () => {
     const source: ProjectSource = { ...localSource(join(webRoot, 'fake-config')), dismissUpgrade: (id) => Promise.resolve(id === 'x') };
     const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });

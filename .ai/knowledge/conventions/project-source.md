@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-10-28
+reviewed_at: 2026-10-29
 ---
 # ProjectSource — how the server reaches a project
 
@@ -30,7 +30,7 @@ Callers (`board/`, and `http/` for task details and the change stream) depend on
 
 The port is `ProjectSource` in `server/source/project-source.ts` — the workspace, a project's
 live tasks and the finished ones Jig still keeps (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), its specs
-(`specs(id)`), connect,
+(`specs(id)`), `readAgain(id)` — the project read through Jig now, for a person's Read again — connect,
 disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,
 `prioritise(id, taskId, priority, revision)`, `moveEpic(id, specId, place, revision)` and
 `prioritiseEpic(id, specId, priority, revision)` — a spec's open epic, among the top level of the
@@ -41,7 +41,7 @@ or the project's state when it is not `ready`; and the upgrade of a project's Ji
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
 only the path a person types to connect. A read that fails becomes a state of the project, not an
 error of the workspace: `unreadable` with Jig's failure code and never its message (it may name a
-path), `incompatible` when Jig answered in a shape JigClient does not read. A task's details carry no
+path), the code `timeout` when Jig did not answer within the read limit, its version read included; `incompatible` when Jig answered in a shape JigClient does not read. A task's details carry no
 worktree path and only the actions Jig offers — a refused action's reason is Jig's text and may
 name a path (feature-task-details). Either one right after a good
 read is held back once — the last good read stays — and believed the second time; while following,

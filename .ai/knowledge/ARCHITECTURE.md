@@ -49,7 +49,7 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `dismissUpgrade`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
-  read), `incompatible` (a newer Jig's shape), `unreadable` (Jig refused; its code only) or
+  read), `incompatible` (a newer Jig's shape), `unreadable` (Jig refused, or `timeout`; its code only — **Read again** reads it at once) or
   `unavailable` (convention-project-source).
 - `server/watch/` — Watcher: one recursive `fs.watch` per directory, debounced into "something
   changed", knowing nothing of Jig (convention-watcher).

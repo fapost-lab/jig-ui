@@ -1,11 +1,12 @@
 <script setup lang="ts">
   import { computed } from 'vue';
-  import { describe, type Project } from '@/api';
+  import type { Project } from '@/api';
   import { Button } from '@/components/ui/button';
   import { Card } from '@/components/ui/card';
   import { toneText } from '@/lib/tones';
   import { needsUpgrade, type PlanState, upgradeMark } from '@/lib/upgrade';
   import AttentionItem from './AttentionItem.vue';
+  import StateLine from './StateLine.vue';
   import UpgradePanel from './UpgradePanel.vue';
 
   const props = defineProps<{
@@ -16,6 +17,8 @@
     held?: boolean;
     /** The newest Jig release a connected project names: a project older than it has an upgrade to make too. */
     release?: string | null;
+    /** Its Read again is under way. */
+    reading?: boolean;
   }>();
 
   const mark = computed(() => upgradeMark(props.project));
@@ -26,6 +29,7 @@
 
   defineEmits<{
     disconnect: [];
+    readAgain: [];
     /** Upgrade on the card: the view asks Jig for the plan, or first to update this machine's Jig. */
     start: [];
     selfUpdate: [];
@@ -39,7 +43,7 @@
   <Card class="gap-3 px-4 py-4" :aria-labelledby="`project-${project.id}`" role="article">
     <div class="flex items-center gap-3">
       <h2 :id="`project-${project.id}`" class="shrink-0 text-sm font-bold">{{ project.id }}</h2>
-      <span class="text-muted-foreground">{{ describe(project) }}</span>
+      <StateLine :project="project" :reading="reading" class="text-muted-foreground" @read-again="$emit('readAgain')" />
       <span v-if="mark" :class="toneText.attention">{{ mark }}</span>
       <div class="ml-auto flex shrink-0 items-center gap-2">
         <Button v-if="upgradable" variant="outline" size="xs" @click="$emit('start')">Upgrade…</Button>

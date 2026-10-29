@@ -11,6 +11,7 @@
   import FinishedList from '@/components/FinishedList.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
   import CopyButton from '@/components/CopyButton.vue';
+  import StateLine from '@/components/StateLine.vue';
   import CopyCommand from '@/components/CopyCommand.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProgressBar from '@/components/ProgressBar.vue';
@@ -334,6 +335,25 @@
       <div class="flex gap-2">
         <CopyButton text="jig task pause design-system" />
         <CopyButton text="design-system" label="copy id" />
+      </div>
+    </CanvasSection>
+
+    <CanvasSection title="StateLine" note="read; past the read limit, with Read again; while it reads again; refused; not supported">
+      <div class="flex flex-col gap-2">
+        <StateLine
+          :project="{
+            id: 'shop',
+            state: 'ready',
+            jigVersion: '0.38.1',
+            counts: { active: 0, paused: 0, ready: 0 },
+            attention: [],
+            housekeepingStale: false,
+          }"
+        />
+        <StateLine :project="{ id: 'shop', state: 'unreadable', code: 'timeout' }" />
+        <StateLine :project="{ id: 'shop', state: 'unreadable', code: 'timeout' }" reading />
+        <StateLine :project="{ id: 'shop', state: 'unreadable', code: 'not-initialised' }" />
+        <StateLine :project="{ id: 'shop', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' }" />
       </div>
     </CanvasSection>
 

@@ -130,6 +130,8 @@ export type Planned =
   | {
       state: 'refused';
       code: string;
+      /** Jig's reasons, the paths cut out; none when it gave none. */
+      reasons?: string[];
     }
   | NotReady;
 
@@ -139,6 +141,8 @@ export type Started =
   | {
       state: 'refused';
       code: string;
+      /** Jig's reasons, the paths cut out; none when it gave none. */
+      reasons?: string[];
     }
   | NotReady;
 

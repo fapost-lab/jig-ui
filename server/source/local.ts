@@ -722,7 +722,10 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       try {
         return { state: 'planned', plan: await planUpgrade(found.entry.project.path) };
       } catch (error) {
-        return { state: 'refused', code: error instanceof JigRefusal ? error.code : 'failed' };
+        if (!(error instanceof JigRefusal)) return { state: 'refused', code: 'failed' };
+        return error.reasons.length
+          ? { state: 'refused', code: error.code, reasons: error.reasons }
+          : { state: 'refused', code: error.code };
       }
     },
     upgrade(id) {

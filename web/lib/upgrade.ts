@@ -1,4 +1,4 @@
-import type { Project, UpgradePlan } from '../api';
+import type { Machine, Project, UpgradePlan } from '../api';
 import type { Tone } from './tones';
 
 /**
@@ -13,6 +13,64 @@ export function upgradeOf(project: Project):
   | undefined {
   if (project.state !== 'ready') return undefined;
   return project.attention.find((a) => a.kind === 'upgrade-available')?.versions ?? undefined;
+}
+
+/**
+ * Jig's line that a newer release than this machine's is out, as `jig v0.38.0 is out`: the project's upgrade waits for
+ * `jig self-update`, which moves this machine's Jig. None without Jig's `release-available` item.
+ */
+export function releaseOf(project: Project): string | undefined {
+  if (project.state !== 'ready') return undefined;
+  return project.attention.find((a) => a.kind === 'release-available')?.title;
+}
+
+/** The project has an upgrade to make: now, or once this machine's Jig is updated. */
+export const needsUpgrade = (project: Project): boolean => upgradeOf(project) !== undefined || releaseOf(project) !== undefined;
+
+/** What Upgrade all would do: update this machine's Jig first when a release is out, then upgrade these projects. */
+export function upgradeAllPlan(projects: Project[]): {
+  selfUpdate: boolean;
+  projects: string[];
+} {
+  return { selfUpdate: projects.some((p) => releaseOf(p) !== undefined), projects: projects.filter(needsUpgrade).map((p) => p.id) };
+}
+
+/** A run that changes this machine's Jig or every project is under way: no other upgrade starts meanwhile. */
+export const machineBusy = (machine: Machine | undefined): boolean =>
+  machine?.selfUpdate?.state === 'running' || machine?.upgradeAll?.state === 'running';
+
+/** What the page says of Upgrade all and of a self-update: under way, or what it came to; none when nothing ran. */
+export function machineLine(machine: Machine | undefined):
+  | {
+      text: string;
+      tone: Tone;
+      reasons: string[];
+      ended: boolean;
+    }
+  | undefined {
+  const all = machine?.upgradeAll;
+  const listed = (ids: string[]) => ids.join(', ');
+  // A self-update from a card comes before what an earlier Upgrade all came to.
+  if (machine?.selfUpdate?.state === 'running' && all?.state !== 'running') {
+    return { text: 'Updating Jig on this machine…', tone: 'quiet', reasons: [], ended: false };
+  }
+  if (all?.state === 'running') {
+    if (all.current === null) {
+      const text =
+        machine?.selfUpdate?.state === 'running' ? 'Upgrade all: updating Jig on this machine…' : 'Upgrade all: reading the projects…';
+      return { text, tone: 'quiet', reasons: [], ended: false };
+    }
+    const after = all.upgraded.length ? ` (done: ${listed(all.upgraded)})` : '';
+    return { text: `Upgrade all: upgrading ${all.current}…${after}`, tone: 'quiet', reasons: [], ended: false };
+  }
+  if (all?.state === 'done') {
+    if (all.failed)
+      return { text: 'Upgrade all stopped: Jig could not update itself on this machine.', tone: 'bad', reasons: all.failed, ended: true };
+    const parts = [all.upgraded.length ? `ran the upgrade in ${listed(all.upgraded)}` : 'had no project to upgrade'];
+    if (all.skipped.length) parts.push(`left ${listed(all.skipped)} alone`);
+    return { text: `Upgrade all ${parts.join('; ')}. Each card says what its upgrade came to.`, tone: 'quiet', reasons: [], ended: true };
+  }
+  return undefined;
 }
 
 /** A card's mark of a project behind the machine's Jig, both versions; none when it is not behind. */
@@ -31,8 +89,16 @@ export function upgradeLine(projects: Project[]): string | undefined {
 /** An upgrade started from the page: under way, what Jig did, or why it did not get there. */
 export type UpgradeRun = NonNullable<Project['upgrade']>;
 
-/** The upgrade panel of a card before a run: Jig's dry run being read, its plan, or why there is none. */
+/**
+ * The upgrade panel of a card before a run: asking to update this machine's Jig first, that update under way, Jig's dry
+ * run being read, its plan, or why there is none.
+ */
 export type PlanState =
+  | {
+      state: 'confirm-self-update';
+      release: string;
+    }
+  | { state: 'self-updating' }
   | { state: 'reading' }
   | {
       state: 'planned';

@@ -62,6 +62,13 @@ function project(
     plan?: unknown;
     /** What `upgrade` prints once a file `go` is in the project: an envelope's `data`, or a whole envelope as a string. */
     upgrade?: unknown;
+    /** What `self-update` does once no file `hold-self` is in the project; given `statusAfter`, it also replaces status.json with it, as a new Jig would. */
+    selfUpdate?: {
+      out?: string;
+      err?: string;
+      code?: number;
+      statusAfter?: unknown;
+    };
   } = {},
 ): string {
   const dir = join(root, name);
@@ -84,6 +91,10 @@ function project(
   );
   writeFileSync(join(dir, 'plan.json'), envelope(answers.plan ?? {}));
   writeFileSync(join(dir, 'upgrade.json'), typeof answers.upgrade === 'string' ? answers.upgrade : envelope(answers.upgrade ?? {}));
+  const self = answers.selfUpdate ?? {};
+  writeFileSync(join(dir, 'self.out'), self.out ?? 'self-update: already current');
+  writeFileSync(join(dir, 'self.err'), self.err ?? '');
+  if (self.statusAfter !== undefined) writeFileSync(join(dir, 'status-after.json'), envelope(self.statusAfter));
   writeFileSync(
     join(dir, '.ai', 'scripts', 'jig'),
     `#!/usr/bin/env bash
@@ -96,6 +107,7 @@ case "$*" in
   "queue list --json") cat queue.json ;;
   "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
   "upgrade --dry-run --json") cat plan.json ;;
+  "self-update") while [ -f hold-self ]; do sleep 0.05; done; cat self.out; echo; cat self.err >&2; if [ -f status-after.json ] && [ ${self.code ?? 0} -eq 0 ]; then cp status-after.json status.json; fi; exit ${self.code ?? 0} ;;
   "upgrade --json") while [ ! -f go ]; do sleep 0.05; done; cat upgrade.json; if grep -q '"error"' upgrade.json; then exit 1; fi ;;
 esac
 `,
@@ -992,5 +1004,370 @@ describe('localSource, upgrading a project', () => {
     expect((await source.workspace()).map((p) => p.id)).toContain('behind');
     writeFileSync(join(behind, 'go'), '');
     await ended('behind');
+  });
+});
+
+describe('localSource, self-update and Upgrade all', () => {
+  const release = {
+    kind: 'release-available',
+    subject: { type: 'project', id: null },
+    tasks: [],
+    title: 'A newer Jig is out',
+    detail: null,
+    todo: 'jig self-update',
+    url: null,
+    versions: { from: '0.35.0', to: '0.36.0' },
+  };
+  const upgradeItem = {
+    kind: 'upgrade-available',
+    subject: { type: 'project', id: null },
+    tasks: [],
+    title: 'Jig in this project is older than on this machine',
+    detail: null,
+    todo: 'jig upgrade',
+    url: null,
+    versions: { from: '0.34.0', to: '0.35.0' },
+  };
+  const outcome = {
+    mode: 'copy',
+    dry_run: false,
+    from: '0.34.0',
+    to: '0.35.0',
+    outcome: 'upgraded',
+    files: { placed: 1, kept: 1, removed: 0, conflicts: 0 },
+    git: null,
+    manual_steps: [],
+    would_stop: [],
+  };
+  const behindStatus = { attention: [upgradeItem], housekeeping: null };
+  let configs = 0;
+  /** A fresh source and registry per test, so the machine's runs of one never reach another. */
+  function fresh() {
+    const config = join(root, `machine-config-${configs++}`);
+    const source = localSource(config);
+    return { source, config };
+  }
+  const behind = (name: string, more: Parameters<typeof project>[2] = {}) =>
+    project(name, '0.34.0', { status: behindStatus, upgrade: outcome, ...more });
+  const log = (dir: string, call: string) => calls(dir).filter((c) => c === call).length;
+  const go = (dir: string) => writeFileSync(join(dir, 'go'), '');
+  async function ended(source: ReturnType<typeof localSource>): Promise<void> {
+    await until(() => source.machine().upgradeAll?.state === 'done');
+  }
+
+  it('shows nothing of the machine before it does anything', () => {
+    expect(fresh().source.machine()).toEqual({ selfUpdate: null, upgradeAll: null });
+  });
+
+  describe('self-update', () => {
+    it('runs through the first connected project with a Jig, says what Jig said, and reads every project again', async () => {
+      const { source } = fresh();
+      const first = project('su-first', '0.35.0', {
+        status: { attention: [release], housekeeping: null },
+        selfUpdate: { out: 'noise\nself-update: updated 0.35.0 -> 0.36.0 (abc1234)', statusAfter: behindStatus },
+      });
+      const second = project('su-second', '0.35.0');
+      await source.connect(first);
+      await source.connect(second);
+      const secondReads = log(second, 'status --json');
+      expect(await source.selfUpdate()).toEqual({ state: 'done', said: 'self-update: updated 0.35.0 -> 0.36.0 (abc1234)' });
+      expect(calls(first)).toContain('self-update');
+      expect(calls(second)).not.toContain('self-update');
+      expect(source.machine().selfUpdate).toEqual({ state: 'done', at: expect.any(String), said: expect.any(String) });
+      expect(log(second, 'status --json')).toBeGreaterThan(secondReads);
+      // The project now shows the upgrade the new Jig makes.
+      const shown = (await source.workspace()).find((p) => p.id === 'su-first');
+      expect(shown).toMatchObject({ state: 'ready', attention: [expect.objectContaining({ kind: 'upgrade-available' })] });
+    });
+
+    it('skips a project without a Jig when it picks one to run through', async () => {
+      const { source, config } = fresh();
+      const bare = join(root, 'su-bare');
+      mkdirSync(bare, { recursive: true });
+      execFileSync('git', ['init', '-q'], { cwd: bare });
+      await addProject(config, bare);
+      const real = project('su-real', '0.35.0');
+      await source.connect(real);
+      expect(await source.selfUpdate()).toMatchObject({ state: 'done' });
+      expect(calls(real)).toContain('self-update');
+    });
+
+    it('is refused as not-found when no project has a Jig, and runs nothing', async () => {
+      const { source } = fresh();
+      expect(await source.selfUpdate()).toEqual({ state: 'refused', code: 'not-found' });
+      expect(source.machine().selfUpdate).toBeNull();
+    });
+
+    it('keeps why it failed, with no path', async () => {
+      const { source } = fresh();
+      await source.connect(
+        project('su-fail', '0.35.0', {
+          selfUpdate: { err: 'jig: error: self-update: cannot reach the remote at /Users/me/jig', code: 1 },
+        }),
+      );
+      expect(await source.selfUpdate()).toEqual({ state: 'failed', reasons: ['cannot reach the remote at …'] });
+      expect(source.machine().selfUpdate).toEqual({ state: 'failed', at: expect.any(String), reasons: ['cannot reach the remote at …'] });
+      // A failed run does not hold the next one.
+      expect(await source.selfUpdate()).toEqual({ state: 'failed', reasons: expect.any(Array) });
+    });
+
+    it('is under way until Jig ends, and holds the plan of a project upgrade meanwhile', async () => {
+      const { source } = fresh();
+      const dir = behind('su-hold');
+      await source.connect(dir);
+      writeFileSync(join(dir, 'hold-self'), '');
+      const running = source.selfUpdate();
+      await until(() => calls(dir).includes('self-update'));
+      expect(source.machine().selfUpdate).toEqual({ state: 'running', since: expect.any(String) });
+      expect(await source.planUpgrade('su-hold')).toEqual({ state: 'refused', code: 'running' });
+      // Refused at once, not queued behind the run.
+      expect(await source.selfUpdate()).toEqual({ state: 'refused', code: 'running' });
+      expect(await source.upgradeAll()).toEqual({ state: 'refused', code: 'running' });
+      expect(await source.upgrade('su-hold')).toEqual({ state: 'refused', code: 'running' });
+      // Dismissing does not forget a run under way.
+      source.dismissUpgradeAll();
+      expect(source.machine().selfUpdate?.state).toBe('running');
+      rmSync(join(dir, 'hold-self'));
+      expect(await running).toMatchObject({ state: 'done' });
+      expect(log(dir, 'upgrade --json')).toBe(0);
+    });
+
+    it('is refused while a project upgrade runs', async () => {
+      const { source } = fresh();
+      const dir = behind('su-while-upgrade');
+      await source.connect(dir);
+      expect(await source.upgrade('su-while-upgrade')).toEqual({ state: 'started' });
+      expect(await source.selfUpdate()).toEqual({ state: 'refused', code: 'running' });
+      go(dir);
+      await until(() => source.machine() !== undefined && log(dir, 'upgrade --json') > 0);
+    });
+  });
+
+  describe('Upgrade all', () => {
+    it('answers at once and upgrades the projects that show an upgrade one at a time, in the order connected', async () => {
+      const { source } = fresh();
+      const one = behind('ua-one');
+      const two = behind('ua-two');
+      await source.connect(one);
+      await source.connect(two);
+      expect(await source.upgradeAll()).toEqual({ state: 'started' });
+      expect(source.machine().upgradeAll).toEqual({ state: 'running', since: expect.any(String), current: null, upgraded: [] });
+
+      await until(() => log(one, 'upgrade --json') > 0);
+      expect(source.machine().upgradeAll).toMatchObject({ state: 'running', current: 'ua-one', upgraded: [] });
+      await delay(250);
+      // The second waits for the first to end.
+      expect(log(two, 'upgrade --json')).toBe(0);
+      expect(await source.upgradeAll()).toEqual({ state: 'refused', code: 'running' });
+      expect(await source.selfUpdate()).toEqual({ state: 'refused', code: 'running' });
+      expect(await source.upgrade('ua-two')).toEqual({ state: 'refused', code: 'running' });
+      expect(await source.planUpgrade('ua-two')).toEqual({ state: 'refused', code: 'running' });
+
+      go(one);
+      await until(() => log(two, 'upgrade --json') > 0);
+      expect(source.machine().upgradeAll).toMatchObject({ state: 'running', current: 'ua-two', upgraded: ['ua-one'] });
+      go(two);
+      await ended(source);
+      expect(source.machine().upgradeAll).toEqual({
+        state: 'done',
+        at: expect.any(String),
+        upgraded: ['ua-one', 'ua-two'],
+        skipped: [],
+        failed: null,
+      });
+      // No release was out: Jig is not updated.
+      expect(calls(one)).not.toContain('self-update');
+      expect(calls(two)).not.toContain('self-update');
+      expect(log(one, 'upgrade --json')).toBe(1);
+      expect(log(two, 'upgrade --json')).toBe(1);
+    });
+
+    it('never upgrades a project disconnected while it waits its turn, and keeps the one being upgraded', async () => {
+      const { source } = fresh();
+      const one = behind('ud-one');
+      const two = behind('ud-two');
+      await source.connect(one);
+      await source.connect(two);
+      await source.upgradeAll();
+      await until(() => log(one, 'upgrade --json') > 0);
+      expect(await source.disconnect('ud-one')).toBe('upgrading');
+      // Disconnected while the first runs: its turn finds it gone.
+      expect(await source.disconnect('ud-two')).toBe(true);
+      go(one);
+      await ended(source);
+      expect(source.machine().upgradeAll).toMatchObject({ state: 'done', upgraded: ['ud-one'], skipped: [] });
+      expect(log(two, 'upgrade --json')).toBe(0);
+    });
+
+    it('skips an up-to-date project and one it cannot read, and upgrades the rest', async () => {
+      const { source } = fresh();
+      const current = project('ua-current', '0.35.0');
+      const broken = project('ua-broken', '0.35.0', { status: 'not json at all' });
+      const needs = behind('ua-needs');
+      for (const dir of [current, broken, needs]) await source.connect(dir);
+      go(needs);
+      expect(await source.upgradeAll()).toEqual({ state: 'started' });
+      await ended(source);
+      expect(source.machine().upgradeAll).toEqual({
+        state: 'done',
+        at: expect.any(String),
+        upgraded: ['ua-needs'],
+        skipped: ['ua-current', 'ua-broken'],
+        failed: null,
+      });
+      expect(log(current, 'upgrade --json')).toBe(0);
+      expect(log(broken, 'upgrade --json')).toBe(0);
+      expect(log(needs, 'upgrade --json')).toBe(1);
+    });
+
+    it('ends done with everything skipped when no project is connected or none needs an upgrade', async () => {
+      const empty = fresh().source;
+      expect(await empty.upgradeAll()).toEqual({ state: 'started' });
+      await ended(empty);
+      expect(empty.machine().upgradeAll).toEqual({ state: 'done', at: expect.any(String), upgraded: [], skipped: [], failed: null });
+
+      const { source } = fresh();
+      await source.connect(project('ua-fine', '0.35.0'));
+      await source.upgradeAll();
+      await ended(source);
+      expect(source.machine().upgradeAll).toMatchObject({ state: 'done', upgraded: [], skipped: ['ua-fine'], failed: null });
+    });
+
+    it('updates this machine first when a release is out, then upgrades the projects that now show an upgrade', async () => {
+      const { source } = fresh();
+      // Its status shows the release; after self-update (run through it) it shows the upgrade, as a new Jig would.
+      const first = project('ua-rel-first', '0.34.0', {
+        status: { attention: [release], housekeeping: null },
+        selfUpdate: { out: 'self-update: updated 0.35.0 -> 0.36.0 (abc1234)', statusAfter: behindStatus },
+        upgrade: outcome,
+      });
+      const second = behind('ua-rel-second');
+      go(first);
+      go(second);
+      await source.connect(first);
+      await source.connect(second);
+      await source.upgradeAll();
+      await ended(source);
+      expect(calls(first)).toContain('self-update');
+      expect(calls(second)).not.toContain('self-update');
+      expect(calls(first).indexOf('self-update')).toBeLessThan(calls(first).indexOf('upgrade --json'));
+      expect(source.machine().upgradeAll).toEqual({
+        state: 'done',
+        at: expect.any(String),
+        upgraded: ['ua-rel-first', 'ua-rel-second'],
+        skipped: [],
+        failed: null,
+      });
+      expect(source.machine().selfUpdate).toMatchObject({ state: 'done' });
+    });
+
+    it('stops before any project when the self-update fails, and says why', async () => {
+      const { source } = fresh();
+      const first = project('ua-fail-first', '0.34.0', {
+        status: { attention: [release, upgradeItem], housekeeping: null },
+        selfUpdate: { err: 'jig: error: self-update: cannot reach the remote', code: 1 },
+        upgrade: outcome,
+      });
+      const second = behind('ua-fail-second');
+      go(first);
+      go(second);
+      await source.connect(first);
+      await source.connect(second);
+      await source.upgradeAll();
+      await ended(source);
+      expect(source.machine().upgradeAll).toEqual({
+        state: 'done',
+        at: expect.any(String),
+        upgraded: [],
+        skipped: [],
+        failed: ['cannot reach the remote'],
+      });
+      expect(source.machine().selfUpdate).toMatchObject({ state: 'failed' });
+      expect(log(first, 'upgrade --json')).toBe(0);
+      expect(log(second, 'upgrade --json')).toBe(0);
+    });
+
+    it('gives a reason of its own when the self-update fails without one', async () => {
+      const { source } = fresh();
+      await source.connect(
+        project('ua-silent', '0.34.0', { status: { attention: [release], housekeeping: null }, selfUpdate: { code: 1 } }),
+      );
+      await source.upgradeAll();
+      await ended(source);
+      expect(source.machine().upgradeAll).toMatchObject({ state: 'done', upgraded: [], failed: [expect.any(String)] });
+    });
+
+    it('does not update this machine when no release is out, even when a project is behind', async () => {
+      const { source } = fresh();
+      const dir = behind('ua-norel');
+      go(dir);
+      await source.connect(dir);
+      await source.upgradeAll();
+      await ended(source);
+      expect(calls(dir)).not.toContain('self-update');
+      expect(source.machine().selfUpdate).toBeNull();
+    });
+
+    it('continues past a project whose upgrade is refused', async () => {
+      const { source } = fresh();
+      const blocked = behind('ua-blocked', {
+        upgrade: JSON.stringify({
+          schema: 1,
+          revision: 7,
+          generated_at: 'x',
+          error: { code: 'upgrade-blocked', message: 'upgrade: nothing was changed:\n  - dirty tree' },
+        }),
+      });
+      const fine = behind('ua-fine-after');
+      go(blocked);
+      go(fine);
+      await source.connect(blocked);
+      await source.connect(fine);
+      await source.upgradeAll();
+      await ended(source);
+      expect(log(fine, 'upgrade --json')).toBe(1);
+      expect(source.machine().upgradeAll).toMatchObject({ state: 'done', failed: null });
+    });
+
+    it('keeps what it came to until dismissed, and may be started again afterwards', async () => {
+      const { source } = fresh();
+      const dir = behind('ua-again');
+      go(dir);
+      await source.connect(dir);
+      await source.upgradeAll();
+      await ended(source);
+      expect(source.machine().upgradeAll?.state).toBe('done');
+      source.dismissUpgradeAll();
+      expect(source.machine()).toEqual({ selfUpdate: null, upgradeAll: null });
+      // Dismissing nothing is harmless.
+      source.dismissUpgradeAll();
+      expect(source.machine()).toEqual({ selfUpdate: null, upgradeAll: null });
+      expect(await source.upgradeAll()).toEqual({ state: 'started' });
+      await ended(source);
+    });
+
+    it('clears a self-update result along with it', async () => {
+      const { source } = fresh();
+      await source.connect(project('ua-clear', '0.35.0'));
+      await source.selfUpdate();
+      expect(source.machine().selfUpdate?.state).toBe('done');
+      source.dismissUpgradeAll();
+      expect(source.machine().selfUpdate).toBeNull();
+    });
+
+    it('tells a listener when it starts, moves on and ends', async () => {
+      const { source } = fresh();
+      const dir = behind('ua-told');
+      go(dir);
+      await source.connect(dir);
+      const changes: Change[] = [];
+      const unsubscribe = source.subscribe((c) => changes.push(c));
+      await settled(dir);
+      const before = changes.length;
+      await source.upgradeAll();
+      await ended(source);
+      expect(changes.length).toBeGreaterThan(before);
+      unsubscribe();
+    });
   });
 });

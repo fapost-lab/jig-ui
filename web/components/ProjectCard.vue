@@ -4,7 +4,7 @@
   import { Button } from '@/components/ui/button';
   import { Card } from '@/components/ui/card';
   import { toneText } from '@/lib/tones';
-  import { type PlanState, upgradeMark } from '@/lib/upgrade';
+  import { needsUpgrade, type PlanState, upgradeMark } from '@/lib/upgrade';
   import AttentionItem from './AttentionItem.vue';
   import UpgradePanel from './UpgradePanel.vue';
 
@@ -12,15 +12,19 @@
     project: Project;
     /** The upgrade panel before a run, when it is open. */
     plan?: PlanState;
+    /** A self-update or Upgrade all is under way: no upgrade starts from the card meanwhile. */
+    held?: boolean;
   }>();
 
   const mark = computed(() => upgradeMark(props.project));
-  // Offered on a marked project with nothing about an upgrade on the card yet.
-  const upgradable = computed(() => mark.value && !props.project.upgrade && !props.plan);
+  // Offered on a project with an upgrade to make — now, or after a self-update — and nothing about one on the card yet.
+  const upgradable = computed(() => needsUpgrade(props.project) && !props.project.upgrade && !props.plan && !props.held);
 
   defineEmits<{
     disconnect: [];
-    plan: [];
+    /** Upgrade on the card: the view asks Jig for the plan, or first to update this machine's Jig. */
+    start: [];
+    selfUpdate: [];
     upgrade: [];
     close: [];
     dismiss: [];
@@ -33,16 +37,17 @@
       <h2 :id="`project-${project.id}`" class="shrink-0 text-sm font-bold">{{ project.id }}</h2>
       <span class="text-muted-foreground">{{ describe(project) }}</span>
       <span v-if="mark" :class="toneText.attention">{{ mark }}</span>
-      <Button v-if="upgradable" variant="outline" size="xs" @click="$emit('plan')">Upgrade…</Button>
-      <Button v-if="project.upgrade?.state !== 'running'" variant="ghost" size="xs" class="ml-auto" @click="$emit('disconnect')">
-        Disconnect
-      </Button>
+      <div class="ml-auto flex shrink-0 items-center gap-2">
+        <Button v-if="upgradable" variant="outline" size="xs" @click="$emit('start')">Upgrade…</Button>
+        <Button v-if="project.upgrade?.state !== 'running'" variant="ghost" size="xs" @click="$emit('disconnect')">Disconnect</Button>
+      </div>
     </div>
     <UpgradePanel
       v-if="project.upgrade || plan"
       :project="project.id"
       :run="project.upgrade"
       :plan="plan"
+      @self-update="$emit('selfUpdate')"
       @upgrade="$emit('upgrade')"
       @close="$emit('close')"
       @dismiss="$emit('dismiss')"

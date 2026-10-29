@@ -103,7 +103,29 @@ function apiRoutes(source: ProjectSource, version: string) {
     new Hono()
       .get('/api/instance', (c) => c.json({ version }, 200))
 
-      .get('/api/workspace', async (c) => c.json({ projects: await source.workspace() }, 200))
+      .get('/api/workspace', async (c) => c.json({ projects: await source.workspace(), machine: source.machine() }, 200))
+
+      // Moves this machine's Jig to its newest release and answers once it has: a git fetch, not minutes.
+      .post('/api/self-update', async (c) => {
+        const run = await source.selfUpdate();
+        if (run.state === 'done') return c.json({ said: run.said }, 200);
+        if (run.state === 'failed')
+          return c.json({ error: { code: 'failed', message: 'Jig could not update itself on this machine.', reasons: run.reasons } }, 422);
+        if (run.code === 'running') return refuse(c, 409, run.code, 'An upgrade is under way; try again once it ends.');
+        return refuse(c, 404, run.code, 'No connected project has a Jig to run jig self-update through.');
+      })
+
+      // Answered at once: the projects are upgraded one at a time in the server, and the workspace shows each.
+      .post('/api/upgrade-all', async (c) => {
+        const started = await source.upgradeAll();
+        if (started.state === 'started') return c.json({ started: true as const }, 202);
+        return refuse(c, 409, started.code, 'An upgrade is under way; try again once it ends.');
+      })
+
+      .delete('/api/upgrade-all', (c) => {
+        source.dismissUpgradeAll();
+        return c.body(null, 204);
+      })
 
       .get('/api/projects/:id/board', async (c) => {
         const id = c.req.param('id');

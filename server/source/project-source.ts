@@ -66,6 +66,53 @@ export type UpgradeRun =
       reasons: string[];
     };
 
+/** This machine's Jig moved to its newest release from the page (`jig self-update`): under way, what Jig said, or why not. */
+export type SelfUpdateRun =
+  | {
+      state: 'running';
+      since: string;
+    }
+  | {
+      state: 'done';
+      at: string;
+      /** Jig's line, as `self-update: updated 0.37.0 -> 0.38.0 (abc1234)`. */
+      said: string;
+    }
+  | {
+      state: 'failed';
+      at: string;
+      reasons: string[];
+    };
+
+/**
+ * Every connected project upgraded from the page one at a time: this machine's Jig first when a release is out, then
+ * each project that shows an upgrade to make, in the order they were connected. Each project's own run is its `upgrade`.
+ */
+export type UpgradeAllRun =
+  | {
+      state: 'running';
+      since: string;
+      /** The project being upgraded now; `null` while this machine's Jig is updated or the projects are read. */
+      current: string | null;
+      /** The projects upgraded so far, in order. */
+      upgraded: string[];
+    }
+  | {
+      state: 'done';
+      at: string;
+      upgraded: string[];
+      /** The connected projects left alone: up to date, or not readable. */
+      skipped: string[];
+      /** Why it stopped before the projects: this machine's Jig could not be updated. */
+      failed: string[] | null;
+    };
+
+/** What the workspace shows beyond its projects: the runs that change this machine's Jig or many projects. */
+export interface Machine {
+  selfUpdate: SelfUpdateRun | null;
+  upgradeAll: UpgradeAllRun | null;
+}
+
 /** A connected project as the workspace shows it, with the upgrade started from the page, if any. */
 export type WorkspaceProject = ProjectView & { upgrade: UpgradeRun | null };
 
@@ -280,6 +327,40 @@ export interface ProjectSource {
   upgrade(id: string): Promise<Started | undefined>;
   /** Forgets what the project's last upgrade came to; one under way stays. False when no project has that id. */
   dismissUpgrade(id: string): Promise<boolean>;
+  /** The runs started from the page that change this machine's Jig or every project. */
+  machine(): Machine;
+  /**
+   * Moves this machine's Jig to its newest release and answers once it has, then reads every project again: they now
+   * show the upgrade it makes possible. Touches no project. Refused `running` while it, an upgrade or Upgrade all runs,
+   * `not-found` when no connected project has a Jig to run it through.
+   */
+  selfUpdate(): Promise<
+    | {
+        state: 'done';
+        said: string;
+      }
+    | {
+        state: 'failed';
+        reasons: string[];
+      }
+    | {
+        state: 'refused';
+        code: string;
+      }
+  >;
+  /**
+   * Starts upgrading every connected project and answers at once: this machine's Jig first when a project says a
+   * release is out, then one project at a time. Refused `running` while it, a self-update or an upgrade runs.
+   */
+  upgradeAll(): Promise<
+    | { state: 'started' }
+    | {
+        state: 'refused';
+        code: string;
+      }
+  >;
+  /** Forgets what the last Upgrade all and self-update came to; one under way stays. */
+  dismissUpgradeAll(): void;
   /** False when no project has that id, `upgrading` while its upgrade runs. Nothing in the project is touched. */
   disconnect(id: string): Promise<boolean | 'upgrading'>;
   /**

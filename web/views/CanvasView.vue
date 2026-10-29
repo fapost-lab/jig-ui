@@ -33,6 +33,7 @@
   import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
   import { Input } from '@/components/ui/input';
   import { Label } from '@/components/ui/label';
+  import { Progress } from '@/components/ui/progress';
   import { Separator } from '@/components/ui/separator';
   import { Toggle } from '@/components/ui/toggle';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -154,17 +155,31 @@
       <ProjectSwitcher :projects="[]" />
     </CanvasSection>
 
-    <CanvasSection title="ProjectList" note="one chosen, a project in each state; type to search">
-      <ProjectList :projects="projects" chosen="jig-ui" class="w-64" />
+    <CanvasSection title="ProjectList" note="one chosen, a project in each state; type to search; on the first load, two still being read">
+      <div class="flex flex-wrap gap-6">
+        <ProjectList :projects="projects" chosen="jig-ui" class="w-64" />
+        <ProjectList
+          :projects="[projects[0]!, { id: 'slow-monorepo', state: 'reading' }, { id: 'billing', state: 'reading' }]"
+          class="w-64"
+        />
+      </div>
     </CanvasSection>
 
-    <CanvasSection title="ProjectMark" note="things that need you; not readable; nothing">
+    <CanvasSection title="Progress" note="the first read of the projects: 1 of 3 landed">
+      <div class="flex max-w-md flex-col gap-1">
+        <p class="text-muted-foreground">Reading projects: 1 of 3</p>
+        <Progress :model-value="33" aria-label="Projects read" />
+      </div>
+    </CanvasSection>
+
+    <CanvasSection title="ProjectMark" note="things that need you; not readable; nothing; being read">
       <div class="flex gap-4">
         <ProjectMark
           v-for="p in [
             projects[0]!,
             projects.find((q) => q.state !== 'ready')!,
             projects.find((q) => q.state === 'ready' && q.attention.length === 0)!,
+            { id: 'slow-monorepo', state: 'reading' as const },
           ]"
           :key="p.id"
           :project="p"

@@ -214,6 +214,14 @@ describe('/api/projects and /api/workspace', () => {
     expectNoPath(text);
     expect(text).not.toContain('"path"');
 
+    expect(await (await call('GET', '/api/projects')).json()).toEqual({ projects: ['ready', 'old', 'broken'] });
+    const one = await call('GET', '/api/projects/broken');
+    expect(one.status).toBe(200);
+    expect(await one.json()).toEqual({ project: { id: 'broken', state: 'unreadable', code: 'failed', upgrade: null } });
+    expect((await call('GET', '/api/projects/nobody')).status).toBe(404);
+    expect((await projects.request('/api/projects', { headers: { host: HOST } })).status).toBe(401);
+    expect((await projects.request('/api/projects/ready', { headers: { host: HOST } })).status).toBe(401);
+
     expect((await call('DELETE', '/api/projects/old')).status).toBe(204);
     expect((await call('DELETE', '/api/projects/old')).status).toBe(404);
     expect(((await (await call('GET', '/api/workspace')).json()) as { projects: unknown[] }).projects).toHaveLength(2);

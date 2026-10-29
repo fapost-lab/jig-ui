@@ -47,11 +47,11 @@ import type {
   TaskCounts,
   TaskDetails,
   UpgradeRun,
+  WorkspaceProject,
   Written,
 } from './project-source.js';
 
-/** Jig's version in the checkout: `null` when Jig is there but names no version Jig UI can read. */
-/** The project's Jig version; `null` when Jig names none. A Jig too slow to answer throws its JigRefusal. */
+/** Jig's version in the checkout: `null` when Jig is there but names no version Jig UI can read. A Jig too slow to answer throws its JigRefusal. */
 async function version(root: string): Promise<string | null | undefined> {
   try {
     return await jigVersion(root);
@@ -640,11 +640,22 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     return written;
   }
 
+  /** A project as the workspace shows it: what its read says, and the upgrade started from the page. */
+  const listed = async (project: Project): Promise<WorkspaceProject> => ({
+    ...(await shown(project)).view,
+    upgrade: entryOf(project).upgrade ?? null,
+  });
+
   return {
     async workspace() {
-      return Promise.all(
-        (await readProjects(configDir)).map(async (p) => ({ ...(await shown(p)).view, upgrade: entryOf(p).upgrade ?? null })),
-      );
+      return Promise.all((await readProjects(configDir)).map(listed));
+    },
+    async connected() {
+      return (await readProjects(configDir)).map((p) => p.id);
+    },
+    async project(id) {
+      const project = (await readProjects(configDir)).find((p) => p.id === id);
+      return project && listed(project);
     },
     async connect(path) {
       const found = await connectable(path);

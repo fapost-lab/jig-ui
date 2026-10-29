@@ -31,6 +31,10 @@ attention items as `jig status --json` lists them — and the housekeeping note.
 holds a dropdown with search over the projects (`web/components/ProjectSwitcher.vue`, in
 `App.vue`) that opens a project's board; the list and the dropdown mark each project with its
 count of attention items, or *!* when it cannot be read (`web/components/ProjectMark.vue`).
+The first load lists the connected ids at once (`GET /api/projects`) and reads each project on its
+own (`GET /api/projects/:id`), so each fills in as Jig answers for it — `…` until then — under a bar
+counting the projects read (`readProgress` in `web/lib/projects.ts`); later loads read the whole
+workspace, as before.
 A project whose Jig is older than the machine's is marked with both versions
 (*0.34.0 → 0.35.0 on this machine*) and counted in a line above the projects; `web/lib/upgrade.ts`
 decides both. Its **Upgrade…** opens a panel on the card (`web/components/UpgradePanel.vue`): Jig's
@@ -45,7 +49,9 @@ attention items already say what and why; the page shows them as Jig ordered the
 by its texts. One card per project made a long page once a person kept many (a maintainer's
 colleague, task `card-fields-and-artifacts`): a list scans at any length, and the card shown first
 is the one most likely to need them. The choice is in the address, so a reload or a shared link
-keeps it. Projects to upgrade get a mark on top of their item because across many cards a
+keeps it. The page read every project before it showed any, so one slow project — up to Jig's 30 s
+limit — left *Reading projects…* on the whole page (a colleague, task `read-progress`); listed
+before they are read, the projects a person came for are there in a second. Projects to upgrade get a mark on top of their item because across many cards a
 version in the header and one count are quicker to scan than an item inside each card.
 
 ## Constraints
@@ -59,6 +65,19 @@ version in the header and one count are quicker to scan than an item inside each
   `jig init --link` the scripts move with Jig's source while the manifest, which Jig compares,
   stays until `jig upgrade`.
 - The item stays in the card's list: it carries Jig's todo. The mark only repeats its versions.
+- While projects are still read, no card is picked for the person (`chosen` waits): the one that needs
+  them may be among the unread, and a card that jumps once it lands is worse than none. A project they
+  chose shows *Reading <id>…* until it lands. **Upgrade all…** waits too: its plan is worked out over
+  the projects read, and would leave the rest out.
+- `GET /api/workspace` stays the one read of the machine's state
+  (adr-20261029-upgrade-all-and-self-update-from-the-page). On the first load it starts after the
+  per-project reads: it waits for the slowest project anyway, and a browser opens six connections to a
+  site, two of them held that long by the change stream and the header's own workspace read
+  (feature-live-updates). The four left serve the per-project reads, so four projects Jig does not
+  answer, read first, already hold the rest, up to 30 s; one streamed answer for the first load would lift it.
+- A project's own read fills only a place still waiting for it (`landed` in `web/lib/projects.ts`):
+  these reads do not go through `lastWins`, and a project a workspace read already put there is as
+  new or newer.
 
 ## Decisions and rejected alternatives
 

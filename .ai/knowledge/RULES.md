@@ -63,3 +63,7 @@ are added as sections of this file.
   `RELEASING.md` lists. `docs/` is the public documentation, and a user reads it before trying
   what a release says it does. (The maintainer, 2026-10-22. Checked in review of the version pull
   request.)
+- Every page in `docs/` compiles as MDX: Mintlify deploys `docs/` from `main` and, when a page
+  does not parse, keeps the old site with no failing check of ours, which left 0.4.0 off the site.
+  A literal `<word>` outside code is written `&lt;word&gt;`. (The maintainer, 2026-10-29. Checked by
+  `server/docs.test.ts` in `npm test`.)

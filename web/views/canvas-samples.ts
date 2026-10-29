@@ -368,3 +368,11 @@ export const specs: Spec[] = [
     queue: null,
   },
 ];
+
+/** Open epics in the order the Specs view shows them: three queued, one not yet. */
+export const epics: Spec[] = [
+  specs[1]!,
+  { ...specs[1]!, id: 'refunds', title: 'Refunds', queue: { position: 200, priority: null } },
+  { ...specs[1]!, id: 'exports', title: 'Exports', queue: { position: 300, priority: 4 } },
+  { ...specs[1]!, id: 'payouts', title: 'Payouts', queue: null },
+];

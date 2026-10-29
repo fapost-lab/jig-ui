@@ -4,6 +4,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { serve } from '@hono/node-server';
 import { type CliCommand, DEFAULT_PORT, parseCliArgs } from './args.js';
 import { createApp, readPackageVersion } from './http/app.js';
+import { stopJig } from './jig/client.js';
 import { openBrowser } from './open-browser.js';
 import { configDir } from './registry/config-dir.js';
 import { connectThrough, type InstanceInfo, probeInstance, readInstance, removeInstance, writeInstance } from './registry/instance.js';
@@ -124,7 +125,8 @@ async function runServer(command: Extract<CliCommand, { kind: 'run' | 'serve' }>
   const version = readPackageVersion();
   const token = randomBytes(32).toString('base64url');
   const shutdown = (): void => {
-    void removeInstance(dir, token).finally(() => {
+    // A Jig run under way — an upgrade above all — ends with Jig UI, however Jig UI was stopped.
+    void Promise.allSettled([stopJig(), removeInstance(dir, token)]).finally(() => {
       server.close(() => process.exit(0));
       if ('closeAllConnections' in server) server.closeAllConnections();
     });
@@ -155,6 +157,8 @@ async function runServer(command: Extract<CliCommand, { kind: 'run' | 'serve' }>
 
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+  // The terminal closed: its Jig runs lead groups of their own, so they hear of it only through Jig UI.
+  process.on('SIGHUP', shutdown);
 }
 
 async function startBackground(port: number, dir: string): Promise<void> {

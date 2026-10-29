@@ -42,7 +42,8 @@ are added as sections of this file.
 
 - Each JSON shape Jig exposes has a contract test over fixtures, and the package declares the
   minimum Jig version it reads. (spec `jig-ui`, stack.md. Checked by `jig verify`.)
-- `jig` is spawned with `execFile` and no shell; on Windows through Git's bash.
+- `jig` is spawned without a shell: with `spawn` leading a process group of its own, so that stopping Jig UI stops
+  the whole run (task `stop-ends-upgrade`); on Windows with `execFile` through Git's bash.
   (adr-20261014-stack-vue-hono-sse-on-node. Checked in review.)
 - The published package has no native runtime dependencies and carries the page already built;
   development tools (the TypeScript compiler, Vitest's bundler) may be native.

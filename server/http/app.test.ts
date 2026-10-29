@@ -188,7 +188,7 @@ describe('/api/projects and /api/workspace', () => {
         { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0', upgrade: null },
         { id: 'broken', state: 'unreadable', code: 'failed', upgrade: null },
       ],
-      machine: { selfUpdate: null, upgradeAll: null },
+      machine: { release: null, selfUpdate: null, upgradeAll: null },
     });
     expectNoPath(text);
     expect(text).not.toContain('"path"');
@@ -669,6 +669,7 @@ describe('/api/self-update and /api/upgrade-all', () => {
 
   it('shows what the machine is doing beside the projects', async () => {
     const machine = {
+      release: '0.38.0',
       selfUpdate: { state: 'failed' as const, at: 'x', reasons: ['no remote'] },
       upgradeAll: { state: 'running' as const, since: 'y', current: 'a', upgraded: ['b'] },
     };

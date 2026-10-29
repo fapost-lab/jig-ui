@@ -15,6 +15,7 @@ import {
   readSpecs,
   readStatus,
   readTasks,
+  releaseNamed,
   requestPause,
   resumeTask,
   runUpgrade,
@@ -116,6 +117,14 @@ describe('readStatus', () => {
     expect(read.attention).toEqual([
       expect.objectContaining({ kind: 'upgrade-available', todo: 'jig upgrade', versions: { from: '0.33.0', to: '0.35.0' } }),
     ]);
+  });
+
+  // status-release.json is what Jig 0.37.0 printed once its housekeeping had heard of 0.38.0.
+  it('reads the release a release item names, and none from another item', async () => {
+    const read = await readStatus(answering('status-release', 'status-release.json'));
+    expect(read.attention.map(releaseNamed)).toEqual(['0.38.0']);
+    const other = await readStatus(answering('status-upgrade-named', 'status-upgrade.json'));
+    expect(other.attention.map(releaseNamed)).toEqual([undefined]);
   });
 
   it('reads a project where nothing needs the person and housekeeping never ran', async () => {

@@ -15,24 +15,41 @@ export function upgradeOf(project: Project):
   return project.attention.find((a) => a.kind === 'upgrade-available')?.versions ?? undefined;
 }
 
+/** `a` is an older version than `b`, both as `0.38.0`. */
+function older(a: string, b: string): boolean {
+  const [x, y] = [a.split('.').map(Number), b.split('.').map(Number)];
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) < (y[i] ?? 0);
+  return false;
+}
+
 /**
  * Jig's line that a newer release than this machine's is out, as `jig v0.38.0 is out`: the project's upgrade waits for
- * `jig self-update`, which moves this machine's Jig. None without Jig's `release-available` item.
+ * `jig self-update`, which moves this machine's Jig. A project hears of a release only at its own housekeeping, so one
+ * on a Jig older than `release` — the newest any connected project names — is behind it too, whatever it says itself.
  */
-export function releaseOf(project: Project): string | undefined {
+export function releaseOf(project: Project, release: string | null = null): string | undefined {
   if (project.state !== 'ready') return undefined;
-  return project.attention.find((a) => a.kind === 'release-available')?.title;
+  const said = project.attention.find((a) => a.kind === 'release-available')?.title;
+  if (said !== undefined) return said;
+  return release !== null && older(project.jigVersion, release) ? `jig v${release} is out` : undefined;
 }
 
 /** The project has an upgrade to make: now, or once this machine's Jig is updated. */
-export const needsUpgrade = (project: Project): boolean => upgradeOf(project) !== undefined || releaseOf(project) !== undefined;
+export const needsUpgrade = (project: Project, release: string | null = null): boolean =>
+  upgradeOf(project) !== undefined || releaseOf(project, release) !== undefined;
 
 /** What Upgrade all would do: update this machine's Jig first when a release is out, then upgrade these projects. */
-export function upgradeAllPlan(projects: Project[]): {
+export function upgradeAllPlan(
+  projects: Project[],
+  release: string | null = null,
+): {
   selfUpdate: boolean;
   projects: string[];
 } {
-  return { selfUpdate: projects.some((p) => releaseOf(p) !== undefined), projects: projects.filter(needsUpgrade).map((p) => p.id) };
+  return {
+    selfUpdate: projects.some((p) => releaseOf(p, release) !== undefined),
+    projects: projects.filter((p) => needsUpgrade(p, release)).map((p) => p.id),
+  };
 }
 
 /** A run that changes this machine's Jig or every project is under way: no other upgrade starts meanwhile. */

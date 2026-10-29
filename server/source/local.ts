@@ -14,6 +14,7 @@ import {
   readSpecs,
   readStatus,
   readTasks,
+  releaseNamed,
   requestPause,
   RESUME_JIG_VERSION,
   resumeTask,
@@ -261,7 +262,22 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     return done;
   }
   /** The runs that change this machine's Jig or every project, kept until dismissed or the next one starts. */
-  const machine: Machine = { selfUpdate: null, upgradeAll: null };
+  const machine: Omit<Machine, 'release'> = { selfUpdate: null, upgradeAll: null };
+
+  /** The newest release any connected project's last read names. */
+  function newestRelease(): string | null {
+    let newest: string | null = null;
+    for (const entry of entries.values()) {
+      const read = entry.shown;
+      if (read?.view.state !== 'ready') continue;
+      for (const item of read.view.attention) {
+        const named = releaseNamed(item);
+        // `supports(a, b)` is a ≥ b.
+        if (named && (newest === null || !supports(newest, named))) newest = named;
+      }
+    }
+    return newest;
+  }
   const listeners = new Set<(change: Change) => void>();
   let rescan: NodeJS.Timeout | undefined;
   /** Counts the times following started; a read that finishes after a stop belongs to none. */
@@ -656,7 +672,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       return true;
     },
     machine() {
-      return { ...machine };
+      return { ...machine, release: newestRelease() };
     },
     async selfUpdate() {
       // Started in turn with upgrade starts and disconnects, and awaited after it: a call meanwhile is refused, not queued.

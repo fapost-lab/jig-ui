@@ -109,6 +109,11 @@ export type UpgradeAllRun =
 
 /** What the workspace shows beyond its projects: the runs that change this machine's Jig or many projects. */
 export interface Machine {
+  /**
+   * The newest Jig release a connected project's last read names (`release-available`), as `0.38.0`: a fact of the
+   * machine, not of one project — each project hears of a release only at its own housekeeping. `null` when none does.
+   */
+  release: string | null;
   selfUpdate: SelfUpdateRun | null;
   upgradeAll: UpgradeAllRun | null;
 }

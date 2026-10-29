@@ -65,10 +65,13 @@ describe('instance file', () => {
     const dir = fresh();
     await writeInstance(dir, info);
     const page = await writeConfigFile(dir, OPEN_FILE, '<!doctype html>');
-    await removeInstance(dir, 'another');
+    await removeInstance(dir, { token: 'another', pid: info.pid });
     expect(await readInstance(dir)).toEqual(info);
     expect(existsSync(page)).toBe(true);
-    await removeInstance(dir, 'one');
+    // Every start shares the kept token: an instance that started later is told apart by its pid.
+    await removeInstance(dir, { token: info.token, pid: info.pid + 1 });
+    expect(await readInstance(dir)).toEqual(info);
+    await removeInstance(dir, info);
     expect(await readInstance(dir)).toBeUndefined();
     expect(existsSync(page)).toBe(false);
   });

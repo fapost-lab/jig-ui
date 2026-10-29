@@ -16,14 +16,14 @@ one line that brings its own (the install flow). Jig works exactly as before wit
 - `server/cli.ts` — the `jig-ui` command. It imports nothing but the Node version check, so an
   old Node prints the requirement instead of a stack trace, then loads `server/main.ts`, which
   dispatches the commands parsed in `args.ts`: none (the start flow below), `serve`, and `start`,
-  `stop`, `status`, `open`.
+  `stop`, `status`, `open`, `reset-token`.
 - `server/service.ts` — the background instance: `start` runs the CLI itself as `serve` (the
   server with no browser and no folder) detached, output in `server.log`, and waits for it to
-  answer; `stop` asks the instance over HTTP; `status` and `open` read and probe. A probe tells
+  answer, after which `main.ts` opens the browser on it unless `--no-open`; `stop` asks the instance over HTTP; `status` and `open` read and probe. A probe tells
   `up`, `gone` (refused, or another's answer: a stale file) and `silent` (maybe busy: touched by
   nothing). Its system calls are injected, so tests start and signal no process.
 - `server/http/` — the Hono app on 127.0.0.1: security headers, then the access guard in
-  `access.ts` (local-only `Host`/`Origin`, then the per-start token swapped for a cookie;
+  `access.ts` (local-only `Host`/`Origin`, then the token swapped for a cookie;
   convention-access-guard) before every route, `GET /api/instance`, `POST /api/instance/stop` (the same shutdown as SIGTERM, after its 202), and the built page from
   `dist/web`. The API's routes are chained in `apiRoutes()`, whose type `AppType` the page takes
   (adr-20261018-page-takes-api-types-through-hono-rpc). A route's refusal is
@@ -31,7 +31,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   JSON) as `usage` with its status, anything unforeseen as `internal` with 500 and its message only
   in the terminal, since it may name a path. The guard's 403 (text) and 401, and an unknown `/api/*`
   path's 404, keep forms of their own.
-- `server/registry/` — the config directory and the single instance: `instance.json` (port,
+- `server/registry/` — the config directory and the single instance: `token`, the access token
+  kept across starts (`token.ts`; adr-20261029-the-token-outlives-a-start); `instance.json` (port,
   token) written atomically, probed by a second start, removed with `open.html` on stop; and the
   registry, `projects.json`, of connected projects by id and main-checkout path
   (adr-20261017-registry-of-connected-projects). It knows neither git nor Jig.
@@ -85,8 +86,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `server/http/` for types only — lint refuses a value import from `server/`.
 - **Start flow.** `npx @fapost/jig-ui` checks Node 24+, finds a running instance through the
   config directory and checks it answers with its token — then opens it and exits — or starts one
-  on 127.0.0.1 with a fresh token and opens the browser on a link carrying it
-  (adr-20261014-local-server-access-guard). Two starts at once: the one that loses the port opens
+  on 127.0.0.1 with the kept token and opens the browser on a link carrying it
+  (adr-20261014-local-server-access-guard, adr-20261029-the-token-outlives-a-start). Two starts at once: the one that loses the port opens
   the winner. Run in a git checkout, the command then asks the instance that serves — its own or
   the running one — to connect the folder (`POST /api/projects` with the token, so only that
   instance writes the registry), a worktree standing for its clone's main checkout, and opens the

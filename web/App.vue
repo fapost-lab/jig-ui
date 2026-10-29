@@ -29,7 +29,7 @@
   <div class="flex h-screen flex-col">
     <p v-if="failure?.kind === 'registry-unreadable'" role="alert" class="p-4 text-destructive">{{ failure.message }}</p>
     <p v-else-if="failure?.kind === 'session-ended'" role="alert" class="p-4">
-      This page's session has ended. Run <code>npx @fapost/jig-ui</code>, or <code>jig-ui</code>, again to reopen it.
+      This page's session has ended. Run <code>jig-ui open</code>, or <code>npx @fapost/jig-ui</code>, to reopen it.
     </p>
     <p v-else-if="failure?.kind === 'internal'" role="alert" class="p-4 text-destructive">
       Jig UI hit an error it did not expect; its terminal says what. Reload the page to try again.

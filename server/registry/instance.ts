@@ -35,9 +35,13 @@ export async function writeInstance(dir: string, info: InstanceInfo): Promise<vo
   await writeConfigFile(dir, FILE, `${JSON.stringify(info, null, 2)}\n`);
 }
 
-/** Removes the files only while they are still ours: an instance started after us may have replaced them. */
-export async function removeInstance(dir: string, token: string): Promise<void> {
-  if ((await readInstance(dir))?.token !== token) return;
+/**
+ * Removes the files only while they are still the owner's: an instance started after it may have
+ * replaced them. The token alone does not tell, as every start uses the kept one; the pid does.
+ */
+export async function removeInstance(dir: string, owner: Pick<InstanceInfo, 'token' | 'pid'>): Promise<void> {
+  const recorded = await readInstance(dir);
+  if (recorded?.token !== owner.token || recorded.pid !== owner.pid) return;
   await rm(join(dir, OPEN_FILE), { force: true });
   await rm(join(dir, FILE), { force: true });
 }

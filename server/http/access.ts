@@ -33,7 +33,7 @@ interface TokenOptions {
 }
 
 /**
- * The per-start token: `/?token=` swaps it for a cookie and redirects to `/`, and every `/api/*`
+ * The access token (kept across starts): `/?token=` swaps it for a cookie and redirects to `/`, and every `/api/*`
  * request without that cookie is refused. Static files need no token; they carry no data.
  */
 export function tokenAccess({ port, token }: TokenOptions): MiddlewareHandler {

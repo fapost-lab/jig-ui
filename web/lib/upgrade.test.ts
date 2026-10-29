@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import type { Attention, Machine, Project } from '../api';
 import {
   agentRequest,
+  landedLine,
   machineBusy,
   machineLine,
+  mergeWaitOf,
   needsUpgrade,
   releaseOf,
   upgradeAllPlan,
@@ -191,7 +193,7 @@ describe('releaseOf and needsUpgrade', () => {
 
 describe('machineLine', () => {
   const at = '2026-10-29T10:00:00Z';
-  const m = (machine: Partial<Machine>): Machine => ({ release: null, selfUpdate: null, upgradeAll: null, ...machine });
+  const m = (machine: Partial<Machine>): Machine => ({ release: null, selfUpdate: null, upgradeAll: null, landingAll: false, ...machine });
 
   it('says nothing when nothing ran', () => {
     expect(machineLine(m({}))).toBeUndefined();
@@ -230,6 +232,99 @@ describe('machineLine', () => {
       upgradeAll: { state: 'done', at, upgraded: ['a'], skipped: [], failed: null },
     });
     expect(machineLine(after)).toMatchObject({ text: 'Updating Jig on this machine…', ended: false });
+  });
+});
+
+describe('mergeWaitOf', () => {
+  // The server works the wait out (Jig 0.39.0, its item or the page's last run): the page only reads it.
+  const wait = { state: 'open' as const, to: '0.40.0', url: 'https://github.com/o/r/pull/12' };
+  const waiting: Project = { ...ready('p', [item('upgrade-available', { from: '0.39.0', to: '0.40.0' })]), mergeWait: wait };
+
+  it('reads the wait the server sends, and none without one', () => {
+    expect(mergeWaitOf(waiting)).toEqual(wait);
+    expect(mergeWaitOf(ready('p'))).toBeUndefined();
+    expect(mergeWaitOf(old)).toBeUndefined();
+  });
+
+  it('keeps needsUpgrade false while a merge waits, so no second upgrade branch is cut', () => {
+    expect(needsUpgrade(waiting)).toBe(false);
+    expect(needsUpgrade(waiting, '0.41.0')).toBe(false);
+    expect(needsUpgrade({ ...waiting, mergeWait: undefined })).toBe(true);
+    expect(upgradeAllPlan([waiting, behind])).toEqual({ selfUpdate: false, projects: ['behind'] });
+  });
+});
+
+describe('Check all merges', () => {
+  const at = '2026-10-29T10:00:00Z';
+  const m = (machine: Partial<Machine>): Machine => ({ release: null, selfUpdate: null, upgradeAll: null, landingAll: false, ...machine });
+  const waiting: Project = {
+    ...(ready('w') as Extract<Project, { state: 'ready' }>),
+    jigVersion: '0.39.0',
+    mergeWait: { state: 'open', to: '0.40.0', url: 'https://x/pull/1' },
+  };
+  const plain: Project = { ...(ready('plain') as Extract<Project, { state: 'ready' }>), jigVersion: '0.39.0' };
+
+  it('is busy and says so while it runs, over what an Upgrade all came to', () => {
+    const checking = m({ landingAll: true, upgradeAll: { state: 'done', at, upgraded: ['w'], skipped: [], failed: null } });
+    expect(machineBusy(checking)).toBe(true);
+    expect(machineLine(checking, [waiting])).toEqual({
+      text: 'Checking the merges of upgrade pull requests…',
+      tone: 'quiet',
+      reasons: [],
+      ended: false,
+    });
+  });
+
+  it('names the upgraded projects that wait for a pull request after Upgrade all', () => {
+    const one = m({ upgradeAll: { state: 'done', at, upgraded: ['w', 'plain'], skipped: [], failed: null } });
+    expect(machineLine(one, [waiting, plain])?.text).toBe(
+      'Upgrade all ran the upgrade in w, plain; w waits for a pull request: Check merge once merged. Each card says what its upgrade came to.',
+    );
+    const two = m({ upgradeAll: { state: 'done', at, upgraded: ['w', 'w2'], skipped: ['c'], failed: null } });
+    expect(machineLine(two, [waiting, { ...waiting, id: 'w2' }])?.text).toBe(
+      'Upgrade all ran the upgrade in w, w2; w, w2 wait for a pull request: Check merge once merged; left c alone. Each card says what its upgrade came to.',
+    );
+  });
+
+  it('names none that was not upgraded by it, or none at all without projects', () => {
+    const done = m({ upgradeAll: { state: 'done', at, upgraded: ['plain'], skipped: ['w'], failed: null } });
+    expect(machineLine(done, [waiting, plain])?.text).toBe(
+      'Upgrade all ran the upgrade in plain; left w alone. Each card says what its upgrade came to.',
+    );
+    expect(machineLine(done)?.text).not.toContain('pull request');
+  });
+
+  it('says what a landing came to', () => {
+    const landed = (outcome: string): Extract<UpgradeRun, { state: 'done' }> =>
+      done(outcome, { git: { ...git, merged: true }, land: { base: 'main', branchDeleted: true, originBranchDeleted: false } } as never);
+    expect(upgradeResult(landed('landed'))).toMatchObject({
+      text: 'Merged and brought here: main now runs Jig 0.35.0.',
+      tone: 'good',
+      url: git.pullRequest,
+    });
+    expect(upgradeResult(done('landed'))).toMatchObject({
+      text: "Merged and brought here: the project's base branch now runs Jig 0.35.0.",
+      tone: 'good',
+      url: null,
+    });
+    expect(upgradeResult({ state: 'refused', at: 'x', code: 'not-merged', reasons: ['the pull request is open'] })).toEqual({
+      text: 'Not merged yet: the pull request is still open, and nothing changed here.',
+      tone: 'attention',
+      url: null,
+      steps: [],
+      reasons: [],
+    });
+  });
+
+  it('says what Check all merges came to', () => {
+    expect(landedLine({ landed: [], waiting: [], stopped: [] })).toBe('Check all merges found no upgrade pull request to check.');
+    expect(landedLine({ landed: ['a', 'b'], waiting: [], stopped: [] })).toBe('Check all merges brought a, b up to date.');
+    expect(landedLine({ landed: ['a'], waiting: ['b'], stopped: ['c'] })).toBe(
+      'Check all merges brought a up to date; b still waits for a merge; c could not be brought here: see its card.',
+    );
+    expect(landedLine({ landed: [], waiting: ['b', 'd'], stopped: ['c', 'e'] })).toBe(
+      'Check all merges b, d still wait for a merge; c, e could not be brought here: see their cards.',
+    );
   });
 });
 

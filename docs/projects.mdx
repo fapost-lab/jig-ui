@@ -130,6 +130,28 @@ fails, no project is upgraded and the line says why.
 While Upgrade all or a self-update runs, no card offers **Upgrade…**; and **Upgrade all…** is
 offered only while no project is being upgraded.
 
+### An upgrade that waits for its pull request
+
+Where the project's `agent.git` lets Jig open a pull request but not merge it, an upgrade ends on a
+branch, and the project's main checkout stays on the Jig it had until the pull request is merged and
+brought here. From Jig 0.39.0 in the project, the card says so — *The upgrade to 0.40.0 waits for
+its pull request to be merged*, with the pull request's link — and offers **Check merge** instead of
+**Upgrade…**, after a restart of Jig UI too: Jig remembers the pull request from its last
+`jig housekeeping`.
+
+**Check merge** runs `jig upgrade --land` in the project's main checkout. While the pull request is
+open it says *Not merged yet* and changes nothing. Once merged, Jig checks the base branch out,
+brings it up to origin's by fast-forward and deletes the upgrade's branch, and the card shows the
+new Jig. Uncommitted changes, another branch checked out, or a base that cannot be fast-forwarded
+stop it with Jig's reasons; Jig never stashes and never forces.
+
+**Check all merges** above the projects does the same for every project with such an upgrade, one
+at a time, and says which were brought up to date and which still wait. After **Upgrade all**, each
+project is either upgraded or waits for its pull request, and its card offers **Check merge**.
+
+A project on an older Jig shows the pull request as the run left it, until Jig UI stops; run
+`jig upgrade` there once the pull request is merged.
+
 ## The board
 
 **Open board** on a readable project's card, or the project in the dropdown at the top, shows its live tasks in five columns: Needs

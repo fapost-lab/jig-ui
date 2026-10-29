@@ -10,7 +10,17 @@
   import { lastWins } from '@/lib/last-wins';
   import { chosen, landed, type Listed, readOnes, readProgress } from '@/lib/projects';
   import { toneRule, toneText } from '@/lib/tones';
-  import { machineBusy, machineLine, type PlanState, releaseOf, upgradeAllPlan, upgradeLine, upgradeOf } from '@/lib/upgrade';
+  import {
+    landedLine,
+    machineBusy,
+    machineLine,
+    mergeWaitOf,
+    type PlanState,
+    releaseOf,
+    upgradeAllPlan,
+    upgradeLine,
+    upgradeOf,
+  } from '@/lib/upgrade';
 
   const route = useRoute();
   const router = useRouter();
@@ -40,7 +50,14 @@
     () => allPlan.value.projects.length > 0 && !held.value && !progress.value && !read.value.some((p) => p.upgrade?.state === 'running'),
   );
 
-  const said = computed(() => machineLine(machine.value));
+  const said = computed(() => machineLine(machine.value, read.value));
+  /** Projects whose upgrade waits for its pull request: Check all merges is offered while any does. */
+  const offerLandAll = computed(
+    () => !held.value && read.value.some((p) => mergeWaitOf(p) !== undefined && p.upgrade?.state !== 'running'),
+  );
+
+  /** What the last Check all merges came to, until the next one. */
+  const landedAll = ref<string>();
   // A confirmation or a refusal of Upgrade all belongs to the moment it was asked: a run from another tab ends both.
   watch(offerAll, (offered) => {
     if (!offered) confirmingAll.value = false;
@@ -148,6 +165,23 @@
     await load();
   }
 
+  /** Check merge on a card: Jig lands the upgrade if its pull request is merged; the card shows what came of it. */
+  async function land(id: string): Promise<void> {
+    const res = await call(() => upgradeApi.land.$post(param(id)));
+    if (res && res.status !== 200) plans.value[id] = { state: 'refused', message: (await res.json()).error.message };
+    await load();
+  }
+
+  /** Check all merges: every upgrade pull request in turn; each card shows its outcome, the line sums them up. */
+  async function landAll(): Promise<void> {
+    landedAll.value = undefined;
+    const res = await call(() => client.api.upgrade['land-all'].$post());
+    if (!res) return;
+    const body = await res.json();
+    landedAll.value = 'landed' in body ? landedLine(body.landed) : body.error.message;
+    await load();
+  }
+
   async function dismissAll(): Promise<void> {
     if (await call(() => client.api['upgrade-all'].$delete())) await load();
   }
@@ -200,10 +234,12 @@
   <div class="mx-auto flex max-w-6xl flex-col gap-4 p-4">
     <div class="flex items-center gap-3">
       <h1 class="font-semibold tracking-wider uppercase">Projects</h1>
-      <Button v-if="offerAll && !confirmingAll" variant="outline" size="xs" class="ml-auto" @click="confirmingAll = true">
-        Upgrade all…
-      </Button>
+      <div class="ml-auto flex items-center gap-2">
+        <Button v-if="offerLandAll" variant="outline" size="xs" @click="landAll">Check all merges</Button>
+        <Button v-if="offerAll && !confirmingAll" variant="outline" size="xs" @click="confirmingAll = true">Upgrade all…</Button>
+      </div>
     </div>
+    <p v-if="landedAll" :class="toneText.quiet" role="status">{{ landedAll }}</p>
     <p v-if="upgrades" :class="toneText.attention">{{ upgrades }}</p>
     <section v-if="confirmingAll && offerAll" aria-label="Upgrade all" :class="toneRule.attention" class="flex flex-col gap-2">
       <p v-if="allPlan.selfUpdate">
@@ -258,6 +294,7 @@
         @start="start(shown)"
         @self-update="selfUpdate(shown.id)"
         @upgrade="upgrade(shown.id)"
+        @land="land(shown.id)"
         @close="delete plans[shown.id]"
         @dismiss="dismiss(shown.id)"
       />

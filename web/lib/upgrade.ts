@@ -1,4 +1,4 @@
-import type { Machine, Project, UpgradePlan } from '../api';
+import type { LandedAll, Machine, Project, UpgradePlan } from '../api';
 import type { Tone } from './tones';
 
 /**
@@ -34,9 +34,15 @@ export function releaseOf(project: Project, release: string | null = null): stri
   return release !== null && older(project.jigVersion, release) ? `jig v${release} is out` : undefined;
 }
 
-/** The project has an upgrade to make: now, or once this machine's Jig is updated. */
+/** An upgrade of the project that waits for its pull request, as the server works it out (Jig 0.39.0 in the project). */
+export type MergeWait = NonNullable<Project['mergeWait']>;
+
+/** The project's upgrade that waits for its pull request — open, or merged and not here yet; none otherwise. */
+export const mergeWaitOf = (project: Project): MergeWait | undefined => project.mergeWait;
+
+/** The project has an upgrade to make: now, or once this machine's Jig is updated — not while one waits to be merged. */
 export const needsUpgrade = (project: Project, release: string | null = null): boolean =>
-  upgradeOf(project) !== undefined || releaseOf(project, release) !== undefined;
+  mergeWaitOf(project) === undefined && (upgradeOf(project) !== undefined || releaseOf(project, release) !== undefined);
 
 /** What Upgrade all would do: update this machine's Jig first when a release is out, then upgrade these projects. */
 export function upgradeAllPlan(
@@ -54,10 +60,13 @@ export function upgradeAllPlan(
 
 /** A run that changes this machine's Jig or every project is under way: no other upgrade starts meanwhile. */
 export const machineBusy = (machine: Machine | undefined): boolean =>
-  machine?.selfUpdate?.state === 'running' || machine?.upgradeAll?.state === 'running';
+  machine?.landingAll === true || machine?.selfUpdate?.state === 'running' || machine?.upgradeAll?.state === 'running';
 
 /** What the page says of Upgrade all and of a self-update: under way, or what it came to; none when nothing ran. */
-export function machineLine(machine: Machine | undefined):
+export function machineLine(
+  machine: Machine | undefined,
+  projects: Project[] = [],
+):
   | {
       text: string;
       tone: Tone;
@@ -71,6 +80,7 @@ export function machineLine(machine: Machine | undefined):
   if (machine?.selfUpdate?.state === 'running' && all?.state !== 'running') {
     return { text: 'Updating Jig on this machine…', tone: 'quiet', reasons: [], ended: false };
   }
+  if (machine?.landingAll) return { text: 'Checking the merges of upgrade pull requests…', tone: 'quiet', reasons: [], ended: false };
   if (all?.state === 'running') {
     if (all.current === null) {
       const text =
@@ -84,6 +94,10 @@ export function machineLine(machine: Machine | undefined):
     if (all.failed)
       return { text: 'Upgrade all stopped: Jig could not update itself on this machine.', tone: 'bad', reasons: all.failed, ended: true };
     const parts = [all.upgraded.length ? `ran the upgrade in ${listed(all.upgraded)}` : 'had no project to upgrade'];
+    // Where the upgrade ended in a pull request, the project is not upgraded until it is merged and brought here.
+    const waiting = projects.filter((p) => all.upgraded.includes(p.id) && mergeWaitOf(p) !== undefined).map((p) => p.id);
+    if (waiting.length)
+      parts.push(`${listed(waiting)} ${waiting.length === 1 ? 'waits' : 'wait'} for a pull request: Check merge once merged`);
     if (all.skipped.length) parts.push(`left ${listed(all.skipped)} alone`);
     return { text: `Upgrade all ${parts.join('; ')}. Each card says what its upgrade came to.`, tone: 'quiet', reasons: [], ended: true };
   }
@@ -140,6 +154,15 @@ export interface UpgradeResult {
 /** What the card says once an upgrade has ended, by what Jig answered. */
 export function upgradeResult(run: Exclude<UpgradeRun, { state: 'running' }>): UpgradeResult {
   if (run.state === 'refused') {
+    if (run.code === 'not-merged') {
+      return {
+        text: 'Not merged yet: the pull request is still open, and nothing changed here.',
+        tone: 'attention',
+        url: null,
+        steps: [],
+        reasons: [],
+      };
+    }
     if (run.code === 'upgrade-blocked') {
       return { text: 'Jig did not start the upgrade; nothing changed:', tone: 'attention', url: null, steps: [], reasons: run.reasons };
     }
@@ -167,6 +190,10 @@ export function upgradeResult(run: Exclude<UpgradeRun, { state: 'running' }>): U
       return said(`Nothing to upgrade: the project already has ${to}.`, 'quiet');
     case 'incomplete':
       return said("Jig's check after placing the files failed, so nothing was committed. Run the upgrade again.", 'bad');
+    case 'landed': {
+      const base = run.upgrade.land?.base ?? "the project's base branch";
+      return said(`Merged and brought here: ${base} now runs Jig ${to}.`, 'good', git?.pullRequest ?? null);
+    }
     case 'linked':
       return said("Linked to Jig's source; nothing to commit.", 'good');
     default:
@@ -176,3 +203,13 @@ export function upgradeResult(run: Exclude<UpgradeRun, { state: 'running' }>): U
 
 /** What to ask an agent for, so that it upgrades the project and does the steps the release asks for by hand. */
 export const agentRequest = (project: string): string => `Upgrade Jig in ${project}`;
+
+/** What Check all merges came to, in a line: landed, still waiting for a merge, and stopped on their card. */
+export function landedLine(all: LandedAll): string {
+  const parts: string[] = [];
+  if (all.landed.length) parts.push(`brought ${all.landed.join(', ')} up to date`);
+  if (all.waiting.length) parts.push(`${all.waiting.join(', ')} still ${all.waiting.length === 1 ? 'waits' : 'wait'} for a merge`);
+  if (all.stopped.length)
+    parts.push(`${all.stopped.join(', ')} could not be brought here: see ${all.stopped.length === 1 ? 'its card' : 'their cards'}`);
+  return parts.length ? `Check all merges ${parts.join('; ')}.` : 'Check all merges found no upgrade pull request to check.';
+}

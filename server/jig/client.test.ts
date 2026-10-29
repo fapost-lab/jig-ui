@@ -8,6 +8,7 @@ import {
   closeTask,
   fileTask,
   jigVersion,
+  landUpgrade,
   JigRefusal,
   JigShapeError,
   MIN_JIG_VERSION,
@@ -710,6 +711,55 @@ describe('writtenByReads', () => {
     expect(writtenByReads('runtime/revision/1792229491')).toBe(false);
     expect(writtenByReads('workspace/tasks/a/state')).toBe(false);
     expect(writtenByReads('runtimes')).toBe(false);
+  });
+});
+
+// Jig 0.38.1 from fapost-lab/jig main after #352 (released as 0.39.0) printed these in a scratch project, the forge faked
+// as Jig's own tests fake it: an upgrade's pull request open and merged, and `jig upgrade --land` landing it, finding
+// nothing, and refused while the pull request was open.
+describe("an upgrade's pull request", () => {
+  it('reads the item of a pull request open, and of one merged that is not here yet', async () => {
+    const waiting = await readStatus(answering('status-pr-waiting', 'status-upgrade-pr-waiting.json'));
+    expect(waiting.attention).toEqual([
+      expect.objectContaining({
+        kind: 'upgrade-pull-request-waiting',
+        url: 'https://github.com/o/r/pull/12',
+        versions: null,
+        pullRequest: { branch: 'jig/upgrade-9.9.9', base: 'main', state: 'open', to: '9.9.9' },
+      }),
+    ]);
+    const merged = await readStatus(answering('status-pr-merged', 'status-upgrade-pr-merged.json'));
+    expect(merged.attention[0]).toMatchObject({
+      kind: 'upgrade-pull-request-merged',
+      todo: 'jig upgrade --land',
+      pullRequest: { state: 'merged', to: '9.9.9' },
+    });
+  });
+
+  it('refuses a pull request item without its pull request', async () => {
+    const answer = changed('status-upgrade-pr-waiting.json', (d) => delete d.attention[0].pull_request);
+    await expect(readStatus(answering(`case-${cases++}`, answer))).rejects.toBeInstanceOf(JigShapeError);
+  });
+
+  it('lands a merged upgrade, and finds nothing the second time', async () => {
+    const dir = answering('land', 'upgrade-land.json');
+    expect(await landUpgrade(dir)).toMatchObject({
+      outcome: 'landed',
+      from: '0.38.1',
+      to: '9.9.9',
+      git: { branch: 'jig/upgrade-9.9.9', merged: true, pullRequest: 'https://github.com/example/example/pull/12' },
+      land: { base: 'main', branchDeleted: true, originBranchDeleted: false },
+    });
+    expect(await landUpgrade(answering('land-nothing', 'upgrade-land-nothing.json'))).toMatchObject({
+      outcome: 'nothing-to-do',
+      git: null,
+    });
+  });
+
+  it('is refused not-merged while the pull request is open', async () => {
+    const refused = await landUpgrade(answering('land-open', 'upgrade-land-not-merged.json', 1)).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(JigRefusal);
+    expect(refused).toMatchObject({ code: 'not-merged' });
   });
 });
 

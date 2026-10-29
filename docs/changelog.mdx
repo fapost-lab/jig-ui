@@ -8,6 +8,10 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+- [An upgrade that waits for its pull request](/projects#an-upgrade-that-waits-for-its-pull-request):
+  the card says so and offers **Check merge**, which brings the merged upgrade into the project's main
+  checkout; **Check all merges** does every project. **Upgrade…** is no longer offered meanwhile, so a
+  second upgrade branch is not cut. Needs Jig 0.39.0 in the project.
 - When Jig refuses an upgrade for a reason of its own, the card says what Jig said — for example
   `cannot determine the framework source root; pass --from <dir>` — not only *Jig refused the upgrade*.
 - `jig-ui stop`, and stopping Jig UI running in the background, now stop an upgrade under way, as

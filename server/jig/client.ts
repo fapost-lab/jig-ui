@@ -218,6 +218,20 @@ type Json = Record<string, unknown>;
 const isObject = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /**
+ * Why Jig refused, as it said it: each line of its message with `jig: error:` and the command's own `<command>:` cut off,
+ * and every absolute path cut out — `upgrade: cannot determine the framework source root; pass --from <dir>` becomes
+ * `cannot determine the framework source root; pass --from <dir>`. None without a message.
+ */
+function said(message: unknown, command: string | undefined): string[] {
+  if (typeof message !== 'string') return [];
+  return message.split('\n').flatMap((line) => {
+    let text = line.trim().replace(/^jig: error: /, '');
+    if (command && text.startsWith(`${command}: `)) text = text.slice(command.length + 2);
+    return text ? [withoutPaths(text)] : [];
+  });
+}
+
+/**
  * Runs a `--json` command and returns its `data` and the clone's revision — for a write, the one it was checked against. Jig's refusal throws
  * JigRefusal, as does output that is no JSON at all (a crash); an envelope of another shape throws
  * JigShapeError.
@@ -253,7 +267,7 @@ async function readJson(
       const reasons = message.split('\n').flatMap((line) => (line.startsWith('  - ') ? [withoutPaths(line.slice(4))] : []));
       throw new JigRefusal(code, reasons);
     }
-    throw new JigRefusal(typeof code === 'string' && CODES.has(code) ? code : 'failed');
+    throw new JigRefusal(typeof code === 'string' && CODES.has(code) ? code : 'failed', said(message, args[0]));
   }
   if (!isObject(envelope.data)) throw new JigShapeError();
   return { revision: envelope.revision, data: envelope.data };

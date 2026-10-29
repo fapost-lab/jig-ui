@@ -537,6 +537,18 @@ describe('upgrading the project', () => {
     expect((refused as JigRefusal).reasons).toEqual([expect.stringContaining('checked out here (record …); the upgrade would take')]);
   });
 
+  it("carries Jig's words with any other refusal, its own prefix and every path cut off", async () => {
+    const failed = (message: string) => JSON.stringify({ schema: 1, revision: 7, generated_at: 'x', error: { code: 'failed', message } });
+    const source = await planUpgrade(
+      answering(`case-${cases++}`, failed('upgrade: cannot determine the framework source root; pass --from <dir>'), 1),
+    ).catch((e: unknown) => e);
+    expect(source).toMatchObject({ code: 'failed', reasons: ['cannot determine the framework source root; pass --from <dir>'] });
+    const pathed = await runUpgrade(
+      answering(`case-${cases++}`, failed('jig: error: upgrade: no Jig at /Users/juve/.local/share/jig\nsecond line'), 1),
+    ).catch((e: unknown) => e);
+    expect(pathed).toMatchObject({ code: 'failed', reasons: ['no Jig at …', 'second line'] });
+  });
+
   it.each([
     ['an upgrade without its outcome', (d: Record<string, any>) => delete d.outcome],
     ['git without pushed', (d: Record<string, any>) => delete d.git.pushed],

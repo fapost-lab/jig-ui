@@ -91,10 +91,11 @@ function written(c: Context, w: Written | undefined) {
   return refuse(c, 422, w.code, 'Jig refused the change.');
 }
 
-/** An upgrade refused before it ran, in the API's form: under way already, none to make, or Jig's code. */
-function upgradeRefused(c: Context, code: string) {
+/** An upgrade refused before it ran, in the API's form: under way already, none to make, or Jig's code and its reasons. */
+function upgradeRefused(c: Context, code: string, reasons: string[] = []) {
   if (code === 'running') return refuse(c, 409, code, 'An upgrade of this project is under way.');
   if (code === 'not-found') return refuse(c, 404, code, 'This project shows no upgrade of Jig to make.');
+  if (reasons.length) return c.json({ error: { code, message: 'Jig refused the upgrade.', reasons } }, 422);
   return refuse(c, 422, code, 'Jig refused the upgrade.');
 }
 
@@ -313,7 +314,7 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
         if (planned === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
         if (planned.state === 'planned') return c.json({ plan: planned.plan }, 200);
         if (planned.state !== 'refused') return c.json({ project: planned }, 200);
-        return upgradeRefused(c, planned.code);
+        return upgradeRefused(c, planned.code, planned.reasons);
       })
 
       // Answered at once: the upgrade runs on in the server, and the workspace shows it and then what it came to.
@@ -322,7 +323,7 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
         if (started === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
         if (started.state === 'started') return c.json({ started: true as const }, 202);
         if (started.state !== 'refused') return c.json({ project: started }, 200);
-        return upgradeRefused(c, started.code);
+        return upgradeRefused(c, started.code, started.reasons);
       })
 
       .delete('/api/projects/:id/upgrade', async (c) => {

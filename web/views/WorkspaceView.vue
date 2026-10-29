@@ -133,7 +133,7 @@
       };
     };
 
-    plans.value[id] = { state: 'refused', message: [error.message, ...(error.reasons ?? [])].join(' ') };
+    plans.value[id] = { state: 'refused', message: error.message, reasons: error.reasons ?? [] };
     await load();
   }
 
@@ -152,6 +152,19 @@
     if (await call(() => client.api['upgrade-all'].$delete())) await load();
   }
 
+  /** A refusal as the API answers it: the page's line and Jig's own reasons, when it gave any. */
+  interface Refused {
+    message: string;
+    reasons?: string[];
+  }
+
+  /** A refusal for the card's panel. */
+  const refusedPlan = (error: Refused): PlanState => ({
+    state: 'refused',
+    message: error.message,
+    reasons: error.reasons ?? [],
+  });
+
   /** Opens the card's upgrade panel with Jig's dry run of the upgrade. */
   async function plan(id: string): Promise<void> {
     plans.value[id] = { state: 'reading' };
@@ -159,7 +172,7 @@
     if (!res) return void delete plans.value[id];
     const body = await res.json();
     if ('plan' in body) plans.value[id] = { state: 'planned', plan: body.plan };
-    else if ('error' in body) plans.value[id] = { state: 'refused', message: body.error.message };
+    else if ('error' in body) plans.value[id] = refusedPlan(body.error);
     else {
       delete plans.value[id]; // the project cannot be read now: its card says why
       await load();
@@ -171,7 +184,7 @@
     const res = await call(() => upgradeApi.$post(param(id)));
     if (!res) return;
     const body = await res.json();
-    if ('error' in body) plans.value[id] = { state: 'refused', message: body.error.message };
+    if ('error' in body) plans.value[id] = refusedPlan(body.error);
     else delete plans.value[id];
     await load();
   }

@@ -77,6 +77,9 @@
 
     <div v-else-if="plan?.state === 'refused'" :class="toneRule.bad" class="flex flex-col gap-1">
       <p>{{ plan.message }}</p>
+      <ul v-if="plan.reasons?.length" class="list-disc pl-5 text-foreground">
+        <li v-for="(reason, i) in plan.reasons" :key="i">{{ reason }}</li>
+      </ul>
       <Button variant="ghost" size="xs" class="self-start" @click="$emit('close')">Close</Button>
     </div>
 

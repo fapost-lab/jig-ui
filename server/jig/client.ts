@@ -71,6 +71,9 @@ async function jig(root: string, args: string[], platform: NodeJS.Platform, time
   return stdout;
 }
 
+/** The checkout has a Jig of its own to run. */
+export const hasJig = (root: string): boolean => existsSync(join(root, SCRIPT));
+
 /**
  * The project's Jig version, `undefined` when the checkout has no Jig. Throws when Jig is there but
  * does not answer with a version.
@@ -562,4 +565,29 @@ export async function planUpgrade(root: string, platform: NodeJS.Platform = proc
  */
 export async function runUpgrade(root: string, platform: NodeJS.Platform = process.platform): Promise<Upgrade> {
   return parsed(Upgrade, (await readJson(root, ['upgrade'], platform, UPGRADE_TIMEOUT_MS)).data);
+}
+
+/** `jig self-update` pulls the framework source's git remote: a network round trip, never a prompt (Jig sets it so). */
+const SELF_UPDATE_TIMEOUT_MS = 2 * 60_000;
+
+/**
+ * Moves this machine's Jig — the framework checkout every project upgrades from — to its newest release (`jig self-update`),
+ * run through a project's Jig, which hands it to the machine's. It touches no project. It prints no JSON:
+ * what it did is its last line, as `self-update: updated 0.37.0 -> 0.38.0 (abc1234)`. A failure throws JigRefusal
+ * `failed` with Jig's error lines, as `jig: error: self-update: <why>`, without a path.
+ */
+export async function selfUpdate(root: string, platform: NodeJS.Platform = process.platform): Promise<string> {
+  let stdout: string;
+  try {
+    stdout = await jig(root, ['self-update'], platform, SELF_UPDATE_TIMEOUT_MS);
+  } catch (error) {
+    const stderr = (error as { stderr?: string }).stderr ?? '';
+    const reasons = stderr.split('\n').flatMap((line) => {
+      const m = /^jig: error: (?:self-update: )?(.+)$/.exec(line.trim());
+      return m?.[1] ? [withoutPaths(m[1])] : [];
+    });
+    throw new JigRefusal('failed', reasons);
+  }
+  const lines = stdout.trim().split('\n');
+  return withoutPaths(lines.at(-1)?.trim() ?? '');
 }

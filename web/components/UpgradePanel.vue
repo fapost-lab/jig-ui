@@ -16,6 +16,7 @@
   }>();
 
   defineEmits<{
+    selfUpdate: [];
     upgrade: [];
     close: [];
     dismiss: [];
@@ -57,6 +58,20 @@
       </template>
       <Button variant="ghost" size="xs" class="self-start" @click="$emit('dismiss')">Dismiss</Button>
     </div>
+
+    <div v-else-if="plan?.state === 'confirm-self-update'" :class="toneRule.attention" class="flex flex-col gap-2">
+      <p>
+        {{ plan.release }}. The project upgrades from the Jig installed on this machine, so that Jig is updated first:
+        <code>jig self-update</code> moves it to the newest release for every project on this machine. No project changes until its own
+        upgrade, which Jig plans next.
+      </p>
+      <div class="flex gap-2">
+        <Button size="xs" @click="$emit('selfUpdate')">Update Jig on this machine</Button>
+        <Button variant="ghost" size="xs" @click="$emit('close')">Cancel</Button>
+      </div>
+    </div>
+
+    <p v-else-if="plan?.state === 'self-updating'" class="text-muted-foreground">Updating Jig on this machine…</p>
 
     <p v-else-if="plan?.state === 'reading'" class="text-muted-foreground">Asking Jig what the upgrade would do…</p>
 

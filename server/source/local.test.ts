@@ -132,7 +132,15 @@ describe('localSource', () => {
     queue: {
       items: [
         { ref: 'epic:e', kind: 'epic', id: 'e', level: null, position: 100, priority: 0, depends_on: [] },
-        { ref: 'task:b', kind: 'task', id: 'b', level: null, position: 200, priority: 2, depends_on: [] },
+        {
+          ref: 'task:b',
+          kind: 'task',
+          id: 'b',
+          level: null,
+          position: 200,
+          priority: 2,
+          depends_on: [{ on: 'task:a', reason: 'Needs its form' }],
+        },
       ],
     },
     tasks: {
@@ -231,6 +239,52 @@ describe('localSource', () => {
     expect(await source.specs('old')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' });
     expect(await source.specs('nobody')).toBeUndefined();
     await source.disconnect('planned');
+  });
+
+  it('places a queued task among the live tasks and open epics of its level, and lists what its epic waits for', async () => {
+    const spec = (id: string, state: string) => ({
+      id,
+      title: null,
+      missing_files: [],
+      release: null,
+      epic: { branch: `epic/${id}`, state, checked_out: false, missing: false, ref: null },
+      progress: null,
+      phases: [],
+    });
+    const item = (kind: string, id: string, level: string | null, position: number, depends_on: unknown[] = []) => ({
+      ref: `${kind}:${id}`,
+      kind,
+      id,
+      level,
+      position,
+      priority: null,
+      depends_on,
+    });
+    const dir = project('places', '0.31.0', {
+      specs: { specs: [spec('booking', 'open'), spec('landed', 'finished')] },
+      queue: {
+        items: [
+          item('task', 'merged', null, 50),
+          item('epic', 'landed', null, 60),
+          item('task', 'top', null, 100),
+          item('epic', 'booking', null, 200, [{ on: 'epic:payments', reason: 'Shares the API' }]),
+          item('task', 'inner', 'epic:booking', 100, [{ on: 'task:top', reason: 'Needs its form' }]),
+        ],
+      },
+      tasks: { tasks: [task('merged', 'consolidated'), task('top', 'active'), task('inner', 'active')], hidden: 0, housekeeping: null },
+    });
+    await source.connect(dir);
+    expect(await source.task('places', 'top')).toMatchObject({ task: { place: { rank: 1, of: 2 }, dependsOn: [] } });
+    expect(await source.task('places', 'inner')).toMatchObject({
+      task: {
+        place: { rank: 1, of: 1 },
+        dependsOn: [
+          { on: 'task:top', reason: 'Needs its form', through: null },
+          { on: 'epic:payments', reason: 'Shares the API', through: 'epic:booking' },
+        ],
+      },
+    });
+    await source.disconnect('places');
   });
 
   it("orders the specs by their epics' places in the queue: queued, then open, then the rest, each in Jig's order", async () => {
@@ -387,11 +441,20 @@ describe('localSource', () => {
         worktree: { uncommitted: 3 },
         actions: [{ id: 'pause', command: 'jig task pause b' }],
         attention: [{ ...attention, versions: null }],
+        // First at the top: no spec has an open epic e, so the page does not count it.
+        place: { rank: 1, of: 1 },
+        dependsOn: [{ on: 'task:a', reason: 'Needs its form', through: null }],
       }),
     });
     expect(JSON.stringify(read)).not.toContain('/secret/');
     expect(await source.task('busy', 'a')).toMatchObject({
-      task: { id: 'a', attention: [], actions: [{ id: 'request-pause', command: 'jig queue request task:a pause' }] },
+      task: {
+        id: 'a',
+        attention: [],
+        actions: [{ id: 'request-pause', command: 'jig queue request task:a pause' }],
+        place: null,
+        dependsOn: [],
+      },
     });
     expect(await source.task('busy', 'gone-task')).toEqual({ state: 'ready', task: null });
     expect(await source.task('busy', 'closed')).toEqual({ state: 'ready', task: null });

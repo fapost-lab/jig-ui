@@ -1,18 +1,19 @@
 <script setup lang="ts">
   import { computed, onMounted, onUnmounted, ref } from 'vue';
-  import { useRoute } from 'vue-router';
+  import { useRoute, useRouter } from 'vue-router';
   import { call, client, failure, onChange, type Project } from './api';
-  import ProjectTabs from './components/ProjectTabs.vue';
+  import ProjectSwitcher from './components/ProjectSwitcher.vue';
   import ThemeToggle from './components/ThemeToggle.vue';
   import { lastWins } from './lib/last-wins';
 
   const route = useRoute();
+  const router = useRouter();
   const version = ref<string>();
   const projects = ref<Project[]>([]);
   /** The project whose board or task is open; the workspace and the canvas have none. */
   const current = computed(() => (typeof route.params.id === 'string' ? route.params.id : undefined));
 
-  const loadTabs = lastWins(
+  const loadProjects = lastWins(
     async () => (await (await call(() => client.api.workspace.$get()))?.json())?.projects,
     (read) => (projects.value = read),
   );
@@ -21,7 +22,7 @@
     version.value = (await (await call(() => client.api.instance.$get()))?.json())?.version;
   });
 
-  onUnmounted(onChange(() => void loadTabs()));
+  onUnmounted(onChange(() => void loadProjects()));
 </script>
 
 <template>
@@ -37,10 +38,18 @@
       Jig UI is not running. Start it with <code>npx @fapost/jig-ui</code>, or <code>jig-ui</code>.
     </p>
     <template v-else>
-      <ProjectTabs :projects="projects" :current="current" :version="version" class="shrink-0"><ThemeToggle /></ProjectTabs>
+      <ProjectSwitcher
+        :projects="projects"
+        :current="current"
+        :version="version"
+        class="shrink-0"
+        @pick="(id) => router.push(`/projects/${encodeURIComponent(id)}`)"
+        ><ThemeToggle
+      /></ProjectSwitcher>
       <main class="min-h-0 flex-1 overflow-auto">
-        <!-- Keyed on the address: a view reads once when it mounts, so a new address mounts it again. -->
-        <RouterView :key="route.fullPath" />
+        <!-- Keyed on the path: a view reads once when it mounts, so a new path mounts it again; the workspace's
+             `?project=` only picks the card it shows from what it read. -->
+        <RouterView :key="route.path" />
       </main>
     </template>
   </div>

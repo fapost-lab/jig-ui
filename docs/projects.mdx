@@ -38,10 +38,15 @@ Connect only projects whose Jig you would run yourself; that includes running
 
 ## What the page shows
 
-A row of tabs runs along the top: `jig-ui://` for this page, then one tab per connected project
-with how many things need you there (a red `!` when the project cannot be read). Below, each connected
-project, in the order you connected them. The page is dark; the button at the right end of the tabs
-switches it to light, and the browser remembers the choice. For a readable project:
+Along the top: `jig-ui://` for this page, and a dropdown that opens a project's board — type part of
+its name to find it. Each project there shows how many things need you in it (a red `!` when it
+cannot be read). The page is dark; the button at the right end switches it to light, and the browser
+remembers the choice.
+
+Below, the connected projects in a list, in the order you connected them, with a search and the same
+counts. Choose one to see its card beside the list (above it on a narrow screen); the address keeps
+the choice. Until you choose, the first project that needs you is shown, or else the first. A
+readable project's card shows:
 
 - **Its live tasks counted** — `active`, `paused` and `ready` (finished tasks are not counted).
 - **What needs you** — the same items `jig status` lists under "Needs you", most urgent first: a
@@ -93,7 +98,7 @@ which changes nothing — and shows it on the card:
 
 **Upgrade** runs `jig upgrade` in the project's main checkout, as you would in a terminal: Jig cuts
 a branch, places its files, commits, and then goes as far as the project's `agent.git` lets it —
-push, a pull request, a merge after CI. The card says *Upgrading…* meanwhile, in every tab and
+push, a pull request, a merge after CI. The card says *Upgrading…* meanwhile, in every browser tab and
 after a reload. Until it ends Jig UI neither reads the project nor changes it: a change from the
 board is refused, and the card offers no **Disconnect**. Then the card says what came of
 it: merged, a pull request waiting for review with its link, pushed, committed, staged, nothing
@@ -123,7 +128,7 @@ offered only while no project is being upgraded.
 
 ## The board
 
-**Open board** on a readable project, or its tab, shows its live tasks in five columns: Needs
+**Open board** on a readable project's card, or the project in the dropdown at the top, shows its live tasks in five columns: Needs
 you, In progress, Ready, Backlog, Paused — what waits for you first. Jig UI works the column out
 from the task's state in Jig every time it reads it, and stores it nowhere; the first rule that
 fits wins:
@@ -277,9 +282,13 @@ from the page is not here: ask your agent.
 ## Task details
 
 A click on a card opens its details inside the card; in the list, the row's details appear in a
-pane on the right. **Open full details** shows them on a page of their own, with an address you can
-keep. The details are:
+pane on the right. **copy id** beside them copies the task's id. **Open full details** shows them on a
+page of their own, with an address you can keep, and with what Jig offers. The details are:
 
+- **Its place in the queue** — its priority, its place among the live tasks and open epics of its
+  level (*2nd of 5 at the top*, *1st of 3 in epic booking*, or *not queued*), and what it waits for,
+  with the reason given to `jig queue depend`: its own dependencies, then its epic's, as they were
+  declared, met or not.
 - **Where it stands** — its column, status, class, branch and the branch it lands on, how many
   files are uncommitted in its worktree, whether its knowledge decision is recorded, and when it
   was filed and last changed.
@@ -289,13 +298,12 @@ keep. The details are:
 - **Its pull request** — open, merged or closed, its CI, and a link, as Jig's last
   `jig housekeeping` heard it.
 - **What needs you** about it, and the housekeeping flags that still stand for it.
-- **What Jig offers now** — each step Jig would accept on the task as it is (approve the design,
+- **What Jig offers now**, on the full page only — each step Jig would accept on the task as it is (approve the design,
   answer the autopilot, pause, ship, close…) with the command to run in the project and a **copy**
   button. Jig UI runs none of them; the page follows the change once you do.
 
-Two things are not shown yet: which of the task's documents exist (Jig does not report them in a
-form Jig UI reads) and dependencies between tasks (Jig's queue holds them; Jig UI does not show
-them yet). A finished task has no details page; its link says so.
+Not shown yet: which of the task's documents exist, and what they say — Jig does not report them in
+a form Jig UI reads. A finished task has no details page; its link says so.
 
 ## Staying current
 

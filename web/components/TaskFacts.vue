@@ -1,6 +1,7 @@
 <script setup lang="ts">
   import { ExternalLink } from '@lucide/vue';
   import { link, type ReadyDetails } from '@/api';
+  import { placeLine, priorityLabel, waitLine } from '@/lib/queue';
   import { toneRule } from '@/lib/tones';
 
   defineProps<{
@@ -18,6 +19,19 @@
       <dd class="mb-1 @sm:mb-0">{{ details.status }}{{ details.paused ? ', paused' : '' }}</dd>
       <dt class="text-muted-foreground">class</dt>
       <dd class="mb-1 @sm:mb-0">{{ details.class ?? 'not classified yet' }}</dd>
+      <dt class="text-muted-foreground">priority</dt>
+      <dd class="mb-1 @sm:mb-0">{{ priorityLabel(details.priority) }}</dd>
+      <dt class="text-muted-foreground">queue</dt>
+      <dd class="mb-1 @sm:mb-0">{{ placeLine(details) }}</dd>
+      <dt class="text-muted-foreground">waits for</dt>
+      <dd class="mb-1 @sm:mb-0">
+        <template v-if="details.dependsOn.length === 0">nothing in the queue</template>
+        <ul v-else>
+          <li v-for="d in details.dependsOn" :key="`${d.through}>${d.on}`">{{ waitLine(d) }}</li>
+        </ul>
+      </dd>
+      <dt class="text-muted-foreground">filed, changed</dt>
+      <dd class="mb-1 @sm:mb-0">{{ details.createdAt ?? '—' }}, {{ details.updatedAt ?? '—' }}</dd>
       <dt class="text-muted-foreground">branch</dt>
       <dd class="mb-1 break-all @sm:mb-0">
         <template v-if="details.branch">{{ details.branch }} → {{ details.baseBranch }}</template>
@@ -72,8 +86,6 @@
       </template>
       <dt class="text-muted-foreground">knowledge</dt>
       <dd class="mb-1 @sm:mb-0">{{ details.knowledgeConsolidated ? 'decision recorded' : 'decision not recorded yet' }}</dd>
-      <dt class="text-muted-foreground">filed, changed</dt>
-      <dd class="mb-1 @sm:mb-0">{{ details.createdAt ?? '—' }}, {{ details.updatedAt ?? '—' }}</dd>
     </dl>
     <div v-if="details.autopilot === 'stopped' && details.run?.stopReason" :class="toneRule.attention" role="note">
       <p class="font-semibold">

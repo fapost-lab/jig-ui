@@ -139,8 +139,35 @@ const card = (t: Live, q: QueueItem | undefined, resumes: boolean): Task => ({
   queue: q ? { level: q.level, position: q.position } : null,
 });
 
+/**
+ * The queue as the page shows it: the live tasks and the open epics. Jig keeps a finished task, or a finished epic, in
+ * its queue until `jig queue remove`, which nothing runs for it.
+ */
+interface ShownQueue {
+  tasks: QueueItem[];
+  epics: QueueItem[];
+}
+
+/** A queued task's place among the tasks and epics of its level: 1 the first. */
+function placeIn(
+  queue: ShownQueue,
+  q: QueueItem,
+): {
+  rank: number;
+  of: number;
+} {
+  const level = [...queue.tasks, ...queue.epics].filter((i) => i.level === q.level).sort((a, b) => a.position - b.position);
+  return { rank: level.indexOf(q) + 1, of: level.length };
+}
+
+/** What a queued task waits for, as Jig declares it, met or not: its own dependencies, then its epic's. */
+const waitsFor = (queue: ShownQueue, q: QueueItem): TaskDetails['dependsOn'] => [
+  ...q.dependsOn.map((d) => ({ ...d, through: null })),
+  ...(queue.epics.find((e) => `epic:${e.id}` === q.level)?.dependsOn.map((d) => ({ ...d, through: q.level })) ?? []),
+];
+
 /** A live task in full; where its worktree is was never read, and an action Jig refuses is left out. */
-const details = (t: Live, q: QueueItem | undefined, attention: Attention[], resumes: boolean): TaskDetails => ({
+const details = (t: Live, q: QueueItem | undefined, queue: ShownQueue, attention: Attention[], resumes: boolean): TaskDetails => ({
   ...card(t, q, resumes),
   issue: t.issue,
   branch: t.branch,
@@ -161,6 +188,8 @@ const details = (t: Live, q: QueueItem | undefined, attention: Attention[], resu
   housekeepingFlags: t.housekeepingFlags,
   actions: t.actions.filter((a) => a.offered).map(({ id, command }) => ({ id, command })),
   attention: attention.filter((a) => a.tasks.includes(t.id)),
+  place: q ? placeIn(queue, q) : null,
+  dependsOn: q ? waitsFor(queue, q) : [],
 });
 
 /**
@@ -192,6 +221,11 @@ async function readProject(project: Project): Promise<Read> {
   const live = list.tasks.filter((t): t is Live => t.status === 'active' || t.status === 'ready');
   const finished = list.tasks.filter((t): t is Finished => t.status === 'consolidated' || t.status === 'abandoned');
   const queued = new Map(queue.items.map((q) => [q.id, q]));
+  const open = new Set(specs.specs.filter((s) => s.epic?.state === 'open').map((s) => s.id));
+  const shownQueue = {
+    tasks: queue.items.filter((q) => live.some((t) => t.id === q.id)),
+    epics: queue.epics.filter((e) => open.has(e.id)),
+  };
   // The oldest of the reads the board is made of: a write against it is refused if anything was written after any of them.
   const revision = Math.min(status.revision, list.revision, queue.revision);
   const resumes = supports(jigVersion, RESUME_JIG_VERSION);
@@ -205,7 +239,7 @@ async function readProject(project: Project): Promise<Read> {
       housekeepingStale: status.housekeepingStale,
     },
     tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id), resumes)), finished: finished.map(gone), revision },
-    details: live.map((t) => details(t, queued.get(t.id), status.attention, resumes)),
+    details: live.map((t) => details(t, queued.get(t.id), shownQueue, status.attention, resumes)),
     // The specs are read beside the queue: a write of an epic carries the older of the two reads, or of the board's.
     specs: { state: 'ready', specs: ordered(specs.specs, queue.epics), revision: Math.min(revision, specs.revision) },
     revision,

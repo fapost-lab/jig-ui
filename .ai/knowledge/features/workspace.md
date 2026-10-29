@@ -10,16 +10,27 @@ paths:
   - server/jig/fixtures/status-upgrade.json
   - web/components/UpgradePanel.vue
   - "server/jig/fixtures/upgrade-*.json"
-summary: "The workspace page: a card per connected project with Jig's attention items, the mark and count of projects whose Jig is older than the machine's, and their upgrade from the card"
-reviewed_at: 2026-10-27
+  - web/components/ProjectList.vue
+  - web/components/ProjectSwitcher.vue
+  - web/components/ProjectMark.vue
+  - web/lib/projects.ts
+summary: "The workspace page: a list of the connected projects with search and the chosen one's card — Jig's attention items, the mark and count of projects whose Jig is older than the machine's, and their upgrade from the card"
+reviewed_at: 2026-10-29
 ---
 # Workspace — every connected project on one page
 
 ## What
 
-The page at `#/` (`web/views/WorkspaceView.vue`): one card per connected project
-(`web/components/ProjectCard.vue`) with its Jig version, its live tasks counted, what needs the
-person there — Jig's attention items as `jig status --json` lists them — and the housekeeping note.
+The page at `#/` (`web/views/WorkspaceView.vue`): a list of the connected projects with a search
+over their ids (`web/components/ProjectList.vue`) and, beside it, one project's card
+(`web/components/ProjectCard.vue`). The card is the project `?project=<id>` names, else the first
+that needs the person — not readable, or with an attention item — else the first
+(`web/lib/projects.ts`); a click in the list sets `?project=`, and a project just connected is
+shown. The card has its Jig version, its live tasks counted, what needs the person there — Jig's
+attention items as `jig status --json` lists them — and the housekeeping note. Every page's header
+holds a dropdown with search over the projects (`web/components/ProjectSwitcher.vue`, in
+`App.vue`) that opens a project's board; the list and the dropdown mark each project with its
+count of attention items, or *!* when it cannot be read (`web/components/ProjectMark.vue`).
 A project whose Jig is older than the machine's is marked with both versions
 (*0.34.0 → 0.35.0 on this machine*) and counted in a line above the projects; `web/lib/upgrade.ts`
 decides both. Its **Upgrade…** opens a panel on the card (`web/components/UpgradePanel.vue`): Jig's
@@ -31,7 +42,10 @@ person's agent (adr-20261027-upgrading-a-project-runs-in-the-background).
 
 The person keeps several projects and needs to see at a glance which one waits for them. Jig's
 attention items already say what and why; the page shows them as Jig ordered them, an unknown kind
-by its texts. Projects to upgrade get a mark on top of their item because across many cards a
+by its texts. One card per project made a long page once a person kept many (a maintainer's
+colleague, task `card-fields-and-artifacts`): a list scans at any length, and the card shown first
+is the one most likely to need them. The choice is in the address, so a reload or a shared link
+keeps it. Projects to upgrade get a mark on top of their item because across many cards a
 version in the header and one count are quicker to scan than an item inside each card.
 
 ## Constraints
@@ -52,7 +66,11 @@ version in the header and one count are quicker to scan than an item inside each
   machine's version for it, and its card already says to run `jig upgrade`.
 - `release-available` (the machine's own Jig is outdated) is not a project mark: it is about the
   machine, not a project.
-- One project at a time: no "upgrade all" (the maintainer, 2026-10-27).
+- One project at a time at first (the maintainer, 2026-10-27); Upgrade all came later,
+  adr-20261029-upgrade-all-and-self-update-from-the-page.
+- A tree of projects — rejected: projects have no hierarchy to show, so a flat list with search
+  (the maintainer, task `card-fields-and-artifacts`). The header's tabs gave way to the dropdown on
+  every page for the same reason: tabs stop fitting long before a list does.
 - A stopped upgrade is said on the card only, not as an attention item (the maintainer): Jig's
   item is the todo, the result says why it is still there.
 - The agent's road is a copied request (*Upgrade Jig in <project>*), never an agent started:

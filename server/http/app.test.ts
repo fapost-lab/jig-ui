@@ -218,7 +218,7 @@ describe('/api/projects and /api/workspace', () => {
 
   it("serves a project's specs, its state when it is not readable, and 404 for an unknown id", async () => {
     const text = await (await call('GET', '/api/projects/ready/specs')).text();
-    expect(JSON.parse(text)).toEqual({ specs: { state: 'ready', specs: [] } });
+    expect(JSON.parse(text)).toEqual({ specs: { state: 'ready', specs: [], revision: 1 } });
     expectNoPath(text);
     expect(await (await call('GET', '/api/projects/broken/specs')).json()).toEqual({
       specs: { id: 'broken', state: 'unreadable', code: 'failed' },
@@ -419,6 +419,27 @@ describe('/api/projects/:id/queue', () => {
     }
   });
 
+  it("hands an epic's move and priority to the source as the page sent them", async () => {
+    const sent: unknown[] = [];
+    const source: ProjectSource = {
+      ...localSource(join(webRoot, 'epic-config')),
+      moveEpic: (...a) => (sent.push(['move', ...a]), Promise.resolve({ state: 'written' })),
+      prioritiseEpic: (...a) => (sent.push(['priority', ...a]), Promise.resolve({ state: 'written' })),
+    };
+    const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
+    for (const place of ['top', { after: 'b' }, { before: 'b' }]) {
+      const res = await post(fake, '/api/projects/x/queue/epic/move', { epic: 'a', place, revision: 3 });
+      expect(await res.json()).toEqual({ written: true });
+    }
+    expect((await post(fake, '/api/projects/x/queue/epic/priority', { epic: 'a', priority: null, revision: 3 })).status).toBe(200);
+    expect(sent).toEqual([
+      ['move', 'x', 'a', 'top', 3],
+      ['move', 'x', 'a', { after: 'b' }, 3],
+      ['move', 'x', 'a', { before: 'b' }, 3],
+      ['priority', 'x', 'a', null, 3],
+    ]);
+  });
+
   it("asks a pause and takes it back through the project's Jig", async () => {
     await post(app, '/api/projects', { path: queued });
     for (const kind of ['pause', 'pause/cancel']) {
@@ -452,6 +473,11 @@ describe('/api/projects/:id/queue', () => {
     ['priority', { task: 'a', revision: 1 }],
     ['pause', { revision: 1 }],
     ['pause/cancel', { task: 'a' }],
+    ['epic/move', { task: 'a', place: 'top', revision: 1 }],
+    ['epic/move', { epic: 'a', place: { before: '' }, revision: 1 }],
+    ['epic/move', { epic: 'a', place: 'top' }],
+    ['epic/priority', { epic: 'a', priority: 6, revision: 1 }],
+    ['epic/priority', { epic: '', priority: 1, revision: 1 }],
   ])('refuses a %s of %o as usage', async (kind, body) => {
     const res = await post(app, `/api/projects/queued/queue/${kind}`, body);
     expect(res.status).toBe(422);
@@ -470,6 +496,8 @@ describe('/api/projects/:id/queue', () => {
       ...localSource(join(webRoot, 'fake-config')),
       move: () => Promise.resolve(outcome),
       prioritise: () => Promise.resolve(outcome),
+      moveEpic: () => Promise.resolve(outcome),
+      prioritiseEpic: () => Promise.resolve(outcome),
       requestPause: () => Promise.resolve(outcome),
       cancelPause: () => Promise.resolve(outcome),
       resume: () => Promise.resolve(outcome),
@@ -480,6 +508,8 @@ describe('/api/projects/:id/queue', () => {
       ['priority', { task: 'a', priority: 1, revision: 1 }],
       ['pause', { task: 'a', revision: 1 }],
       ['pause/cancel', { task: 'a', revision: 1 }],
+      ['epic/move', { epic: 'a', place: 'top', revision: 1 }],
+      ['epic/priority', { epic: 'a', priority: 1, revision: 1 }],
     ] as const) {
       const res = await post(fake, `/api/projects/x/queue/${kind}`, body);
       expect(res.status).toBe(status);

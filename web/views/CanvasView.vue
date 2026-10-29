@@ -14,6 +14,7 @@
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProgressBar from '@/components/ProgressBar.vue';
   import ProjectTabs from '@/components/ProjectTabs.vue';
+  import EpicMenu from '@/components/EpicMenu.vue';
   import QueueMenu from '@/components/QueueMenu.vue';
   import SpecCard from '@/components/SpecCard.vue';
   import SpecItemRow from '@/components/SpecItemRow.vue';
@@ -318,9 +319,20 @@
 
     <CanvasSection
       title="SpecCard"
-      note="no epic, a finished phase folded; an open epic as of the last fetch; a lost epic branch; missing files"
+      note="no epic, a finished phase folded; an open epic in the queue at P1, with its queue menu; a lost epic branch, not queued, with its change on its way; missing files"
     >
-      <SpecCard v-for="spec in specs" :key="spec.id" :spec="spec" project="jig-ui" :live="['design-system', 'specs-and-epics']" />
+      <SpecCard
+        v-for="spec in specs"
+        :key="spec.id"
+        :spec="spec"
+        project="jig-ui"
+        :live="['design-system', 'specs-and-epics']"
+        :busy="spec.id === 'lost-epic'"
+      >
+        <template v-if="spec.epic?.state === 'open'" #menu>
+          <EpicMenu :spec="spec" :specs="specs" :disabled="spec.id === 'lost-epic'" />
+        </template>
+      </SpecCard>
     </CanvasSection>
   </div>
 </template>

@@ -58,8 +58,8 @@ const field = (body: unknown, key: string): unknown =>
 /** Where a drop puts a task: after another, or to the top or bottom of its level; `undefined` for anything else. */
 function place(v: unknown): Place | undefined {
   if (v === 'top' || v === 'bottom') return v;
-  const after = field(v, 'after');
-  return isId(after) ? { after } : undefined;
+  const [after, before] = [field(v, 'after'), field(v, 'before')];
+  return isId(after) ? { after } : isId(before) ? { before } : undefined;
 }
 
 /** A priority as the page sends it: 0 to 5, or `null` for none. */
@@ -165,6 +165,45 @@ function apiRoutes(source: ProjectSource, version: string) {
             return refuse(c, 422, 'usage', 'Give a task, a priority from 0 to 5 or null, and the revision it was read at.');
           }
           return written(c, await source.prioritise(c.req.param('id'), task, priority, revision));
+        },
+      )
+
+      // An epic is named by its spec and ordered among the top level of the queue, as a task is in its own level.
+      .post(
+        '/api/projects/:id/queue/epic/move',
+        validator('json', (body: unknown) => {
+          const [epic, revision] = [field(body, 'epic'), field(body, 'revision')];
+          return {
+            epic: isId(epic) ? epic : undefined,
+            place: place(field(body, 'place')),
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { epic, place, revision } = c.req.valid('json');
+          if (epic === undefined || place === undefined || revision === undefined) {
+            return refuse(c, 422, 'usage', 'Give an epic, where it goes and the revision it was read at.');
+          }
+          return written(c, await source.moveEpic(c.req.param('id'), epic, place, revision));
+        },
+      )
+
+      .post(
+        '/api/projects/:id/queue/epic/priority',
+        validator('json', (body: unknown) => {
+          const [epic, priority, revision] = [field(body, 'epic'), field(body, 'priority'), field(body, 'revision')];
+          return {
+            epic: isId(epic) ? epic : undefined,
+            priority: isPriority(priority) ? priority : undefined,
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { epic, priority, revision } = c.req.valid('json');
+          if (epic === undefined || priority === undefined || revision === undefined) {
+            return refuse(c, 422, 'usage', 'Give an epic, a priority from 0 to 5 or null, and the revision it was read at.');
+          }
+          return written(c, await source.prioritiseEpic(c.req.param('id'), epic, priority, revision));
         },
       )
 

@@ -335,6 +335,7 @@ export const specs: Spec[] = [
       },
       { phase: 1, title: 'Read-only UI', done: 1, total: 5, filed: 2, fog: 1, items: specItems },
     ],
+    queue: null,
   },
   {
     id: 'billing',
@@ -344,6 +345,7 @@ export const specs: Spec[] = [
     epic: { branch: 'epic/billing', state: 'open', checkedOut: false, missing: false, fetched: true },
     progress: { done: 0, total: 1, filed: 0, fog: 0 },
     phases: [{ phase: null, title: null, done: 0, total: 1, filed: 0, fog: 0, items: [specItems[3]!] }],
+    queue: { position: 100, priority: 1 },
   },
   {
     id: 'lost-epic',
@@ -353,6 +355,16 @@ export const specs: Spec[] = [
     epic: { branch: 'epic/lost', state: 'open', checkedOut: true, missing: true, fetched: false },
     progress: null,
     phases: [],
+    queue: null,
   },
-  { id: 'half-written', title: null, missingFiles: ['spec.md', 'roadmap.md'], release: null, epic: null, progress: null, phases: [] },
+  {
+    id: 'half-written',
+    title: null,
+    missingFiles: ['spec.md', 'roadmap.md'],
+    release: null,
+    epic: null,
+    progress: null,
+    phases: [],
+    queue: null,
+  },
 ];

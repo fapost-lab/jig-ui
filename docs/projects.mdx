@@ -212,7 +212,18 @@ the version level its release raises is shown when the roadmap records one.
 Each phase folds away (a finished one starts folded) and lists its items: done, open or fog. An
 item that names a live task links to the task's details; its dependencies (`after: …`) are shown
 in grey. A spec missing `spec.md` or `roadmap.md` says so. The specs follow the project like the
-board does; planning them from the page is not here yet.
+board does.
+
+### Ordering the epics
+
+The specs with an open epic come first, in the order of the project's queue — the order in which
+`jig queue next` takes their tasks — then the specs with none. An epic's ⋯ menu moves it **Up** or
+**Down** past the epic next to it, or **To top** or **To bottom** of the whole queue, ahead of or
+after the tasks that belong to no epic too; it also sets the epic's priority, from P0 to P5, shown
+beside its progress. Jig UI runs `jig queue move` and `jig queue set` with the revision of the specs
+you saw, so a change made in the project meanwhile is refused and the specs are read again. An epic
+not moved yet is not in the queue; it follows the ones that are, in Jig's order. Editing a roadmap
+from the page is not here: ask your agent.
 
 ## Task details
 

@@ -4,6 +4,7 @@
   import { type Board, call, client, describe, onChange, type Place, readTask, type ReadyDetails, type Specs, type Written } from '@/api';
   import BoardColumns from '@/components/BoardColumns.vue';
   import BoardList from '@/components/BoardList.vue';
+  import EpicMenu from '@/components/EpicMenu.vue';
   import FinishedList from '@/components/FinishedList.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
   import SpecCard from '@/components/SpecCard.vue';
@@ -12,6 +13,7 @@
   import { Toggle } from '@/components/ui/toggle';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { conflict } from '@/lib/conflict';
+  import { movable } from '@/lib/epics';
   import { lastWins } from '@/lib/last-wins';
   import { refusal } from '@/lib/refusal';
   import { toneText } from '@/lib/tones';
@@ -146,6 +148,35 @@
   const resume = (task: string) =>
     write(task, 'resuming', (revision) => client.api.projects[':id'].tasks.resume.$post({ param, json: { task, revision } }));
 
+  /** The spec whose epic's change is on its way to Jig; the notice says what Jig refused, as for a task. */
+  const pendingEpic = ref<string>();
+
+  /** Sends one change of an epic with the revision of the specs it was made on, then reads them again. */
+  async function writeEpic(epic: string, doing: string, send: (revision: number) => Promise<Written>): Promise<void> {
+    const shown = specs.value;
+    if (typeof shown !== 'object' || shown.state !== 'ready' || pendingEpic.value !== undefined) return;
+    pendingEpic.value = epic;
+    notice.value = undefined;
+    const res = await call(() => send(shown.revision));
+    const code = res && res.status !== 200 ? (await res.json()).error.code : undefined;
+    await loadSpecs();
+    if (code === 'stale-revision') {
+      notice.value = {
+        text: `The project changed while you were ${doing} epic ${epic}. Try again on the specs as they are now.`,
+        changed: [],
+      };
+    } else if (code !== undefined) notice.value = { text: refusal(code, doing, `epic ${epic}`), changed: [] };
+    pendingEpic.value = undefined;
+  }
+
+  const moveEpic = (epic: string, place: Place) =>
+    writeEpic(epic, 'moving', (revision) => client.api.projects[':id'].queue.epic.move.$post({ param, json: { epic, place, revision } }));
+
+  const prioritiseEpic = (epic: string, priority: number | null) =>
+    writeEpic(epic, 'setting the priority of', (revision) =>
+      client.api.projects[':id'].queue.epic.priority.$post({ param, json: { epic, priority, revision } }),
+    );
+
   /** The new-task form: open, its request on its way, and why the last one was refused. */
   const filing = ref(false);
   const filingBusy = ref(false);
@@ -256,7 +287,17 @@
         No specs in this project. A spec is written with the <code>jig-idea</code> skill and kept in <code>.ai/specs/</code>.
       </p>
       <div v-else class="flex flex-col gap-3 p-3">
-        <SpecCard v-for="spec in specs.specs" :key="spec.id" :spec="spec" :project="id" :live="liveIds" />
+        <SpecCard v-for="spec in specs.specs" :key="spec.id" :spec="spec" :project="id" :live="liveIds" :busy="pendingEpic === spec.id">
+          <template v-if="movable(spec)" #menu>
+            <EpicMenu
+              :spec="spec"
+              :specs="specs.specs"
+              :disabled="pendingEpic !== undefined"
+              @move="(place) => moveEpic(spec.id, place)"
+              @prioritise="(priority) => prioritiseEpic(spec.id, priority)"
+            />
+          </template>
+        </SpecCard>
       </div>
     </div>
 

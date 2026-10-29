@@ -2,6 +2,7 @@
   import { ChevronDown, ChevronRight } from '@lucide/vue';
   import { ref } from 'vue';
   import type { Spec } from '@/api';
+  import { Badge } from '@/components/ui/badge';
   import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
   import { toneText } from '@/lib/tones';
   import ProgressBar from './ProgressBar.vue';
@@ -12,6 +13,8 @@
     spec: Spec;
     project: string;
     live: string[];
+    /** A change of its epic's place or priority is on its way to Jig. */
+    busy?: boolean;
   }>();
 
   /** Phases folded away; a finished phase starts folded. */
@@ -32,7 +35,15 @@
           <ProgressBar :done="spec.progress.done" :total="spec.progress.total" />
           <span v-if="spec.progress.fog > 0" class="text-muted-foreground">fog {{ spec.progress.fog }}</span>
         </span>
+        <span class="flex items-center gap-2" :class="!spec.progress && 'ml-auto'">
+          <Badge v-if="spec.queue?.priority != null" variant="secondary" :title="`Priority ${spec.queue.priority}`">
+            P{{ spec.queue.priority }}
+          </Badge>
+          <!-- The epic's queue menu, from the page that writes it. -->
+          <slot name="menu" />
+        </span>
       </div>
+      <p v-if="busy" class="text-muted-foreground" role="status">sending to Jig…</p>
       <p class="flex flex-wrap gap-x-4 text-muted-foreground">
         <span v-if="spec.epic">
           epic <span class="text-foreground">{{ spec.epic.branch }}</span> — {{ spec.epic.state

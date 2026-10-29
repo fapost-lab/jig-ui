@@ -184,11 +184,23 @@ export type ProjectTask =
     }
   | Exclude<ProjectView, { state: 'ready' }>;
 
-/** A project's specs, in Jig's order, or why the project cannot be read. */
+/** A spec with its open epic's place in Jig's queue: `null` without an open epic, or with one not queued. */
+export type ShownSpec = Spec & {
+  queue: {
+    position: number;
+    priority: number | null;
+  } | null;
+};
+
+/**
+ * A project's specs — the queued epics first, in the queue's order, then the other open epics, then the specs with
+ * none, each in Jig's order — and the revision a write based on them carries; or why the project cannot be read.
+ */
 export type ProjectSpecs =
   | {
       state: 'ready';
-      specs: Spec[];
+      specs: ShownSpec[];
+      revision: number;
     }
   | Exclude<ProjectView, { state: 'ready' }>;
 
@@ -238,6 +250,10 @@ export interface ProjectSource {
    * names another live task. `undefined` when no project has that id.
    */
   move(id: string, taskId: string, place: Place, revision: number): Promise<Written | undefined>;
+  /** Moves the open epic of a spec in the queue, as `move` writes; `place.after` and `place.before` name another one. */
+  moveEpic(id: string, specId: string, place: Place, revision: number): Promise<Written | undefined>;
+  /** Sets the priority of a spec's open epic, `null` for none, as `move` writes. */
+  prioritiseEpic(id: string, specId: string, priority: number | null, revision: number): Promise<Written | undefined>;
   /** Sets a live task's priority, `null` for none, as `move` writes. */
   prioritise(id: string, taskId: string, priority: number | null, revision: number): Promise<Written | undefined>;
   /** Asks a live task to pause at its next stage boundary, as `move` writes. */

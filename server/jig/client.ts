@@ -366,12 +366,18 @@ export type Spec = z.output<typeof SpecRow>;
 const SpecList = z.object({ specs: z.array(SpecRow) });
 
 /** The project's specs (`jig spec list --json`), in Jig's order. */
-export async function readSpecs(root: string, platform: NodeJS.Platform = process.platform): Promise<Spec[]> {
-  const { data } = await readJson(root, ['spec', 'list'], platform);
-  return parsed(SpecList, data).specs;
+export async function readSpecs(
+  root: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<{
+  revision: number;
+  specs: Spec[];
+}> {
+  const { revision, data } = await readJson(root, ['spec', 'list'], platform);
+  return { revision, specs: parsed(SpecList, data).specs };
 }
 
-/** A task in Jig's queue: its level (`null` the top, `epic:<spec>` an open epic's), its place there, its priority. */
+/** A task or an epic in Jig's queue: its level (`null` the top, `epic:<spec>` an open epic's), its place there, its priority. */
 const QueueItem = z.object({
   kind: text,
   id: text,
@@ -385,54 +391,69 @@ export type QueueItem = Omit<z.output<typeof QueueItem>, 'kind'>;
 
 const Queue = z.object({ items: z.array(QueueItem) });
 
-/** The tasks in the project's queue (`jig queue list --json`), in Jig's order; a task not queued is not there, nor is an epic. */
+/** The tasks and the epics in the project's queue (`jig queue list --json`), in Jig's order; one not queued is not there. */
 export async function readQueue(
   root: string,
   platform: NodeJS.Platform = process.platform,
 ): Promise<{
   revision: number;
   items: QueueItem[];
+  epics: QueueItem[];
 }> {
   const { revision, data } = await readJson(root, ['queue', 'list'], platform);
-  const items = parsed(Queue, data)
-    .items.filter((i) => i.kind === 'task')
-    .map(({ id, level, position, priority }) => ({ id, level, position, priority }));
-  return { revision, items };
+  const all = parsed(Queue, data).items;
+  const of = (kind: string) =>
+    all.filter((i) => i.kind === kind).map(({ id, level, position, priority }) => ({ id, level, position, priority }));
+  return { revision, items: of('task'), epics: of('epic') };
 }
 
-/** Where a moved task goes: after a task already in its level of the queue, or to the top or bottom of that level. */
+/** A task or an epic as Jig's queue names it, never a bare id, which could read as a flag. */
+export type Ref = `task:${string}` | `epic:${string}`;
+
+/** Where a moved item goes: after or before another of its kind already in its level of the queue, or to the top or bottom of that level. */
 export type Place =
   | {
       after: string;
+    }
+  | {
+      before: string;
     }
   | 'top'
   | 'bottom';
 
 /**
- * Moves a task in the queue (`jig queue move`), adding it when it is not there; refused as `stale-revision`
- * when anything was written in the clone since `revision`. Ids go to Jig as `task:<id>`, never as a flag.
+ * Moves a task or an epic in the queue (`jig queue move`), adding it when it is not there; refused as
+ * `stale-revision` when anything was written in the clone since `revision`.
  */
 export async function moveInQueue(
   root: string,
-  task: string,
+  item: Ref,
   place: Place,
   revision: number,
   platform: NodeJS.Platform = process.platform,
 ): Promise<void> {
-  const where = place === 'top' ? ['--top'] : place === 'bottom' ? ['--bottom'] : ['--after', `task:${place.after}`];
-  await readJson(root, ['queue', 'move', `task:${task}`, ...where, '--revision', String(revision)], platform);
+  const kind = item.slice(0, item.indexOf(':') + 1);
+  const where =
+    place === 'top'
+      ? ['--top']
+      : place === 'bottom'
+        ? ['--bottom']
+        : 'after' in place
+          ? ['--after', kind + place.after]
+          : ['--before', kind + place.before];
+  await readJson(root, ['queue', 'move', item, ...where, '--revision', String(revision)], platform);
 }
 
-/** Sets a task's priority in the queue (`jig queue set`), `null` for none; refused as `moveInQueue` is. */
+/** Sets a task's or an epic's priority in the queue (`jig queue set`), `null` for none; refused as `moveInQueue` is. */
 export async function setPriority(
   root: string,
-  task: string,
+  item: Ref,
   priority: number | null,
   revision: number,
   platform: NodeJS.Platform = process.platform,
 ): Promise<void> {
   const value = priority === null ? 'none' : String(priority);
-  await readJson(root, ['queue', 'set', `task:${task}`, '--priority', value, '--revision', String(revision)], platform);
+  await readJson(root, ['queue', 'set', item, '--priority', value, '--revision', String(revision)], platform);
 }
 
 /** True when `version` is at least the minimum Jig UI reads. */

@@ -73,7 +73,7 @@ function project(
     refused ? (answers.status as string) : envelope(answers.status ?? { attention: [], housekeeping: null }),
   );
   writeFileSync(join(dir, 'tasks.json'), envelope(answers.tasks ?? { tasks: [], hidden: 0, housekeeping: null }));
-  writeFileSync(join(dir, 'specs.json'), envelope(answers.specs ?? { specs: [] }));
+  writeFileSync(join(dir, 'specs.json'), typeof answers.specs === 'string' ? answers.specs : envelope(answers.specs ?? { specs: [] }));
   writeFileSync(join(dir, 'queue.json'), envelope(answers.queue ?? { items: [] }));
   const write = answers.write ?? { ref: 'task:x', item: null };
   writeFileSync(
@@ -204,12 +204,58 @@ describe('localSource', () => {
           epic: { branch: 'epic/billing', state: 'open', checkedOut: true, missing: false, fetched: false },
           progress: { done: 1, total: 2, filed: 1, fog: 0 },
           phases: [spec.phases[0]],
+          queue: null,
         },
       ],
+      revision: 7,
     });
     expect(await source.specs('old')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' });
     expect(await source.specs('nobody')).toBeUndefined();
     await source.disconnect('planned');
+  });
+
+  it("orders the specs by their epics' places in the queue: queued, then open, then the rest, each in Jig's order", async () => {
+    const row = (id: string, epic: string | null) => ({
+      id,
+      title: null,
+      missing_files: [],
+      release: null,
+      epic: epic && { branch: `epic/${id}`, state: epic, checked_out: false, missing: false, ref: null },
+      progress: null,
+      phases: [],
+    });
+    const epic = (id: string, position: number, priority: number | null) => ({
+      ref: `epic:${id}`,
+      kind: 'epic',
+      id,
+      level: null,
+      position,
+      priority,
+      depends_on: [],
+    });
+    const dir = project('epics', '0.31.0', {
+      specs: { specs: [row('plain', null), row('late', 'open'), row('loose', 'open'), row('early', 'open'), row('landed', 'finished')] },
+      queue: { items: [epic('late', 300, 1), epic('landed', 50, null), epic('early', 100, null)] },
+    });
+    await source.connect(dir);
+    const read = await source.specs('epics');
+    expect(read?.state === 'ready' && read.specs.map((s) => [s.id, s.queue])).toEqual([
+      ['early', { position: 100, priority: null }],
+      ['late', { position: 300, priority: 1 }],
+      ['loose', null],
+      ['plain', null],
+      ['landed', null],
+    ]);
+    await source.disconnect('epics');
+  });
+
+  it("carries the spec list's revision when it is older than the board's reads", async () => {
+    const specs = JSON.stringify({ schema: 1, revision: 3, generated_at: 'x', data: { specs: [] } });
+    const dir = project('older-specs', '0.31.0', { specs });
+    await source.connect(dir);
+    expect(await source.specs('older-specs')).toEqual({ state: 'ready', specs: [], revision: 3 });
+    expect(await source.tasks('older-specs')).toMatchObject({ revision: 7 });
+    await source.disconnect('older-specs');
   });
 
   it('carries no part of a refusal but its code', async () => {
@@ -385,6 +431,36 @@ describe('localSource, writing the queue', () => {
     expect(writes(dir)).toEqual([
       'queue set task:a --priority 0 --revision 7 --json',
       'queue set task:a --priority none --revision 7 --json',
+    ]);
+  });
+
+  it("moves and prioritises a spec's open epic, and refuses one without", async () => {
+    const row = (id: string, epic: string | null) => ({
+      id,
+      title: null,
+      missing_files: [],
+      release: null,
+      epic: epic && { branch: `epic/${id}`, state: epic, checked_out: false, missing: false, ref: null },
+      progress: null,
+      phases: [],
+    });
+    const dir = project('planner', '0.31.0', { tasks, specs: { specs: [row('one', 'open'), row('two', 'open'), row('flat', null)] } });
+    await source.connect(dir);
+    const from = calls(dir).length;
+    expect(await source.moveEpic('planner', 'two', { before: 'one' }, 7)).toEqual({ state: 'written' });
+    expect(since(dir, from)).toEqual(expect.arrayContaining(['spec list --json', 'queue list --json']));
+    expect(await source.moveEpic('planner', 'one', { after: 'two' }, 7)).toEqual({ state: 'written' });
+    expect(await source.moveEpic('planner', 'one', 'top', 7)).toEqual({ state: 'written' });
+    expect(await source.prioritiseEpic('planner', 'one', 2, 7)).toEqual({ state: 'written' });
+    expect(await source.moveEpic('planner', 'flat', 'top', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.moveEpic('planner', 'one', { after: 'flat' }, 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.prioritiseEpic('planner', 'a', 2, 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.moveEpic('nobody', 'one', 'top', 7)).toBeUndefined();
+    expect(writes(dir)).toEqual([
+      'queue move epic:two --before epic:one --revision 7 --json',
+      'queue move epic:one --after epic:two --revision 7 --json',
+      'queue move epic:one --top --revision 7 --json',
+      'queue set epic:one --priority 2 --revision 7 --json',
     ]);
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Column, Task } from '../api';
-import { filtered, fromQuery, sift, type Sift, toQuery } from './sift';
+import { filtered, fromQuery, reorders, sift, type Sift, toQuery } from './sift';
 
 const task = (id: string, more: Partial<Task> = {}): Task => ({
   id,
@@ -92,6 +92,12 @@ describe('the address', () => {
 
   it('takes the default for what it does not know', () => {
     expect(fromQuery({ sort: 'rank', class: 'T9', priority: ['P2', 'P3'], q: null })).toEqual(view({ priorities: ['P2'] }));
+  });
+
+  it("offers a move within a column only in the queue's order, filtered or not", () => {
+    expect(reorders(view({ text: 'login', priorities: ['P1'] }))).toBe(true);
+    expect(reorders(view({ sort: 'priority' }))).toBe(false);
+    expect(reorders(view({ sort: 'class' }))).toBe(false);
   });
 
   it('says whether a filter is on; a sort alone is none', () => {

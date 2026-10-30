@@ -47,8 +47,8 @@ The script changes nothing else: no shell profile, no system setting. If `~/.loc
 your `PATH`, it says so and gives the command's full path. To pass options on the first start, put
 them after `bash -s --`, for example `… | bash -s -- --no-open`.
 
-To remove Jig UI, delete the two in the table above, and its [config folder](#running-it-in-the-background) with its
-token and the projects it connected. npx keeps the package in `~/.npm/_npx`
+To remove Jig UI, delete the two in the table above, and its [config folder](#running-it-in-the-background), which
+holds its token and its list of connected projects; the projects themselves stay where they are. npx keeps the package in `~/.npm/_npx`
 (`%LOCALAPPDATA%\npm-cache\_npx` on Windows); deleting that folder removes it, and every other
 package npx ran, which npx downloads again when it is next asked for.
 

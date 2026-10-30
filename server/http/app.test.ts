@@ -265,6 +265,9 @@ describe('/api/projects and /api/workspace', () => {
     asked = 'unset';
     expect((await post({ folder: '  ' })).status).toBe(200);
     expect(asked).toBeUndefined();
+    asked = 'unset';
+    expect((await post({ folder: null })).status).toBe(200);
+    expect(asked).toBeUndefined();
 
     expect(await (await call('POST', '/api/scan', { folder: 'relative' })).json()).toEqual({
       error: { code: 'usage', message: 'Give the absolute path of a folder.' },

@@ -397,8 +397,8 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
         '/api/scan',
         validator('json', (body: unknown) => {
           const typed = field(body, 'folder');
-          // `null`: none typed.
-          return { folder: typed === undefined || (typeof typed === 'string' && typed.trim() === '') ? null : absolute(typed) };
+          // `null`: none typed — no field, `null` or a blank one.
+          return { folder: typed == null || (typeof typed === 'string' && typed.trim() === '') ? null : absolute(typed) };
         }),
         async (c) => {
           const { folder } = c.req.valid('json');

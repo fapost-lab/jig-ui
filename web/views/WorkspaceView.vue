@@ -45,7 +45,7 @@
   const allRefusal = ref<string>();
   const release = computed(() => machine.value?.release ?? null);
   const allPlan = computed(() => upgradeAllPlan(read.value, release.value));
-  /** No card starts an upgrade while a self-update or Upgrade all runs. */
+  /** No card starts an upgrade while a self-update or Upgrade all runs, nor before the machine is read. */
   const held = computed(() => machineBusy(machine.value));
   // Upgrade all waits for every upgrade under way: they run one at a time; and for every read, or its list is short.
   const offerAll = computed(

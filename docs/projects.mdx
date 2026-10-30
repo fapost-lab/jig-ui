@@ -24,7 +24,8 @@ folder names — it runs nothing in a project before you connect it — goes 5 f
 at most 20 000 folders, and does not look inside a repository, a hidden folder or `node_modules`. On
 macOS it passes over Desktop, Documents, Downloads, Movies, Music and Pictures in your home folder,
 because macOS asks before an app reads them, and says so: type one, `~/Documents` for example, and
-choose **Find projects** to look there.
+choose **Find projects** to look there. It also passes over, without saying so, `Library` on macOS
+and `AppData` on Windows, which hold apps' data.
 
 The project needs [Jig 0.31.0 or later](/requirements). Each project gets a short id from its
 folder name (`My Project` becomes `my-project`, a second `api` becomes `api-2`); the page names

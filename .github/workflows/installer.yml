@@ -9,6 +9,11 @@ on:
     branches: [main]
     paths: [install.sh, .github/workflows/installer.yml]
   workflow_call:
+    inputs:
+      version:
+        description: The version release.yml just published, which npx must start.
+        type: string
+        required: true
 
 permissions:
   contents: read
@@ -27,6 +32,8 @@ jobs:
           persist-credentials: false
       - name: Install with no Node.js on PATH, then ask Jig UI its version
         shell: bash
+        env:
+          RELEASED: ${{ inputs.version }}
         run: |
           set -eu
           if [ "$RUNNER_OS" = Windows ]; then
@@ -49,8 +56,8 @@ jobs:
           test -x "$node"
           test -x "$launcher"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]
-          # Called by release.yml on a tag: the Jig UI just published, not the `latest` before it.
-          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$version" != "${GITHUB_REF_NAME#v}" ]; then
-            echo "::error::npx started Jig UI $version, not ${GITHUB_REF_NAME#v}: npm may not serve it yet. Re-run this job in a minute."
+          # Called by release.yml, from a merge or a tag: the Jig UI just published, not the `latest` before it.
+          if [ -n "$RELEASED" ] && [ "$version" != "$RELEASED" ]; then
+            echo "::error::npx started Jig UI $version, not $RELEASED: npm may not serve it yet. Re-run this job in a minute."
             exit 1
           fi

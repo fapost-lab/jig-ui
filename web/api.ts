@@ -16,6 +16,11 @@ export type Task = Column['cards'][number];
 export type TaskDetails = Ok<Api['projects'][':id']['tasks'][':task']['$get']>['task'];
 /** A task's details when its project could be read. */
 export type ReadyDetails = Extract<TaskDetails, { state: 'ready' }>;
+type Documents = Api['projects'][':id']['tasks'][':task']['artifacts'];
+/** A task's documents that are there, or why the project's Jig cannot list them. */
+export type TaskArtifacts = Ok<Documents['$get']>['artifacts'];
+export type TaskArtifact = Ok<Documents[':kind']['$get']>['artifact'];
+export type ArtifactKind = Extract<TaskArtifact, { state: 'ready' }>['kind'];
 export type Specs = Ok<Api['projects'][':id']['specs']['$get']>['specs'];
 export type Spec = Extract<Specs, { state: 'ready' }>['specs'][number];
 export type SpecItem = Spec['phases'][number]['items'][number];
@@ -80,6 +85,24 @@ export async function readTask(project: string, task: string): Promise<TaskDetai
   if (!res) return undefined;
   if (res.status === 200) return (await res.json()).task;
   return (await res.json()).error.code === 'not-found' ? 'not-found' : 'not-connected';
+}
+
+/** A task's documents, or why there are none: no such project, no such task; undefined when `call` failed. */
+export async function readArtifacts(project: string, task: string): Promise<TaskArtifacts | 'not-connected' | 'not-found' | undefined> {
+  const param = { id: encodeURIComponent(project), task: encodeURIComponent(task) };
+  const res = await call(() => client.api.projects[':id'].tasks[':task'].artifacts.$get({ param }));
+  if (!res) return undefined;
+  if (res.status === 200) return (await res.json()).artifacts;
+  return (await res.json()).error.code === 'not-found' ? 'not-found' : 'not-connected';
+}
+
+/** One of a task's documents as it is written, or `not-found` when it is gone; undefined when `call` failed. */
+export async function readArtifact(project: string, task: string, kind: ArtifactKind): Promise<TaskArtifact | 'not-found' | undefined> {
+  const param = { id: encodeURIComponent(project), task: encodeURIComponent(task), kind };
+  const res = await call(() => client.api.projects[':id'].tasks[':task'].artifacts[':kind'].$get({ param }));
+  if (!res) return undefined;
+  if (res.status === 200) return (await res.json()).artifact;
+  return 'not-found';
 }
 
 /** Reads a project through Jig now (Read again); `false` when the request did not get through. */

@@ -18,6 +18,9 @@ export const RESUME_JIG_VERSION = '0.35.0';
  */
 export const LAND_JIG_VERSION = '0.39.0';
 
+/** The first Jig that lists a task's documents and reads one as JSON (fapost-lab/jig#347). */
+export const ARTIFACTS_JIG_VERSION = '0.39.0';
+
 const SCRIPT = '.ai/scripts/jig';
 /** A read's limit: 10 s ran out with several projects read at once, each four Jig runs (task `read-timeout`). */
 const TIMEOUT_MS = 30_000;
@@ -547,6 +550,73 @@ export async function readQueue(
       .filter((i) => i.kind === kind)
       .map(({ id, level, position, priority, dependsOn }) => ({ id, level, position, priority, dependsOn }));
   return { revision, items: of('task'), epics: of('epic') };
+}
+
+/** The documents Jig keeps for a task, in its order: the kinds `jig task artifact` writes. */
+export const ARTIFACT_KINDS = [
+  'task',
+  'discovery',
+  'spec',
+  'alternatives',
+  'design',
+  'plan',
+  'review',
+  'verification',
+  'handoff',
+  'knowledge-map',
+  'commit-message',
+  'pr-body',
+] as const;
+export type ArtifactKind = (typeof ARTIFACT_KINDS)[number];
+const isKind = (kind: string): kind is ArtifactKind => (ARTIFACT_KINDS as readonly string[]).includes(kind);
+
+const ArtifactRow = z
+  .object({
+    kind: text,
+    /** `unavailable`: there, but not a file Jig reads (a link out of the workspace, unreadable); `reason` says which. */
+    state: z.enum(['present', 'empty', 'missing', 'unavailable']),
+    reason: maybe,
+    updated_at: maybe,
+    bytes: count.nullable(),
+  })
+  .transform(({ updated_at, ...row }) => ({ ...row, updatedAt: updated_at }));
+
+/** A document of a task that is there: written, empty, or not readable, with Jig's word for why. */
+export type Artifact = Omit<z.output<typeof ArtifactRow>, 'kind' | 'state'> & {
+  kind: ArtifactKind;
+  state: 'present' | 'empty' | 'unavailable';
+};
+
+const ArtifactList = z.object({ artifacts: z.array(ArtifactRow) });
+
+/**
+ * A task's documents (`jig task artifacts <id> --json`, Jig 0.39.0) that are there, in Jig's order, wherever its
+ * workspace is — Jig finds a worktree's; a kind this Jig UI does not know is left out. Refused as `not-found` for a task
+ * Jig does not know.
+ */
+export async function readArtifacts(root: string, task: string, platform: NodeJS.Platform = process.platform): Promise<Artifact[]> {
+  const { data } = await readJson(root, ['task', 'artifacts', task], platform);
+  return parsed(ArtifactList, data).artifacts.flatMap(({ kind, state, reason, ...row }) =>
+    state !== 'missing' && isKind(kind) ? [{ kind, state, reason: reason && withoutPaths(reason), ...row }] : [],
+  );
+}
+
+const ArtifactText = z
+  .object({ kind: text, updated_at: maybe, bytes: count.nullable(), content: z.string() })
+  .transform(({ updated_at, ...artifact }) => ({ ...artifact, updatedAt: updated_at }));
+
+/**
+ * One of a task's documents as it is written (`jig task artifact read <id> <kind> --json`, Jig 0.39.0). Refused as
+ * `not-found` when the task or the document is not there, and `failed` when it is there but not readable.
+ */
+export async function readArtifact(
+  root: string,
+  task: string,
+  kind: ArtifactKind,
+  platform: NodeJS.Platform = process.platform,
+): Promise<z.output<typeof ArtifactText>> {
+  const { data } = await readJson(root, ['task', 'artifact', 'read', task, kind], platform);
+  return parsed(ArtifactText, data);
 }
 
 /** A task or an epic as Jig's queue names it, never a bare id, which could read as a flag. */

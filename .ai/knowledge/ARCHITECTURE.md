@@ -38,15 +38,16 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   (adr-20261017-registry-of-connected-projects). It knows neither git nor Jig.
 - `server/jig/` — JigClient: the project's Jig version against `MIN_JIG_VERSION`, the JSON
   reads `jig status` (what needs the person), `jig task list`, `jig queue list` and `jig spec list`
-  (feature-specs), and the writes `jig queue move`, `jig queue set --priority`, `jig queue request`
+  (feature-specs), a task's documents `jig task artifacts` and `jig task artifact read` (from Jig 0.39.0,
+  adr-20261030-a-task-document-is-shown-as-written), and the writes `jig queue move`, `jig queue set --priority`, `jig queue request`
   and `cancel` (a pause), `jig task new` and `jig task resume` (from Jig 0.35.0), `jig task set <id>
   status consolidated` (a close, text, checked against a revision read first), and
   `jig upgrade`, its dry run and its run (from Jig 0.34.0), and `jig self-update` (its text line), each JSON answer checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
-  fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue
-  (convention-jig-client).
+  fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue,
+  0.39.0 for a task's documents (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, the connected ids
   (`connected`), one project as the workspace shows it (`project`), the Jig projects under a folder (`scan`, walked
-  by `scan.ts`), a project's live tasks, one task in full, connect, disconnect, subscribe to changes, and the writes `move`,
+  by `scan.ts`), a project's live tasks, one task in full, a live task's documents (`artifacts`, `artifact`), connect, disconnect, subscribe to changes, and the writes `move`,
   `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `planUpgrade`, `upgrade` and
   `dismissUpgrade`, `land` and `landAll`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
@@ -61,7 +62,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `GET /api/projects/:id` (one project as the workspace shows it) for the workspace's first load (feature-workspace),
   `POST /api/scan` (Find projects, adr-20261029-finding-projects-shows-their-paths),
   `GET /api/projects/:id/board`,
-  `GET /api/projects/:id/tasks/:task` (feature-task-details), `GET /api/projects/:id/specs`
+  `GET /api/projects/:id/tasks/:task` (feature-task-details), `GET /api/projects/:id/tasks/:task/artifacts` and
+  `/artifacts/:kind` (a task's documents, adr-20261030-a-task-document-is-shown-as-written), `GET /api/projects/:id/specs`
   (feature-specs), `POST /api/projects/:id/queue/move`, `/queue/priority`, `/queue/epic/move`, `/queue/epic/priority`, `/queue/pause`,
   `/queue/pause/cancel`, `/tasks/resume` (adr-20261022-writes-carry-the-revision-of-their-read) and
   `/tasks/close` (adr-20261029-close-a-ready-task-from-the-board),
@@ -100,7 +102,9 @@ one line that brings its own (the install flow). Jig works exactly as before wit
 - **Read and follow.** The page opens its change stream and reads once it is open; while it is
   open a change under a project's `.ai/`, debounced, or the minute's rescan makes the local adapter
   re-read through Jig, and only a read that differs — or a project newly connected — sends
-  "project X changed, revision R"; the page re-reads, served from that read (feature-live-updates).
+  "project X changed, revision R"; the page re-reads, served from that read (feature-live-updates) — all but a task's documents,
+  which that read does not hold: they are read through Jig when the page asks
+  (adr-20261030-a-task-document-is-shown-as-written).
 - **Change.** The page sends a write with the revision of the board it showed; ProjectSource
   runs the matching Jig command for live task ids only and answers after reading the project
   again; Jig's `stale-revision` comes back as 409, and the page reads the board again and shows

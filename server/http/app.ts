@@ -9,7 +9,14 @@ import { secureHeaders } from 'hono/secure-headers';
 import { streamSSE } from 'hono/streaming';
 import { validator } from 'hono/validator';
 import { columns, placeOf } from '../board/columns.js';
-import { type Place, type ProjectSource, RegistryUnreadable, type Written } from '../source/project-source.js';
+import {
+  ARTIFACT_KINDS,
+  type ArtifactKind,
+  type Place,
+  type ProjectSource,
+  RegistryUnreadable,
+  type Written,
+} from '../source/project-source.js';
 import { localOnly, tokenAccess } from './access.js';
 
 /**
@@ -66,6 +73,9 @@ function place(v: unknown): Place | undefined {
 
 /** A priority as the page sends it: 0 to 5, or `null` for none. */
 const isPriority = (v: unknown): v is number | null => v === null || (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 5);
+
+/** A kind of document Jig keeps for a task (`jig task artifact`). */
+const isArtifactKind = (v: string): v is ArtifactKind => (ARTIFACT_KINDS as readonly string[]).includes(v);
 
 /** A new task's id as Jig takes one (`jig_valid_id`): never empty, never led by `.` or `-`, so never a flag. */
 const isNewId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9_][A-Za-z0-9._-]*$/.test(v);
@@ -163,6 +173,26 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
         if (read.state !== 'ready') return c.json({ task: read }, 200);
         if (read.task === null) return refuse(c, 404, 'not-found', 'This project has no live task with this id.');
         return c.json({ task: { state: read.state, ...read.task, column: placeOf(read.task) } }, 200);
+      })
+
+      // A task's documents, read through the project's Jig at each call: the list, then one as it is written.
+      .get('/api/projects/:id/tasks/:task/artifacts', async (c) => {
+        const read = await source.artifacts(c.req.param('id'), c.req.param('task'));
+        if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        if (read.state !== 'ready') return c.json({ artifacts: read }, 200);
+        if (read.artifacts === null) return refuse(c, 404, 'not-found', 'This project has no task with this id.');
+        return c.json({ artifacts: { state: read.state, artifacts: read.artifacts } }, 200);
+      })
+
+      .get('/api/projects/:id/tasks/:task/artifacts/:kind', async (c) => {
+        const kind = c.req.param('kind');
+        if (!isArtifactKind(kind))
+          return refuse(c, 422, 'usage', `Jig keeps no document of this kind; it keeps ${ARTIFACT_KINDS.join(', ')}.`);
+        const read = await source.artifact(c.req.param('id'), c.req.param('task'), kind);
+        if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        if (read.state !== 'ready') return c.json({ artifact: read }, 200);
+        if (read.artifact === null) return refuse(c, 404, 'not-found', 'This task has no such document.');
+        return c.json({ artifact: { state: read.state, ...read.artifact } }, 200);
       })
 
       .get('/api/projects/:id/specs', async (c) => {

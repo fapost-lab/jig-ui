@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-10-29
+reviewed_at: 2026-10-30
 ---
 # JigClient — the only module that knows Jig
 
@@ -30,7 +30,7 @@ The minimum Jig the package reads is `MIN_JIG_VERSION` in `server/jig/client.ts`
 first Jig with a queue (0.29.0 was the first that prints JSON). A write a later Jig made possible
 does not raise it: it carries a version of its own, checked by the local adapter against the
 project's Jig before the page is offered the write — `RESUME_JIG_VERSION`, 0.35.0, for
-`resumeTask` — so a project on an older Jig is still read, and only that write is missing. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
+`resumeTask`, and `ARTIFACTS_JIG_VERSION`, 0.39.0, for a task's documents — so a project on an older Jig is still read, and only that write is missing. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
 found from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`), never a
 `bash` on PATH, which may be WSL's. It is asked once per process; a failed ask is not kept.
 

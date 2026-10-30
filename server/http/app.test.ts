@@ -696,6 +696,54 @@ describe('/api/projects/:id/queue', () => {
     expect((await post(fake, '/api/projects/x/read', {}, {})).status).toBe(401);
   });
 
+  it("serves a task's documents and one as it is written, and refuses what is not there", async () => {
+    const listed = [{ kind: 'plan', state: 'present', reason: null, updatedAt: 'x', bytes: 7 }] as const;
+    const old = { id: 'x', state: 'unsupported', jigVersion: '0.38.1', minimum: '0.39.0' } as const;
+    const asked: string[] = [];
+    const source: ProjectSource = {
+      ...localSource(join(webRoot, 'fake-config')),
+      artifacts: (id, task) =>
+        Promise.resolve(
+          id !== 'x'
+            ? undefined
+            : task === 'b'
+              ? { state: 'ready', artifacts: [...listed] }
+              : task === 'old'
+                ? old
+                : { state: 'ready', artifacts: null },
+        ),
+      artifact: (id, task, kind) => {
+        asked.push(kind);
+        const there = task === 'b' && kind === 'plan';
+        return Promise.resolve(
+          id !== 'x' ? undefined : { state: 'ready', artifact: there ? { kind, updatedAt: 'x', bytes: 7, content: '# Plan\n' } : null },
+        );
+      },
+    };
+    const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
+    const read = async (path: string, cookie: string | null = COOKIE) => {
+      const res = await fake.request(path, { headers: cookie ? { host: HOST, cookie } : { host: HOST } });
+      return { status: res.status, body: await res.json() };
+    };
+    const refused = (code: string) => ({ error: { code, message: expect.any(String) } });
+    expect(await read('/api/projects/x/tasks/b/artifacts')).toEqual({
+      status: 200,
+      body: { artifacts: { state: 'ready', artifacts: listed } },
+    });
+    expect(await read('/api/projects/x/tasks/old/artifacts')).toEqual({ status: 200, body: { artifacts: old } });
+    expect(await read('/api/projects/x/tasks/gone/artifacts')).toEqual({ status: 404, body: refused('not-found') });
+    expect(await read('/api/projects/y/tasks/b/artifacts')).toEqual({ status: 404, body: refused('not-connected') });
+    expect(await read('/api/projects/x/tasks/b/artifacts/plan')).toEqual({
+      status: 200,
+      body: { artifact: { state: 'ready', kind: 'plan', updatedAt: 'x', bytes: 7, content: '# Plan\n' } },
+    });
+    expect(await read('/api/projects/x/tasks/b/artifacts/spec')).toEqual({ status: 404, body: refused('not-found') });
+    expect(await read('/api/projects/x/tasks/b/artifacts/notes')).toEqual({ status: 422, body: refused('usage') });
+    expect(asked).toEqual(['plan', 'spec']);
+    expect((await read('/api/projects/x/tasks/b/artifacts', null)).status).toBe(401);
+    expect((await read('/api/projects/x/tasks/b/artifacts/plan', null)).status).toBe(401);
+  });
+
   it('forgets what an upgrade came to, refuses a disconnect while one runs, and is refused without the token', async () => {
     const source: ProjectSource = { ...localSource(join(webRoot, 'fake-config')), dismissUpgrade: (id) => Promise.resolve(id === 'x') };
     const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });

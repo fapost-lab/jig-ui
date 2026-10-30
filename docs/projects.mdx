@@ -337,8 +337,13 @@ page of their own, with an address you can keep, and with what Jig offers. The d
   answer the autopilot, pause, ship, close…) with the command to run in the project and a **copy**
   button. Jig UI runs none of them; the page follows the change once you do.
 
-Not shown yet: which of the task's documents exist, and what they say — Jig does not report them in
-a form Jig UI reads. A finished task has no details page; its link says so.
+- **Its documents**, on the full page only — the ones its workspace holds (task, discovery, design,
+  plan, review…), each with when it was last written and its size. A click opens one below its name,
+  rendered from its Markdown; an agent rewriting it is followed as the board is. A document is shown
+  as its authors wrote it, paths included. Anything in it that could run in the page — a script, an
+  event handler, a form — is taken out. Needs Jig 0.39.0 or later in the project.
+
+A finished task has no details page; its link says so.
 
 ## Staying current
 

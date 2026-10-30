@@ -25,6 +25,7 @@
   import SpecItemRow from '@/components/SpecItemRow.vue';
   import TaskBrief from '@/components/TaskBrief.vue';
   import TaskCard from '@/components/TaskCard.vue';
+  import TaskDocuments from '@/components/TaskDocuments.vue';
   import TaskFacts from '@/components/TaskFacts.vue';
   import TaskRow from '@/components/TaskRow.vue';
   import ThemeToggle from '@/components/ThemeToggle.vue';
@@ -47,9 +48,11 @@
     board,
     columns,
     details,
+    documents,
     emptyBoard,
     epics,
     finished,
+    openDocument,
     plans,
     projects,
     runs,
@@ -365,6 +368,18 @@
 
     <CanvasSection title="TaskBrief" note="the facts, the link to the full page and the id to copy; no actions">
       <TaskBrief project="jig-ui" :task="details[1]!.id" :details="details[1]" />
+    </CanvasSection>
+
+    <CanvasSection
+      title="TaskDocuments"
+      note="written, empty, not readable — design open, plan being read; none yet; Jig too old; Jig did not answer; being listed; a document Jig could not read"
+    >
+      <TaskDocuments :documents="documents" :open="{ design: openDocument, plan: 'reading' }" />
+      <TaskDocuments :documents="{ state: 'ready', artifacts: [] }" :open="{}" />
+      <TaskDocuments :documents="{ id: 'x', state: 'unsupported', jigVersion: '0.38.1', minimum: '0.39.0' }" :open="{}" />
+      <TaskDocuments :documents="{ id: 'x', state: 'unreadable', code: 'timeout' }" :open="{}" />
+      <TaskDocuments :open="{}" />
+      <TaskDocuments :documents="documents" :open="{ task: { id: 'x', state: 'unreadable', code: 'failed' } }" />
     </CanvasSection>
 
     <CanvasSection title="ActionList" note="Jig's offers, one unknown id; none">

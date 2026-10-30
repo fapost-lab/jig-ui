@@ -1,9 +1,10 @@
 <script setup lang="ts">
   import { computed } from 'vue';
-  import { ExternalLink } from '@lucide/vue';
+  import { Ellipsis, ExternalLink, Unplug } from '@lucide/vue';
   import { link, type Project } from '@/api';
   import { Button } from '@/components/ui/button';
   import { Card } from '@/components/ui/card';
+  import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
   import { toneRule, toneText } from '@/lib/tones';
   import { mergeWaitOf, needsUpgrade, type PlanState, upgradeMark } from '@/lib/upgrade';
   import AttentionItem from './AttentionItem.vue';
@@ -22,6 +23,7 @@
     reading?: boolean;
   }>();
 
+  const board = computed(() => `/projects/${encodeURIComponent(props.project.id)}`);
   const mark = computed(() => upgradeMark(props.project));
   const merge = computed(() => mergeWaitOf(props.project));
   // Check merge while the upgrade waits and nothing runs on the card.
@@ -48,12 +50,23 @@
 <template>
   <Card class="gap-3 px-4 py-4" :aria-labelledby="`project-${project.id}`" role="article">
     <div class="flex items-center gap-3">
-      <h2 :id="`project-${project.id}`" class="shrink-0 text-sm font-bold">{{ project.id }}</h2>
+      <h2 :id="`project-${project.id}`" class="shrink-0 text-sm font-bold">
+        <RouterLink v-if="project.state === 'ready'" :to="board" class="underline-offset-2 hover:underline">{{ project.id }}</RouterLink>
+        <template v-else>{{ project.id }}</template>
+      </h2>
       <StateLine :project="project" :reading="reading" class="text-muted-foreground" @read-again="$emit('readAgain')" />
       <span v-if="mark" :class="toneText.attention">{{ mark }}</span>
       <div class="ml-auto flex shrink-0 items-center gap-2">
         <Button v-if="upgradable" variant="outline" size="xs" @click="$emit('start')">Upgrade…</Button>
-        <Button v-if="project.upgrade?.state !== 'running'" variant="ghost" size="xs" @click="$emit('disconnect')">Disconnect</Button>
+        <Button v-if="project.state === 'ready'" variant="outline" size="xs" as-child><RouterLink :to="board">Board</RouterLink></Button>
+        <DropdownMenu v-if="project.upgrade?.state !== 'running'">
+          <DropdownMenuTrigger as-child>
+            <Button variant="ghost" size="icon-xs" :aria-label="`More for ${project.id}`"><Ellipsis /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="w-36">
+            <DropdownMenuItem @select="$emit('disconnect')"><Unplug />Disconnect</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
     <div v-if="merge" :class="toneRule.attention" class="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -83,10 +96,7 @@
       @dismiss="$emit('dismiss')"
     />
     <template v-if="project.state === 'ready'">
-      <p>
-        {{ project.counts.active }} active · {{ project.counts.paused }} paused · {{ project.counts.ready }} ready ·
-        <RouterLink :to="`/projects/${encodeURIComponent(project.id)}`" class="underline underline-offset-2">Open board</RouterLink>
-      </p>
+      <p>{{ project.counts.active }} active · {{ project.counts.paused }} paused · {{ project.counts.ready }} ready</p>
       <p v-if="project.attention.length === 0" class="text-muted-foreground">Nothing needs you here.</p>
       <ul v-else class="flex flex-col gap-3" :aria-label="`What needs you in ${project.id}`">
         <li v-for="(item, i) in project.attention" :key="i"><AttentionItem :item="item" /></li>

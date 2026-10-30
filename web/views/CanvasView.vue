@@ -8,6 +8,7 @@
   import BoardList from '@/components/BoardList.vue';
   import ColumnHeader from '@/components/ColumnHeader.vue';
   import ConnectForm from '@/components/ConnectForm.vue';
+  import FoundProjects from '@/components/FoundProjects.vue';
   import FinishedList from '@/components/FinishedList.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
   import CopyButton from '@/components/CopyButton.vue';
@@ -218,14 +219,39 @@
       />
     </CanvasSection>
 
-    <CanvasSection title="ConnectForm" note="idle, busy, refused">
+    <CanvasSection title="ConnectForm" note="idle, busy, finding, refused">
       <ConnectForm :busy="false" />
       <ConnectForm :busy="true" model-value="/Users/me/project" />
+      <ConnectForm :busy="false" :finding="true" model-value="~/code" />
       <ConnectForm
         :busy="false"
         model-value="/Users/me/project/.claude/worktrees/x"
         refusal="That is a worktree. Connect the main checkout instead."
       />
+    </CanvasSection>
+
+    <CanvasSection
+      title="FoundProjects"
+      note="found, one connecting; one refused; nothing to connect, folders skipped, stopped at the limit"
+    >
+      <FoundProjects
+        :result="{ folder: '~', found: [{ path: '~/code/api' }, { path: '~/work/api' }], connected: 1, skipped: [], stopped: false }"
+        connecting="~/code/api"
+      />
+      <FoundProjects
+        :result="{
+          folder: '~/code',
+          found: [{ path: '~/code/a-really-long-folder-name/with/a-project-deep-inside' }],
+          connected: 0,
+          skipped: [],
+          stopped: false,
+        }"
+        :refusal="{
+          path: '~/code/a-really-long-folder-name/with/a-project-deep-inside',
+          message: 'There is no Jig in this repository. Run jig init in it first.',
+        }"
+      />
+      <FoundProjects :result="{ folder: '~', found: [], connected: 2, skipped: ['Desktop', 'Documents', 'Downloads'], stopped: true }" />
     </CanvasSection>
 
     <CanvasSection title="AttentionItem" note="no link; a pull request; another link">

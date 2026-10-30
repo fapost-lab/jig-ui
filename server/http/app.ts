@@ -362,6 +362,22 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
         },
       )
 
+      // The folder typed, else the home folder: the Jig projects under it, by path (task `scan-projects`).
+      .post(
+        '/api/scan',
+        validator('json', (body: unknown) => {
+          const typed = field(body, 'folder');
+          return { folder: typed === undefined || (typeof typed === 'string' && typed.trim() === '') ? homedir() : absolute(typed) };
+        }),
+        async (c) => {
+          const { folder } = c.req.valid('json');
+          if (folder === undefined) return refuse(c, 422, 'usage', 'Give the absolute path of a folder.');
+          const result = await source.scan(folder);
+          if ('code' in result) return refuse(c, 422, result.code, result.message);
+          return c.json(result, 200);
+        },
+      )
+
       .delete('/api/projects/:id', async (c) => {
         const disconnected = await source.disconnect(c.req.param('id'));
         if (disconnected === 'upgrading')

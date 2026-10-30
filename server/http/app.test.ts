@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { localSource } from '../source/local.js';
+import { tilde } from '../source/scan.js';
 import type { Change, ProjectSource, Written } from '../source/project-source.js';
 import { createApp, readPackageVersion } from './app.js';
 
@@ -225,6 +226,51 @@ describe('/api/projects and /api/workspace', () => {
     expect((await call('DELETE', '/api/projects/old')).status).toBe(204);
     expect((await call('DELETE', '/api/projects/old')).status).toBe(404);
     expect(((await (await call('GET', '/api/workspace')).json()) as { projects: unknown[] }).projects).toHaveLength(2);
+  });
+
+  it('finds the Jig projects under a folder, the home folder when none is typed, and refuses what is not one', async () => {
+    const found = project('found/here', '0.31.0');
+    project('found/without-jig');
+    const folder = join(realpathSync.native(webRoot), 'found');
+    const scan = await call('POST', '/api/scan', { folder });
+    expect(scan.status).toBe(200);
+    const shown = (path: string) => tilde(path, realpathSync.native(homedir())); // the temporary folder is in the home folder on Windows
+    expect(await scan.json()).toEqual({
+      folder: shown(folder),
+      found: [{ path: shown(found) }],
+      connected: 0,
+      skipped: [],
+      stopped: false,
+    });
+
+    let asked: string | undefined;
+    const home = createApp({
+      port: PORT,
+      token: TOKEN,
+      webRoot,
+      source: {
+        ...localSource(join(webRoot, 'scan-config')),
+        scan: (f) => Promise.resolve({ folder: (asked = f), found: [], connected: 0, skipped: [], stopped: false }),
+      },
+    });
+    const post = (body: unknown) =>
+      home.request('/api/scan', {
+        method: 'POST',
+        headers: { host: HOST, cookie: COOKIE, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    expect((await post({})).status).toBe(200);
+    expect(asked).toBe(homedir());
+    expect((await post({ folder: '  ' })).status).toBe(200);
+    expect(asked).toBe(homedir());
+
+    expect(await (await call('POST', '/api/scan', { folder: 'relative' })).json()).toEqual({
+      error: { code: 'usage', message: 'Give the absolute path of a folder.' },
+    });
+    const missing = await call('POST', '/api/scan', { folder: join(folder, 'missing') });
+    expect(missing.status).toBe(422);
+    expect(await missing.json()).toEqual({ error: { code: 'not-a-folder', message: 'There is no folder at this path.' } });
+    expect((await projects.request('/api/scan', { method: 'POST', headers: { host: HOST } })).status).toBe(401);
   });
 
   it("serves a project's board, its state when it is not readable, and 404 for an unknown id", async () => {

@@ -28,8 +28,11 @@ are added as sections of this file.
   command it did not write, and installs Node.js only after its SHA-256 sum matched nodejs.org's; it
   edits no shell profile and no system setting. (spec `jig-ui`, task `install-without-node`. Checked
   by `server/install.test.ts` and the Installer workflow.)
-- The API and the page name projects by id; no path reaches `web/`.
-  (adr-20261014-project-source-port-keeps-hosting-open. Checked by tests on the API responses.)
+- The API and the page name connected projects by id; no path reaches `web/` but Find projects'
+  answer — the folder it looked through and what it found there, under the folder the person named,
+  with `~` for the home folder.
+  (adr-20261014-project-source-port-keeps-hosting-open, adr-20261029-finding-projects-shows-their-paths.
+  Checked by tests on the API responses.)
 - The server binds 127.0.0.1 unless a guard other than the local token is in place, refuses a
   foreign `Host` or `Origin`, and refuses every API call without the token.
 - `jig-ui stop` never signals a pid read from `instance.json` on its own word: it asks the instance

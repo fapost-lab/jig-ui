@@ -1,11 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, describe, expect, it } from 'vitest';
 import { addProject } from '../registry/projects.js';
 import { localSource } from './local.js';
+import { tilde } from './scan.js';
 import type { Change } from './project-source.js';
 
 const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'jig-ui-source-')));
@@ -127,6 +128,33 @@ esac
 }
 
 const calls = (dir: string) => readFileSync(join(dir, 'calls.log'), 'utf8').trim().split('\n');
+
+describe('localSource, finding projects', () => {
+  const source = localSource(join(root, 'scan-config'));
+
+  it('finds the Jig projects under a folder by path, counts the connected ones, and runs no Jig there', async () => {
+    const one = project('scan/one', '0.31.0');
+    const two = project('scan/nested/two', '0.31.0');
+    await source.connect(two);
+    const ran = calls(two).length;
+    const shown = (path: string) => tilde(path, realpathSync.native(homedir())); // the temporary folder is in the home folder on Windows
+    expect(await source.scan(join(root, 'scan'))).toEqual({
+      folder: shown(join(root, 'scan')),
+      found: [{ path: shown(one) }],
+      connected: 1,
+      skipped: [],
+      stopped: false,
+    });
+    expect(() => calls(one)).toThrow(); // no calls.log: its Jig never ran
+    expect(calls(two)).toHaveLength(ran);
+  });
+
+  it('refuses a path that is not a folder', async () => {
+    const refused = { code: 'not-a-folder', message: 'There is no folder at this path.' };
+    expect(await source.scan(join(root, 'nowhere'))).toEqual(refused);
+    expect(await source.scan(join(root, 'scan', 'one', 'status.json'))).toEqual(refused);
+  });
+});
 
 describe('localSource', () => {
   const source = localSource(join(root, 'config'));

@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-10-29
+reviewed_at: 2026-10-30
 ---
 # ProjectSource — how the server reaches a project
 
@@ -20,10 +20,24 @@ MAY:      read a project's tasks, specs, attention items and legal actions; subs
           "project changed, revision R"; send a command with the revision it was based on
 MUST:     name projects by id; return typed data, never Jig's raw output; report a refusal by
           Jig's failure code; keep the last good read when a read fails mid-write
-MUST NOT: expose a path, a file or a child process to its callers; write a project file;
-          compute a board column or a legal action itself
+MUST NOT: expose a path, a file or a child process to its callers — but `scan`'s findings, below;
+          write a project file; compute a board column or a legal action itself
 Why:      a later remote adapter (a connector on the projects' machine) must fit behind the
           same port; anything a caller learns about directories or processes breaks that.
+```
+
+```
+ProjectSource.scan(folder)
+
+MAY:      list folders under `folder`; tell a main checkout with Jig by its `.git` directory and
+          Jig's script
+MUST:     answer only `folder` and paths under it, with `~` for the home folder; say what it
+          skipped and where it stopped
+MUST NOT: run Jig or git; read or write a file in a project; follow a symbolic link; connect
+          anything
+Why:      a scan is pressed on a folder of the person's choosing, before any project in it is
+          trusted: running a project's Jig is what connecting consents to
+          (adr-20261029-finding-projects-shows-their-paths).
 ```
 
 Callers (`board/`, and `http/` for task details and the change stream) depend on the port, never on `jig/` or `watch/` directly.
@@ -32,7 +46,8 @@ The port is `ProjectSource` in `server/source/project-source.ts` — the workspa
 (`connected()`, read from the registry without running Jig) and one project as the workspace shows it
 (`project(id)`), for a page that lists the projects before their reads land, a project's
 live tasks and the finished ones Jig still keeps (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), its specs
-(`specs(id)`), `readAgain(id)` — the project read through Jig now, for a person's Read again — connect,
+(`specs(id)`), `readAgain(id)` — the project read through Jig now, for a person's Read again — `scan(folder)`, the
+Jig projects under a folder, by path — connect,
 disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,
 `prioritise(id, taskId, priority, revision)`, `moveEpic(id, specId, place, revision)` and
 `prioritiseEpic(id, specId, priority, revision)` — a spec's open epic, among the top level of the
@@ -41,7 +56,7 @@ queue — `requestPause(id, taskId, revision)`,
 or the project's state when it is not `ready`; and the upgrade of a project's Jig — `planUpgrade(id)`,
 `upgrade(id)`, which answers `started` before Jig has run, and `dismissUpgrade(id)`; its local adapter
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
-only the path a person types to connect. A read that fails becomes a state of the project, not an
+only the path a person types to connect or to look through, and a scan's answer. A read that fails becomes a state of the project, not an
 error of the workspace: `unreadable` with Jig's failure code and never its message (it may name a
 path), the code `timeout` when Jig did not answer within the read limit, its version read included; `incompatible` when Jig answered in a shape JigClient does not read. A task's details carry no
 worktree path and only the actions Jig offers — a refused action's reason is Jig's text and may

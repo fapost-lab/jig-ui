@@ -28,6 +28,9 @@ export type Written = Awaited<
   ReturnType<Queue['move']['$post'] | Queue['priority']['$post'] | Queue['pause']['$post'] | Queue['pause']['cancel']['$post']>
 >;
 
+/** What Find projects found under a folder. */
+export type FoundProjects = Ok<Api['scan']['$post']>;
+
 /** What upgrading a project's Jig would do: Jig's dry run of it. */
 /** What Check all merges came to: the projects landed, still waiting for a merge, and stopped. */
 export type LandedAll = Ok<Api['upgrade']['land-all']['$post']>['landed'];

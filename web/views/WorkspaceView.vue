@@ -1,14 +1,16 @@
 <script setup lang="ts">
   import { computed, onUnmounted, ref, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
-  import { call, client, type Machine, onChange, type Project, readAgain } from '@/api';
+  import { call, client, type FoundProjects as Found, type Machine, onChange, type Project, readAgain } from '@/api';
   import ConnectForm from '@/components/ConnectForm.vue';
+  import FoundProjects from '@/components/FoundProjects.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProjectList from '@/components/ProjectList.vue';
   import { Button } from '@/components/ui/button';
   import { Progress } from '@/components/ui/progress';
   import { lastWins } from '@/lib/last-wins';
   import { chosen, landed, type Listed, readOnes, readProgress } from '@/lib/projects';
+  import { withConnected } from '@/lib/scan';
   import { toneRule, toneText } from '@/lib/tones';
   import {
     landedLine,
@@ -94,20 +96,72 @@
     await load();
   }
 
+  /** Connects a path; the project's id, or why it was refused. */
+  async function connectPath(target: string): Promise<
+    | {
+        id: string;
+      }
+    | {
+        refused: string;
+      }
+    | undefined
+  > {
+    const res = await call(() => client.api.projects.$post({ json: { path: target } }));
+    if (!res) return undefined;
+    if (res.status !== 200 && res.status !== 201) return { refused: (await res.json()).error.message };
+    return { id: (await res.json()).project.id };
+  }
+
+  /** The project just connected is the one shown, wherever it falls in the list. */
+  async function show(id: string): Promise<void> {
+    await router.replace({ query: { project: id } });
+    await load();
+  }
+
   async function connect(): Promise<void> {
     busy.value = true;
     refusal.value = undefined;
-    const res = await call(() => client.api.projects.$post({ json: { path: path.value } }));
+    const done = await connectPath(path.value);
     busy.value = false;
+    if (!done) return;
+    if ('refused' in done) return void (refusal.value = done.refused);
+    path.value = '';
+    await show(done.id);
+  }
+
+  /** What Find projects last found, until it is pressed again; the found project being connected, and why one was refused. */
+  const found = ref<Found>();
+  const finding = ref(false);
+  const connecting = ref<string>();
+  const foundRefusal = ref<{
+    path: string;
+    message: string;
+  }>();
+
+  async function find(folder: string): Promise<void> {
+    finding.value = true;
+    refusal.value = undefined;
+    foundRefusal.value = undefined;
+    const res = await call(() => client.api.scan.$post({ json: { folder } }));
+    finding.value = false;
     if (!res) return;
-    if (res.status !== 200 && res.status !== 201) {
+    if (res.status !== 200) {
+      found.value = undefined;
       refusal.value = (await res.json()).error.message;
       return;
     }
-    path.value = '';
-    // The project just connected is the one shown, wherever it falls in the list.
-    await router.replace({ query: { project: (await res.json()).project.id } });
-    await load();
+    found.value = await res.json();
+  }
+
+  async function connectFound(target: string): Promise<void> {
+    connecting.value = target;
+    foundRefusal.value = undefined;
+    const done = await connectPath(target);
+    connecting.value = undefined;
+    if (!done) return;
+    if ('refused' in done) return void (foundRefusal.value = { path: target, message: done.refused });
+    if (found.value) found.value = withConnected(found.value, target);
+    await show(done.id);
   }
 
   async function disconnect(id: string): Promise<void> {
@@ -267,7 +321,10 @@
       </ul>
       <Button v-if="said.ended" variant="ghost" size="xs" class="self-start" @click="dismissAll">Dismiss</Button>
     </div>
-    <ConnectForm v-model="path" :busy="busy" :refusal="refusal" class="border-b pb-4" @connect="connect" />
+    <div class="flex flex-col gap-4 border-b pb-4">
+      <ConnectForm v-model="path" :busy="busy" :finding="finding" :refusal="refusal" @connect="connect" @find="find" />
+      <FoundProjects v-if="found" :result="found" :connecting="connecting" :refusal="foundRefusal" @connect="connectFound" />
+    </div>
     <p v-if="projects === undefined" class="text-muted-foreground">Reading projects…</p>
     <p v-else-if="projects.length === 0" class="text-muted-foreground">
       No projects yet. Paste the path of a project's main checkout above.

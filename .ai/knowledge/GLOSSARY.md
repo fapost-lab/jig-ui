@@ -101,8 +101,8 @@ Use in: source code, documentation.
 
 ## ProjectSource
 
-The port through which the server reads and changes a connected project; the local adapter is
-built from JigClient and Watcher.
+The port through which the server reads and changes a connected project, and finds the ones not
+connected yet; the local adapter is built from JigClient and Watcher.
 
 Informal synonyms: provider, backend.
 Use in: source code.

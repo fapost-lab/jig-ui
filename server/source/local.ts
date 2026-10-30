@@ -1,4 +1,6 @@
 import { existsSync } from 'node:fs';
+import { realpath, stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import {
   cancelPause,
   closeTask,
@@ -32,6 +34,7 @@ import {
 import { addProject, type Project, readProjects, removeProject } from '../registry/projects.js';
 import { type Watch, watchTree } from '../watch/watch.js';
 import { mainCheckout } from './checkout.js';
+import { scanFolder, tilde } from './scan.js';
 import type {
   Attention,
   Change,
@@ -773,6 +776,16 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       known?.add(project.id);
       await refresh(entry, news);
       return { project: (entry.shown as Read).view, created };
+    },
+    async scan(folder) {
+      const root = await realpath(folder).catch(() => undefined);
+      if (root === undefined || !(await stat(root).catch(() => undefined))?.isDirectory()) {
+        return { code: 'not-a-folder', message: 'There is no folder at this path.' };
+      }
+      const home = await realpath(homedir()).catch(() => homedir());
+      const connected = new Set((await readProjects(configDir)).map((p) => p.path));
+      const { found, ...rest } = await scanFolder(root, { home, connected });
+      return { folder: tilde(root, home), found: found.map((path) => ({ path: tilde(path, home) })), ...rest };
     },
     async tasks(id) {
       const project = (await readProjects(configDir)).find((p) => p.id === id);

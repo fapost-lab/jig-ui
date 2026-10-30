@@ -17,6 +17,15 @@ only starts. Running it again in a connected project changes nothing; it opens t
 top of the page, above the projects, and choose **Connect**. A path inside the project works too; Jig UI connects the project's
 root. `~/` stands for your home folder.
 
+**By looking for them.** Choose **Find projects** to look for Jig projects in the folder typed in the
+field, or in your home folder when the field is empty. Jig UI lists each one it finds that is not
+connected yet, by its path, with **Connect**, and counts the ones already connected. It reads only
+folder names — it runs nothing in a project before you connect it — goes 5 folders deep and through
+at most 20 000 folders, and does not look inside a repository, a hidden folder or `node_modules`. On
+macOS it passes over Desktop, Documents, Downloads, Movies, Music and Pictures in your home folder,
+because macOS asks before an app reads them, and says so: type one, `~/Documents` for example, and
+choose **Find projects** to look there.
+
 The project needs [Jig 0.31.0 or later](/requirements). Each project gets a short id from its
 folder name (`My Project` becomes `my-project`, a second `api` becomes `api-2`); the page names
 it by that id.

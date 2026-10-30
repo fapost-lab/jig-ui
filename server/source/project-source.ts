@@ -309,6 +309,19 @@ export type Refusal = {
   message: string;
 };
 
+/**
+ * What a scan of a folder found: the main checkouts with Jig not connected yet, by path in the `~/` form the connect
+ * field takes, and the folder itself in that form; the connected ones only counted. `skipped` names the home folder's
+ * folders passed over because macOS asks before an app reads them; `stopped`, that the walk hit its limit.
+ */
+export type FoundProjects = {
+  folder: string;
+  found: { path: string }[];
+  connected: number;
+  skipped: string[];
+  stopped: boolean;
+};
+
 /** What a write came to: done, refused by Jig's failure code (`stale-revision`: the project changed since), or why the project cannot be read. */
 export type Written =
   | { state: 'written' }
@@ -344,6 +357,17 @@ export interface ProjectSource {
         created: boolean;
       }
     | Refusal
+  >;
+  /**
+   * Looks for Jig projects under a folder, reading folder listings only — no Jig, no git; a path that is not a folder is
+   * refused. The one answer that carries paths: the person named the folder and must recognise what they connect.
+   */
+  scan(folder: string): Promise<
+    | FoundProjects
+    | {
+        code: 'not-a-folder';
+        message: string;
+      }
   >;
   /** A connected project's live tasks; `undefined` when no project has that id. */
   tasks(id: string): Promise<ProjectTasks | undefined>;

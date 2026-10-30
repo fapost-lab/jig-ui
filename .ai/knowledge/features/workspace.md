@@ -14,7 +14,10 @@ paths:
   - web/components/ProjectSwitcher.vue
   - web/components/ProjectMark.vue
   - web/lib/projects.ts
-summary: "The workspace page: a list of the connected projects with search and the chosen one's card — Jig's attention items, the mark and count of projects whose Jig is older than the machine's, and their upgrade from the card"
+  - web/components/FoundProjects.vue
+  - web/lib/scan.ts
+  - web/components/ConnectForm.vue
+summary: "The workspace page: a list of the connected projects with search and the chosen one's card — Jig's attention items, the mark and count of projects whose Jig is older than the machine's, their upgrade from the card — and Find projects, which lists the Jig projects in a folder not connected yet"
 reviewed_at: 2026-10-29
 ---
 # Workspace — every connected project on one page
@@ -31,6 +34,9 @@ attention items as `jig status --json` lists them — and the housekeeping note.
 holds a dropdown with search over the projects (`web/components/ProjectSwitcher.vue`, in
 `App.vue`) that opens a project's board; the list and the dropdown mark each project with its
 count of attention items, or *!* when it cannot be read (`web/components/ProjectMark.vue`).
+**Find projects** beside Connect looks for Jig projects in the folder typed, or the home folder, and
+lists the ones not connected yet by path, each with **Connect** (`web/components/FoundProjects.vue`,
+worded by `web/lib/scan.ts`; adr-20261029-finding-projects-shows-their-paths).
 The first load lists the connected ids at once (`GET /api/projects`) and reads each project on its
 own (`GET /api/projects/:id`), so each fills in as Jig answers for it — `…` until then — under a bar
 counting the projects read (`readProgress` in `web/lib/projects.ts`); later loads read the whole
@@ -87,6 +93,9 @@ version in the header and one count are quicker to scan than an item inside each
   machine, not a project.
 - One project at a time at first (the maintainer, 2026-10-27); Upgrade all came later,
   adr-20261029-upgrade-all-and-self-update-from-the-page.
+- Find projects shares the connect field rather than a field of its own (the maintainer, task
+  `scan-projects`): the field already takes a folder and `~/`, and a found project is connected
+  through the same route as a typed one.
 - A tree of projects — rejected: projects have no hierarchy to show, so a flat list with search
   (the maintainer, task `card-fields-and-artifacts`). The header's tabs gave way to the dropdown on
   every page for the same reason: tabs stop fitting long before a list does.

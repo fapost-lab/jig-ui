@@ -45,7 +45,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue
   (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, the connected ids
-  (`connected`), one project as the workspace shows it (`project`), a project's live tasks, one task in full, connect, disconnect, subscribe to changes, and the writes `move`,
+  (`connected`), one project as the workspace shows it (`project`), the Jig projects under a folder (`scan`, walked
+  by `scan.ts`), a project's live tasks, one task in full, connect, disconnect, subscribe to changes, and the writes `move`,
   `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `planUpgrade`, `upgrade` and
   `dismissUpgrade`, `land` and `landAll`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
@@ -58,6 +59,7 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   (feature-board).
 - `server/http/` also serves `GET /api/workspace`, `GET /api/projects` (the connected ids, no Jig run) and
   `GET /api/projects/:id` (one project as the workspace shows it) for the workspace's first load (feature-workspace),
+  `POST /api/scan` (Find projects, adr-20261029-finding-projects-shows-their-paths),
   `GET /api/projects/:id/board`,
   `GET /api/projects/:id/tasks/:task` (feature-task-details), `GET /api/projects/:id/specs`
   (feature-specs), `POST /api/projects/:id/queue/move`, `/queue/priority`, `/queue/epic/move`, `/queue/epic/priority`, `/queue/pause`,
@@ -68,7 +70,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   (adr-20261027-upgrading-a-project-runs-in-the-background), `POST /api/self-update`, `POST` and
   `DELETE /api/upgrade-all` (adr-20261029-upgrade-all-and-self-update-from-the-page), `POST /api/projects/:id/upgrade/land` and `POST /api/upgrade/land-all` (adr-20261029-check-merge-lands-an-upgrade-through-jig), connect /
   disconnect under `/api/projects`, and `GET /api/events` — the SSE stream of "project X changed,
-  revision R" — through the port only; responses name projects by id.
+  revision R" — through the port only; responses name projects by id, and only Find projects' answer names
+  folders, by path.
   Directions: `http/` → `board/`, `source/`; `board/` → `source/` (types); `source/` → `jig/`,
   `registry/`, `watch/`.
 - `server/open-browser.ts` — opens the browser through `open.html` in the config directory, so

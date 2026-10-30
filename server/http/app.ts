@@ -392,17 +392,18 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
         },
       )
 
-      // The folder typed, else the home folder: the Jig projects under it, by path (task `scan-projects`).
+      // The folder typed, else none — the source's home folder: the Jig projects under it, by path (task `scan-projects`).
       .post(
         '/api/scan',
         validator('json', (body: unknown) => {
           const typed = field(body, 'folder');
-          return { folder: typed === undefined || (typeof typed === 'string' && typed.trim() === '') ? homedir() : absolute(typed) };
+          // `null`: none typed — no field, `null` or a blank one.
+          return { folder: typed == null || (typeof typed === 'string' && typed.trim() === '') ? null : absolute(typed) };
         }),
         async (c) => {
           const { folder } = c.req.valid('json');
           if (folder === undefined) return refuse(c, 422, 'usage', 'Give the absolute path of a folder.');
-          const result = await source.scan(folder);
+          const result = await source.scan(folder ?? undefined);
           if ('code' in result) return refuse(c, 422, result.code, result.message);
           return c.json(result, 200);
         },

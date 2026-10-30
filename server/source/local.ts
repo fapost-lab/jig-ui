@@ -828,7 +828,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       return { project: (entry.shown as Read).view, created };
     },
     async scan(folder) {
-      const root = await realpath(folder).catch(() => undefined);
+      const root = await realpath(folder ?? homedir()).catch(() => undefined);
       if (root === undefined || !(await stat(root).catch(() => undefined))?.isDirectory()) {
         return { code: 'not-a-folder', message: 'There is no folder at this path.' };
       }

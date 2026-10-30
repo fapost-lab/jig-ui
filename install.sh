@@ -28,8 +28,12 @@ fail() {
 # The archive nodejs.org publishes for this machine, by the suffix after `node-v<version>-`.
 archive() {
   case "$(uname -s)" in
-    MINGW64*-ARM64 | MSYS*-ARM64) echo win-arm64.zip ;; # Git Bash runs emulated there: `uname -m` says x86_64
-    MINGW64* | MSYS*) echo win-x64.zip ;;
+    # Git Bash: MINGW64_NT-…, MSYS_NT-…, or CLANGARM64_NT-… for Git for Windows' own ARM64 build. The x64 one runs
+    # emulated on ARM64, where `uname -m` says x86_64 and only `uname -s` ends in -ARM64.
+    # Cygwin's paths are not Windows' own: a node.exe would not find what the command gives it.
+    CYGWIN*) return 1 ;;
+    *_NT*-ARM64 | CLANGARM64_NT*) echo win-arm64.zip ;;
+    *_NT*) echo win-x64.zip ;;
     Darwin)
       # A shell under Rosetta says x86_64 on an Apple chip.
       if [ "$(uname -m)" = arm64 ] || [ "$(sysctl -n sysctl.proc_translated 2>/dev/null)" = 1 ]; then
@@ -49,7 +53,7 @@ archive() {
   esac
 }
 
-windows() { case "$(uname -s)" in MINGW* | MSYS*) return 0 ;; *) return 1 ;; esac }
+windows() { case "$(uname -s)" in CYGWIN*) return 1 ;; *_NT*) return 0 ;; *) return 1 ;; esac }
 
 # Single-quoted for /bin/sh, a quote inside closed and reopened.
 quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
@@ -91,8 +95,7 @@ unpack() {
 }
 
 main() {
-  local suffix data bin launcher run what
-  suffix=$(archive) || fail "no Node.js is published for $(uname -s) $(uname -m). $MANUAL"
+  local data bin launcher run what
   command -v curl >/dev/null 2>&1 || fail "curl is not here. $MANUAL"
   if windows; then
     [ -n "${LOCALAPPDATA:-}" ] || fail "LOCALAPPDATA is not set. $MANUAL"
@@ -116,7 +119,9 @@ main() {
     what="the Node.js $(node --version) on this machine"
     run="exec npx --yes @fapost/jig-ui \"\$@\""
   else
-    local dist sums line sum file version node npx tmp top ran
+    local suffix dist sums line sum file version node npx tmp top ran
+    # Only now: a Node.js already here runs on a system nodejs.org publishes no archive for.
+    suffix=$(archive) || fail "no Node.js is published for $(uname -s) $(uname -m). $MANUAL"
     dist="${NODEJS_ORG_MIRROR:-https://nodejs.org/dist}"
     mkdir -p "$data"
     tmp=$(mktemp -d "$data/.install.XXXXXX")
@@ -154,7 +159,8 @@ main() {
       fi
       say "Node.js $version is in $data/node."
     fi
-    rm -rf "$tmp"
+    # Node.js is in place: a file Windows still holds open must not stop the command being written.
+    rm -rf "$tmp" 2>/dev/null || say "could not remove $tmp; delete it later."
     trap - EXIT
 
     if windows; then npx="$data/node/node_modules/npm/bin/npx-cli.js"; else npx="$data/node/lib/node_modules/npm/bin/npx-cli.js"; fi

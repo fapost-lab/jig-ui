@@ -25,8 +25,8 @@
     <div class="flex flex-wrap gap-2">
       <Input
         id="project-path"
-        class="flex-[1_1_14rem]"
         v-model="path"
+        class="flex-[1_1_14rem]"
         required
         placeholder="/path/to/project"
         :aria-invalid="refusal !== undefined"

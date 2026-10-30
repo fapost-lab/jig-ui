@@ -64,7 +64,8 @@ export async function scanFolder(
     }
     const git = entries.find((e) => e.name === '.git');
     if (git) {
-      // A `.git` file is a worktree's or a submodule's: connecting one is refused anyway.
+      // A `.git` file is a worktree's (connect refuses it), a submodule's or a `--separate-git-dir` clone's: passed over,
+      // as the ADR says; its path typed in the field connects the last two.
       if (git.isDirectory() && hasJig(dir)) {
         if (connected.has(dir)) scan.connected++;
         else scan.found.push(dir);

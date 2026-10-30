@@ -10,6 +10,12 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 - Builds on the [development channel](/installation#development-channel) are numbered after the latest
   release — `0.5.1-next.<n>` after 0.5.0 — so they no longer sort before it.
+- The install line works where a Node.js 24 is already on PATH even on a system nodejs.org publishes no
+  Node.js for, and finds Git for Windows' own ARM64 build. A file Windows still holds open no longer
+  stops it before the `jig-ui` command is written. [Removing Jig UI](/installation#without-nodejs)
+  now names its config folder and npx's copy, and says the command runs in Git Bash on Windows.
+- A project's card opened while the Projects page is still loading offers no **Upgrade…** until the
+  page knows whether an upgrade of every project is already under way.
 
 ## 0.5.0 — 2026-10-30
 

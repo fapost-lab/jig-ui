@@ -58,9 +58,12 @@ export function upgradeAllPlan(
   };
 }
 
-/** A run that changes this machine's Jig or every project is under way: no other upgrade starts meanwhile. */
+/**
+ * A run that changes this machine's Jig or every project is under way, or the machine is not read yet — a card opened
+ * during the first load waits for the workspace read: no other upgrade starts meanwhile.
+ */
 export const machineBusy = (machine: Machine | undefined): boolean =>
-  machine?.landingAll === true || machine?.selfUpdate?.state === 'running' || machine?.upgradeAll?.state === 'running';
+  machine === undefined || machine.landingAll || machine.selfUpdate?.state === 'running' || machine.upgradeAll?.state === 'running';
 
 /** What the page says of Upgrade all and of a self-update: under way, or what it came to; none when nothing ran. */
 export function machineLine(

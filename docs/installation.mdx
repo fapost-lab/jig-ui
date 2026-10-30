@@ -32,20 +32,25 @@ and keeps it in Jig UI's own folder — nothing is installed system-wide and no 
 for. Then it adds a `jig-ui` command and starts Jig UI, as `npx @fapost/jig-ui` does. If Node.js 24 or
 later is already on your computer, it uses that one and downloads nothing.
 
-Next time, run `jig-ui` — in a Jig project's folder to connect it. Wherever these pages say
+Next time, run `jig-ui` — in a Jig project's folder to connect it. On Windows it is a command of
+Git Bash: run it there, not in PowerShell or the Command Prompt. Wherever these pages say
 `npx @fapost/jig-ui`, run `jig-ui` instead. It takes the same
 [options](#options); Jig UI itself updates as it does through `npx`. Run the line again to update
 Node.js, with Jig UI stopped (`jig-ui stop` if it runs in the background).
 
 | | Windows | macOS and Linux |
 | --- | --- | --- |
-| Node.js | `%LOCALAPPDATA%\jig-ui\node` | `~/.local/share/jig-ui/node` |
+| Node.js | `%LOCALAPPDATA%\jig-ui\node` | `~/.local/share/jig-ui/node` (`$XDG_DATA_HOME/jig-ui/node` when that is set) |
 | The `jig-ui` command | `~/bin/jig-ui` | `~/.local/bin/jig-ui` |
 
 The script changes nothing else: no shell profile, no system setting. If `~/.local/bin` is not on
-your `PATH`, it says so and gives the command's full path. To remove Jig UI, delete those two. To
-pass options on the first start, put them after `bash -s --`, for example
-`… | bash -s -- --no-open`.
+your `PATH`, it says so and gives the command's full path. To pass options on the first start, put
+them after `bash -s --`, for example `… | bash -s -- --no-open`.
+
+To remove Jig UI, delete the two in the table above, and its [config folder](#running-it-in-the-background), which
+holds its token and its list of connected projects; the projects themselves stay where they are. npx keeps the package in `~/.npm/_npx`
+(`%LOCALAPPDATA%\npm-cache\_npx` on Windows); deleting that folder removes it, and every other
+package npx ran, which npx downloads again when it is next asked for.
 
 ## Starting it again
 

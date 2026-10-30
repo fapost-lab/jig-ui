@@ -199,6 +199,7 @@ describe('machineLine', () => {
     expect(machineLine(m({}))).toBeUndefined();
     expect(machineLine(undefined)).toBeUndefined();
     expect(machineBusy(m({}))).toBe(false);
+    expect(machineBusy(undefined)).toBe(true); // not read yet
   });
 
   it('follows Upgrade all through the self-update and each project', () => {

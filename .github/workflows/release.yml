@@ -130,6 +130,8 @@ jobs:
     if: needs.publish.outputs.release != ''
     needs: publish
     uses: ./.github/workflows/installer.yml
+    with:
+      version: ${{ needs.publish.outputs.release }}
 
   # A stable release's GitHub Release carries install.sh: the installation line downloads it from
   # releases/latest. Released from a merge, creating it creates the tag on the merge commit; a tag

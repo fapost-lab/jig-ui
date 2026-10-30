@@ -30,6 +30,7 @@ repo('home/.hidden/hid');
 repo('home/code/node_modules/dep');
 repo('home/Documents/doc');
 repo('home/Library/lib');
+repo('home/AppData/app');
 const worktree = join(root, 'home/code/tree');
 mkdirSync(worktree, { recursive: true });
 writeFileSync(join(worktree, '.git'), 'gitdir: elsewhere\n');
@@ -39,18 +40,32 @@ symlinkSync(join(root, 'home/code'), join(root, 'home/link'), 'junction'); // a 
 
 describe('scanFolder', () => {
   it('finds the main checkouts with Jig, counts the connected ones, and passes over what it must', async () => {
-    expect(await scanFolder(home, options)).toEqual({ found: [deep, app].sort(), connected: 1, skipped: ['Documents'], stopped: false });
+    expect(await scanFolder(home, options)).toEqual({
+      found: [deep, app, join(home, 'AppData/app')].sort(),
+      connected: 1,
+      skipped: ['Documents'],
+      stopped: false,
+    });
   });
 
   it('looks through a folder macOS asks about once it is named, and every folder of a home elsewhere', async () => {
     expect((await scanFolder(join(home, 'Documents'), options)).found).toEqual([join(home, 'Documents/doc')]);
     expect((await scanFolder(home, { ...options, platform: 'linux' })).found).toEqual(
-      [app, deep, join(home, 'Documents/doc'), join(home, 'Library/lib')].sort(),
+      [app, deep, join(home, 'AppData/app'), join(home, 'Documents/doc'), join(home, 'Library/lib')].sort(),
     );
   });
 
+  it("passes over a Windows home's AppData without a word", async () => {
+    expect(await scanFolder(home, { ...options, platform: 'win32' })).toEqual({
+      found: [app, deep, join(home, 'Documents/doc'), join(home, 'Library/lib')].sort(),
+      connected: 1,
+      skipped: [],
+      stopped: false,
+    });
+  });
+
   it('goes as deep and as wide as it is let, and says when it stopped', async () => {
-    expect((await scanFolder(home, { ...options, depth: 2 })).found).toEqual([app]);
+    expect((await scanFolder(home, { ...options, depth: 2 })).found).toEqual([join(home, 'AppData/app'), app].sort());
     expect(await scanFolder(home, { ...options, folders: 1 })).toEqual({ found: [], connected: 0, skipped: ['Documents'], stopped: true });
   });
 

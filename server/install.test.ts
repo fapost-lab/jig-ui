@@ -62,6 +62,17 @@ function fakeNode(major: number): string {
   return `${bin}${delimiter}${SYSTEM_PATH}`;
 }
 
+/** A `uname` naming the given system and machine, and a `cygpath` passing a path through as it is, first on `path`. */
+function fakeSystem(system: string, machine: string, path: string): string {
+  const bin = join(dir, 'fake-system');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'uname'), `#!/bin/sh\nif [ "$1" = -m ]; then echo ${machine}; else echo ${system}; fi\n`);
+  writeFileSync(join(bin, 'cygpath'), '#!/bin/sh\nprintf "%s\\n" "$2"\n');
+  chmodSync(join(bin, 'uname'), 0o755);
+  chmodSync(join(bin, 'cygpath'), 0o755);
+  return `${bin}${delimiter}${path}`;
+}
+
 /** A Node.js and a launcher this script put there earlier; what they hold, to compare after a run. */
 function earlierInstall(): () => [string, string] {
   mkdirSync(join(data, 'node'), { recursive: true });
@@ -143,5 +154,32 @@ describe('install.sh', () => {
     expect(result.stdout.trim()).toBe('npx --yes @fapost/jig-ui --version');
     expect(readFileSync(launcher, 'utf8')).toContain("# Written by Jig UI's install.sh");
     expect(existsSync(data)).toBe(false);
+  });
+
+  // Git's bash.exe puts its own tools, `uname` among them, ahead of the PATH it is given: the stand-in is never asked.
+  it.skipIf(windows)('starts Jig UI with a Node.js 24 already here on a system nodejs.org has no archive for', () => {
+    const result = install(
+      fakeSystem('FreeBSD', 'amd64', fakeNode(MINIMUM_NODE_MAJOR)),
+      pathToFileURL(join(dir, 'nowhere')).href,
+      '--version',
+    );
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout.trim()).toBe('npx --yes @fapost/jig-ui --version');
+  });
+
+  it.skipIf(windows)("asks for the ARM64 archive under Git for Windows' own ARM64 build, and none under Cygwin", () => {
+    const wrong = mirror((_, path) => writeFileSync(path, 'not node'), false);
+    const older = fakeNode(MINIMUM_NODE_MAJOR - 4);
+    const arm = install(fakeSystem('CLANGARM64_NT-10.0-26100', 'aarch64', older), wrong, '--version');
+
+    expect(arm.status, arm.stderr).toBe(1);
+    expect(arm.stderr).toContain("node-v24.99.0-win-arm64.zip does not match nodejs.org's SHA-256 sum");
+
+    rmSync(join(dir, 'fake-system'), { recursive: true });
+    const cygwin = install(fakeSystem('CYGWIN_NT-10.0-19045', 'x86_64', older), wrong, '--version');
+
+    expect(cygwin.status, cygwin.stderr).toBe(1);
+    expect(cygwin.stderr).toContain('no Node.js is published for CYGWIN_NT-10.0-19045 x86_64');
   });
 });

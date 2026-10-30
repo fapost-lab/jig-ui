@@ -384,10 +384,11 @@ export interface ProjectSource {
     | Refusal
   >;
   /**
-   * Looks for Jig projects under a folder, reading folder listings only — no Jig, no git; a path that is not a folder is
-   * refused. The one answer that carries paths: the person named the folder and must recognise what they connect.
+   * Looks for Jig projects under a folder — the home folder of the machine with the projects when none is given —
+   * reading folder listings only — no Jig, no git; a path that is not a folder is refused. The one answer that carries
+   * paths: the person named the folder and must recognise what they connect.
    */
-  scan(folder: string): Promise<
+  scan(folder?: string): Promise<
     | FoundProjects
     | {
         code: 'not-a-folder';

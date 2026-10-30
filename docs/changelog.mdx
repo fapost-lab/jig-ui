@@ -8,6 +8,13 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+- The install line works where a Node.js 24 is already on PATH even on a system nodejs.org publishes no
+  Node.js for, and finds Git for Windows' own ARM64 build. A file Windows still holds open no longer
+  stops it before the `jig-ui` command is written. [Removing Jig UI](/installation#without-nodejs)
+  now names its config folder and npx's copy, and says the command runs in Git Bash on Windows.
+- **Find projects** passes over `AppData` on Windows, as `Library` on macOS, and the docs say so.
+- A project's card opened while the Projects page is still loading offers no **Upgrade…** until the
+  page knows whether an upgrade of every project is already under way.
 - [A task's documents](/projects#task-details) on its full details page: the ones its workspace holds,
   each opened on a click and rendered from its Markdown. Needs Jig 0.39.0 in the project.
 - [Find projects](/projects#connect-a-project) on the Projects page looks for the Jig projects in a folder —

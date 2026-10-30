@@ -32,8 +32,9 @@ maintainer on 2026-10-29.
 ## Decision
 
 - **Find projects** on the Projects page looks through the folder typed in the connect field, or the
-  home folder when it is empty: `POST /api/scan {folder?}` → `ProjectSource.scan(folder)`, walked by
-  `server/source/scan.ts` in the local adapter. A path that is not a folder is refused
+  home folder when it is empty: `POST /api/scan {folder?}` → `ProjectSource.scan(folder?)`, walked by
+  `server/source/scan.ts` in the local adapter, which takes its own home folder when none is typed.
+  A path that is not a folder is refused
   `422 not-a-folder`.
 - A project found is a folder with a `.git` **directory** and Jig's script (`hasJig`). The walk reads
   folder listings only — no Jig, no git, no file opened, nothing written — never walks into a

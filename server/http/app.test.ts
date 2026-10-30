@@ -250,7 +250,7 @@ describe('/api/projects and /api/workspace', () => {
       webRoot,
       source: {
         ...localSource(join(webRoot, 'scan-config')),
-        scan: (f) => Promise.resolve({ folder: (asked = f), found: [], connected: 0, skipped: [], stopped: false }),
+        scan: (f) => Promise.resolve({ folder: (asked = f) ?? '~', found: [], connected: 0, skipped: [], stopped: false }),
       },
     });
     const post = (body: unknown) =>
@@ -259,10 +259,12 @@ describe('/api/projects and /api/workspace', () => {
         headers: { host: HOST, cookie: COOKIE, 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
+    asked = 'unset';
     expect((await post({})).status).toBe(200);
-    expect(asked).toBe(homedir());
+    expect(asked).toBeUndefined();
+    asked = 'unset';
     expect((await post({ folder: '  ' })).status).toBe(200);
-    expect(asked).toBe(homedir());
+    expect(asked).toBeUndefined();
 
     expect(await (await call('POST', '/api/scan', { folder: 'relative' })).json()).toEqual({
       error: { code: 'usage', message: 'Give the absolute path of a folder.' },

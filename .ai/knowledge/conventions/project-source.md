@@ -28,7 +28,7 @@ Why:      a later remote adapter (a connector on the projects' machine) must fit
 ```
 
 ```
-ProjectSource.scan(folder)
+ProjectSource.scan(folder?)
 
 MAY:      list folders under `folder`; tell a main checkout with Jig by its `.git` directory and
           Jig's script
@@ -48,8 +48,8 @@ The port is `ProjectSource` in `server/source/project-source.ts` — the workspa
 (`project(id)`), for a page that lists the projects before their reads land, a project's
 live tasks and the finished ones Jig still keeps (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), a task's documents (`artifacts(id, taskId)`, and one as it
 is written, `artifact(id, taskId, kind)`, read through Jig at each call), its specs
-(`specs(id)`), `readAgain(id)` — the project read through Jig now, for a person's Read again — `scan(folder)`, the
-Jig projects under a folder, by path — connect,
+(`specs(id)`), `readAgain(id)` — the project read through Jig now, for a person's Read again — `scan(folder?)`, the
+Jig projects under a folder — the source's own home folder when none is given — by path — connect,
 disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,
 `prioritise(id, taskId, priority, revision)`, `moveEpic(id, specId, place, revision)` and
 `prioritiseEpic(id, specId, priority, revision)` — a spec's open epic, among the top level of the

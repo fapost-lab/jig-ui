@@ -72,6 +72,9 @@ function project(
       code?: number;
       statusAfter?: unknown;
     };
+    /** What `task artifacts` (once no file `hold-artifacts` is in the project) and `task artifact read` print: an envelope's `data`, or a refusal's code. */
+    artifacts?: unknown;
+    artifact?: unknown;
     /** What `task set` prints on stderr, and its exit code. */
     set?: {
       err?: string;
@@ -97,6 +100,12 @@ function project(
       ? JSON.stringify({ schema: 1, revision: 9, generated_at: 'x', error: { code: write, message: 'refused' } })
       : envelope(write),
   );
+  const answer = (data: unknown) =>
+    typeof data === 'string'
+      ? JSON.stringify({ schema: 1, revision: 9, generated_at: 'x', error: { code: data, message: 'refused' } })
+      : envelope(data);
+  writeFileSync(join(dir, 'artifacts.json'), answer(answers.artifacts ?? { task: 'x', artifacts: [] }));
+  writeFileSync(join(dir, 'artifact.json'), answer(answers.artifact ?? 'not-found'));
   writeFileSync(join(dir, 'plan.json'), typeof answers.plan === 'string' ? answers.plan : envelope(answers.plan ?? {}));
   writeFileSync(join(dir, 'upgrade.json'), typeof answers.upgrade === 'string' ? answers.upgrade : envelope(answers.upgrade ?? {}));
   writeFileSync(join(dir, 'land.json'), typeof answers.land === 'string' ? answers.land : envelope(answers.land ?? {}));
@@ -116,6 +125,8 @@ case "$*" in
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
   "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "task artifacts "*) while [ -f hold-artifacts ]; do sleep 0.05; done; cat artifacts.json; if grep -q '"error"' artifacts.json; then exit 1; fi ;;
+  "task artifact read "*) cat artifact.json; if grep -q '"error"' artifact.json; then exit 1; fi ;;
   "task set "*) cat set.err >&2; exit ${answers.set?.code ?? 0} ;;
   "upgrade --dry-run --json") cat plan.json ;;
   "self-update") while [ -f hold-self ]; do sleep 0.05; done; cat self.out; echo; cat self.err >&2; if [ -f status-after.json ] && [ ${self.code ?? 0} -eq 0 ]; then cp status-after.json status.json; fi; exit ${self.code ?? 0} ;;
@@ -153,6 +164,72 @@ describe('localSource, finding projects', () => {
     const refused = { code: 'not-a-folder', message: 'There is no folder at this path.' };
     expect(await source.scan(join(root, 'nowhere'))).toEqual(refused);
     expect(await source.scan(join(root, 'scan', 'one', 'status.json'))).toEqual(refused);
+  });
+});
+
+describe("localSource, a task's documents", () => {
+  const source = localSource(join(root, 'documents-config'));
+  const row = (kind: string, state: string, reason: string | null = null) => ({
+    kind,
+    state,
+    reason,
+    updated_at: state === 'unavailable' ? null : '2026-10-30T07:00:00Z',
+    bytes: state === 'unavailable' ? null : 7,
+  });
+
+  const live = { tasks: [task('b', 'active')], hidden: 0, housekeeping: null };
+
+  it("lists a task's documents that are there and reads one, through the project's Jig", async () => {
+    const dir = project('documents', '0.39.0', {
+      tasks: live,
+      artifacts: {
+        task: 'b',
+        artifacts: [row('task', 'present'), row('spec', 'missing'), row('handoff', 'unavailable', 'outside workspace')],
+      },
+      artifact: { task: 'b', kind: 'plan', updated_at: '2026-10-30T07:00:00Z', bytes: 7, content: '# Plan\n' },
+    });
+    await source.connect(dir);
+    expect(await source.artifacts('documents', 'b')).toEqual({
+      state: 'ready',
+      artifacts: [
+        { kind: 'task', state: 'present', reason: null, updatedAt: '2026-10-30T07:00:00Z', bytes: 7 },
+        { kind: 'handoff', state: 'unavailable', reason: 'outside workspace', updatedAt: null, bytes: null },
+      ],
+    });
+    expect(await source.artifact('documents', 'b', 'plan')).toEqual({
+      state: 'ready',
+      artifact: { kind: 'plan', updatedAt: '2026-10-30T07:00:00Z', bytes: 7, content: '# Plan\n' },
+    });
+    expect(calls(dir)).toEqual(expect.arrayContaining(['task artifacts b --json', 'task artifact read b plan --json']));
+  });
+
+  it('answers null for a task or a document Jig does not have, and the code of another refusal', async () => {
+    await source.connect(project('documents-none', '0.39.0', { tasks: live, artifacts: 'not-found' }));
+    expect(await source.artifacts('documents-none', 'b')).toEqual({ state: 'ready', artifacts: null });
+    expect(await source.artifact('documents-none', 'b', 'plan')).toEqual({ state: 'ready', artifact: null });
+    await source.connect(project('documents-failed', '0.39.0', { tasks: live, artifact: 'failed' }));
+    expect(await source.artifact('documents-failed', 'b', 'plan')).toEqual({ id: 'documents-failed', state: 'unreadable', code: 'failed' });
+  });
+
+  it('asks no older Jig, and knows no project it does not have', async () => {
+    const dir = project('documents-old', '0.38.1');
+    await source.connect(dir);
+    const unsupported = { id: 'documents-old', state: 'unsupported', jigVersion: '0.38.1', minimum: '0.39.0' };
+    expect(await source.artifacts('documents-old', 'b')).toEqual(unsupported);
+    expect(await source.artifact('documents-old', 'b', 'plan')).toEqual(unsupported);
+    expect(calls(dir).filter((c) => c.startsWith('task artifact'))).toEqual([]);
+    expect(await source.artifacts('nobody', 'b')).toBeUndefined();
+  });
+
+  it('hands Jig only the id of a task the board shows', async () => {
+    const finished = { tasks: [task('b', 'active'), task('done', 'consolidated')], hidden: 0, housekeeping: null };
+    const dir = project('documents-ids', '0.39.0', { tasks: finished, artifacts: { task: 'b', artifacts: [row('task', 'present')] } });
+    await source.connect(dir);
+    for (const id of ['--help', 'done', 'nope']) {
+      expect(await source.artifacts('documents-ids', id)).toEqual({ state: 'ready', artifacts: null });
+      expect(await source.artifact('documents-ids', id, 'plan')).toEqual({ state: 'ready', artifact: null });
+    }
+    expect(calls(dir).filter((c) => c.startsWith('task artifact'))).toEqual([]);
   });
 });
 
@@ -1198,6 +1275,44 @@ describe('localSource, upgrading a project', () => {
     writeFileSync(join(behind, 'go'), '');
     await ended('behind');
     unsubscribe();
+  });
+
+  it("reads no task's documents while the project upgrades, and starts an upgrade once a read under way has ended", async () => {
+    const dir = project('behind-documents', '0.39.0', {
+      status: { attention: [item], housekeeping: null },
+      tasks: { tasks: [task('b', 'active')], hidden: 0, housekeeping: null },
+      artifacts: { task: 'b', artifacts: [] },
+      plan: planned,
+      upgrade: { ...planned, dry_run: false, outcome: 'upgraded', git },
+    });
+    await source.connect(dir);
+    const documents = () => calls(dir).filter((c) => c.startsWith('task artifact')).length;
+    await source.upgrade('behind-documents');
+    expect(await source.artifacts('behind-documents', 'b')).toEqual({ id: 'behind-documents', state: 'unreadable', code: 'upgrading' });
+    expect(await source.artifact('behind-documents', 'b', 'plan')).toEqual({
+      id: 'behind-documents',
+      state: 'unreadable',
+      code: 'upgrading',
+    });
+    expect(documents()).toBe(0);
+    writeFileSync(join(dir, 'go'), '');
+    await ended('behind-documents');
+
+    // A read held in Jig: the upgrade waits for it to end before it runs.
+    rmSync(join(dir, 'go'));
+    writeFileSync(join(dir, 'hold-artifacts'), '');
+    const upgrades = () => calls(dir).filter((c) => c === 'upgrade --json').length;
+    const before = upgrades();
+    const reading = source.artifacts('behind-documents', 'b');
+    await until(() => documents() > 0);
+    expect(await source.upgrade('behind-documents')).toEqual({ state: 'started' });
+    await delay(300);
+    expect(upgrades()).toBe(before);
+    rmSync(join(dir, 'hold-artifacts'));
+    expect(await reading).toEqual({ state: 'ready', artifacts: [] });
+    await until(() => upgrades() > before);
+    writeFileSync(join(dir, 'go'), '');
+    await ended('behind-documents');
   });
 
   it('starts one run for two starts at once, once a write under way has ended, and keeps the project meanwhile', async () => {

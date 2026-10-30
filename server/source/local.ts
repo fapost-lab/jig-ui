@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import {
+  ARTIFACTS_JIG_VERSION,
   cancelPause,
   closeTask,
   fileTask,
@@ -15,6 +16,8 @@ import {
   moveInQueue,
   planUpgrade,
   type QueueItem,
+  readArtifact,
+  readArtifacts,
   readQueue,
   readSpecs,
   readStatus,
@@ -298,7 +301,7 @@ interface Entry {
   news: boolean;
   /** The upgrade started from the page, kept until dismissed or the next one starts. */
   upgrade?: UpgradeRun;
-  /** The writes under way: an upgrade starts once they have ended. */
+  /** The writes, and the reads of a task's documents, under way: an upgrade starts once they have ended. */
   writes: Set<Promise<void>>;
   /**
    * The pull request the page's last upgrade left open, kept until a landing brings it here: before housekeeping hears
@@ -746,6 +749,53 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     return written;
   }
 
+  /**
+   * Reads a task's documents through the project's Jig in its main checkout, which finds a worktree task's workspace
+   * itself — on demand, as the board's read holds none. `null` for a task not live in the last read, or a document Jig
+   * does not have; a Jig older than 0.39.0 answers `unsupported`, with that version as its minimum. While the project
+   * upgrades it runs no Jig there (`unreadable`, `upgrading`), and an upgrade waits for a read under way.
+   */
+  async function documents<T>(
+    id: string,
+    taskId: string,
+    read: (root: string) => Promise<T>,
+  ): Promise<
+    | {
+        state: 'ready';
+        read: T | null;
+      }
+    | Exclude<ProjectView, { state: 'ready' }>
+    | undefined
+  > {
+    const project = (await readProjects(configDir)).find((p) => p.id === id);
+    if (!project) return undefined;
+    const { view, details } = await shown(project);
+    if (view.state !== 'ready') return view;
+    const { jigVersion } = view;
+    if (!supports(jigVersion, ARTIFACTS_JIG_VERSION)) return { id, state: 'unsupported', jigVersion, minimum: ARTIFACTS_JIG_VERSION };
+    // Only a live task's id reaches Jig, never one the address made up (`--help`).
+    if (!details.some((t) => t.id === taskId)) return { state: 'ready', read: null };
+    const entry = entryOf(project);
+    // Jig replaces its own scripts while it upgrades (adr-20261027-upgrading-a-project-runs-in-the-background).
+    if (entry.upgrade?.state === 'running') return { id, state: 'unreadable', code: 'upgrading' };
+    const run = read(project.path);
+    const held = run.then(
+      () => {},
+      () => {},
+    );
+    entry.writes.add(held);
+    try {
+      return { state: 'ready', read: await run };
+    } catch (error) {
+      if (error instanceof JigRefusal && error.code === 'not-found') return { state: 'ready', read: null };
+      if (error instanceof JigShapeError) return { id, state: 'incompatible', jigVersion };
+      // Only the code goes on: Jig's message may name a path.
+      return { id, state: 'unreadable', code: error instanceof JigRefusal ? error.code : 'failed' };
+    } finally {
+      entry.writes.delete(held);
+    }
+  }
+
   /** A project as the workspace shows it: what its read says, and the upgrade started from the page. */
   const listed = async (project: Project): Promise<WorkspaceProject> => {
     const read = await shown(project);
@@ -797,6 +847,14 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       const read = await shown(project);
       if (read.tasks.state !== 'ready') return read.tasks;
       return { state: 'ready', task: read.details.find((t) => t.id === taskId) ?? null };
+    },
+    async artifacts(id, taskId) {
+      const answer = await documents(id, taskId, (root) => readArtifacts(root, taskId));
+      return answer?.state === 'ready' ? { state: 'ready', artifacts: answer.read } : answer;
+    },
+    async artifact(id, taskId, kind) {
+      const answer = await documents(id, taskId, (root) => readArtifact(root, taskId, kind));
+      return answer?.state === 'ready' ? { state: 'ready', artifact: answer.read && { ...answer.read, kind } } : answer;
     },
     async specs(id) {
       const project = (await readProjects(configDir)).find((p) => p.id === id);

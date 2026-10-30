@@ -30,9 +30,12 @@ are added as sections of this file.
   by `server/install.test.ts` and the Installer workflow.)
 - The API and the page name connected projects by id; no path reaches `web/` but Find projects'
   answer — the folder it looked through and what it found there, under the folder the person named,
-  with `~` for the home folder.
-  (adr-20261014-project-source-port-keeps-hosting-open, adr-20261029-finding-projects-shows-their-paths.
-  Checked by tests on the API responses.)
+  with `~` for the home folder — and a task's documents, whose content is shown as its authors wrote it.
+  (adr-20261014-project-source-port-keeps-hosting-open, adr-20261029-finding-projects-shows-their-paths,
+  adr-20261030-a-task-document-is-shown-as-written. Checked by tests on the API responses.)
+- `v-html` takes only what `rendered()` in `web/lib/markdown.ts` gives: Markdown cleaned by DOMPurify.
+  (adr-20261030-a-task-document-is-shown-as-written. Checked in review; `web/lib/markdown.test.ts`
+  pins that every rendering goes through DOMPurify.)
 - The server binds 127.0.0.1 unless a guard other than the local token is in place, refuses a
   foreign `Host` or `Origin`, and refuses every API call without the token.
 - `jig-ui stop` never signals a pid read from `instance.json` on its own word: it asks the instance

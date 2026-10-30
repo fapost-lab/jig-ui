@@ -1,6 +1,7 @@
-import type { Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade } from '../jig/client.js';
+import type { Artifact, ArtifactKind, Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade } from '../jig/client.js';
 
-export type { Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade };
+export type { Artifact, ArtifactKind, Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade };
+export { ARTIFACT_KINDS } from '../jig/client.js';
 export { RegistryUnreadable } from '../registry/projects.js';
 
 /** A project's live tasks by where they stand. */
@@ -284,6 +285,30 @@ export type ProjectTask =
     }
   | Exclude<ProjectView, { state: 'ready' }>;
 
+/**
+ * A task's documents that are there, in Jig's order, `null` when Jig has no task of that id; or why they cannot be
+ * listed — a project whose Jig is older than 0.39.0 is `unsupported`, with 0.39.0 as its minimum.
+ */
+export type TaskArtifacts =
+  | {
+      state: 'ready';
+      artifacts: Artifact[] | null;
+    }
+  | Exclude<ProjectView, { state: 'ready' }>;
+
+/** One of a task's documents as it is written, `null` when the task or the document is not there; or why it cannot be read. */
+export type TaskArtifact =
+  | {
+      state: 'ready';
+      artifact: {
+        kind: ArtifactKind;
+        updatedAt: string | null;
+        bytes: number | null;
+        content: string;
+      } | null;
+    }
+  | Exclude<ProjectView, { state: 'ready' }>;
+
 /** A spec with its open epic's place in Jig's queue: `null` without an open epic, or with one not queued. */
 export type ShownSpec = Spec & {
   queue: {
@@ -373,6 +398,10 @@ export interface ProjectSource {
   tasks(id: string): Promise<ProjectTasks | undefined>;
   /** One live task of a connected project; `undefined` when no project has that id. */
   task(id: string, taskId: string): Promise<ProjectTask | undefined>;
+  /** A task's documents, read through the project's Jig at each call; `undefined` when no project has that id. */
+  artifacts(id: string, taskId: string): Promise<TaskArtifacts | undefined>;
+  /** One of a task's documents as it is written, read through the project's Jig; `undefined` when no project has that id. */
+  artifact(id: string, taskId: string, kind: ArtifactKind): Promise<TaskArtifact | undefined>;
   /** A connected project's specs with their roadmaps; `undefined` when no project has that id. */
   specs(id: string): Promise<ProjectSpecs | undefined>;
   /** Reads a connected project through Jig now, as a person's Read again asks; `undefined` when no project has that id. */

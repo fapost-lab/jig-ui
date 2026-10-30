@@ -1,11 +1,22 @@
 <script setup lang="ts">
   import { ArrowLeft } from '@lucide/vue';
   import { computed, onUnmounted, ref } from 'vue';
-  import { onChange, readAgain, readTask, type TaskDetails } from '@/api';
+  import {
+    type ArtifactKind,
+    onChange,
+    readAgain,
+    readArtifact,
+    readArtifacts,
+    readTask,
+    type TaskArtifact,
+    type TaskArtifacts,
+    type TaskDetails,
+  } from '@/api';
   import ActionList from '@/components/ActionList.vue';
   import AttentionItem from '@/components/AttentionItem.vue';
   import CopyButton from '@/components/CopyButton.vue';
   import StateLine from '@/components/StateLine.vue';
+  import TaskDocuments from '@/components/TaskDocuments.vue';
   import TaskFacts from '@/components/TaskFacts.vue';
   import { Badge } from '@/components/ui/badge';
   import { lastWins } from '@/lib/last-wins';
@@ -34,9 +45,56 @@
     if (read) await load();
   }
 
+  /** The task's documents Jig lists, and each one open: being read, read, or gone. */
+  const documents = ref<TaskArtifacts | 'not-connected' | 'not-found'>();
+  const open = ref<Partial<Record<ArtifactKind, TaskArtifact | 'reading' | 'not-found'>>>({});
+  const listing = ref(false);
+
+  const list = lastWins(
+    () => readArtifacts(props.project, props.task),
+    (read) => (documents.value = read),
+  );
+
+  /** Each open document's reads, the latest landing: a change can start one while another is under way. */
+  const reads = new Map<ArtifactKind, () => Promise<unknown>>();
+  function readDocument(kind: ArtifactKind): Promise<unknown> {
+    let read = reads.get(kind);
+    if (!read) {
+      read = lastWins(
+        () => readArtifact(props.project, props.task, kind),
+        (answer) => kind in open.value && (open.value[kind] = answer),
+      );
+
+      reads.set(kind, read);
+    }
+    return read();
+  }
+
+  async function toggle(kind: ArtifactKind, opened: boolean): Promise<void> {
+    if (!opened) {
+      delete open.value[kind];
+      return;
+    }
+    open.value[kind] = 'reading';
+    await readDocument(kind);
+  }
+
+  async function relist(): Promise<void> {
+    listing.value = true;
+    await list();
+    listing.value = false;
+  }
+
   const note = computed(() => (typeof details.value === 'object' && details.value.state === 'ready' ? waits(details.value) : undefined));
 
-  onUnmounted(onChange((project) => (project === undefined || project === props.project) && void load()));
+  onUnmounted(
+    onChange((project) => {
+      if (project !== undefined && project !== props.project) return;
+      void load();
+      void list();
+      for (const kind of Object.keys(open.value) as ArtifactKind[]) void readDocument(kind);
+    }),
+  );
 </script>
 
 <template>
@@ -62,6 +120,15 @@
       <p v-if="details.goal">{{ details.goal }}</p>
       <p v-if="note" :class="toneRule[note.tone]">{{ note.text }}</p>
       <TaskFacts :details="details" class="border-y py-3" />
+
+      <TaskDocuments
+        v-if="documents !== 'not-connected' && documents !== 'not-found'"
+        :documents="documents"
+        :open="open"
+        :reading="listing"
+        @toggle="toggle"
+        @read-again="relist"
+      />
 
       <section v-if="details.attention.length > 0" aria-labelledby="needs-you" class="flex flex-col gap-3">
         <h2 id="needs-you" class="font-semibold tracking-wider uppercase">Needs you</h2>

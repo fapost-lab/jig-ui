@@ -8,7 +8,7 @@ paths:
   - server/source/local.ts
   - web/api.ts
 summary: Why the page follows projects by watching .ai/ and re-reading through Jig, what is ignored, and the measured debounce
-reviewed_at: 2026-10-18
+reviewed_at: 2026-10-30
 ---
 # Live updates
 
@@ -20,7 +20,9 @@ read differs from what the page was shown. `GET /api/events` streams that signal
 changed, revision R"); the page re-fetches what it shows (`onChange` in `web/api.ts`), and
 everything after the stream reconnects. The stream's `open` is also the page's first read: a view
 reads nothing on mount. While followed, reads are answered from the last read, so
-re-fetches and extra tabs run no Jig.
+re-fetches and extra tabs run no Jig — except a task's documents, which the read does not hold: the
+task page lists them, and reads each open one, through Jig again on each change
+(adr-20261030-a-task-document-is-shown-as-written).
 
 ## Why
 

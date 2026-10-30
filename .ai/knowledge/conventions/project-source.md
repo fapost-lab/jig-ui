@@ -20,7 +20,8 @@ MAY:      read a project's tasks, specs, attention items and legal actions; subs
           "project changed, revision R"; send a command with the revision it was based on
 MUST:     name projects by id; return typed data, never Jig's raw output; report a refusal by
           Jig's failure code; keep the last good read when a read fails mid-write
-MUST NOT: expose a path, a file or a child process to its callers — but `scan`'s findings, below;
+MUST NOT: expose a path, a file or a child process to its callers — but `scan`'s findings, below,
+          and a task's documents as written (adr-20261030-a-task-document-is-shown-as-written);
           write a project file; compute a board column or a legal action itself
 Why:      a later remote adapter (a connector on the projects' machine) must fit behind the
           same port; anything a caller learns about directories or processes breaks that.
@@ -45,7 +46,8 @@ Callers (`board/`, and `http/` for task details and the change stream) depend on
 The port is `ProjectSource` in `server/source/project-source.ts` — the workspace, the connected ids
 (`connected()`, read from the registry without running Jig) and one project as the workspace shows it
 (`project(id)`), for a page that lists the projects before their reads land, a project's
-live tasks and the finished ones Jig still keeps (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), its specs
+live tasks and the finished ones Jig still keeps (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), a task's documents (`artifacts(id, taskId)`, and one as it
+is written, `artifact(id, taskId, kind)`, read through Jig at each call), its specs
 (`specs(id)`), `readAgain(id)` — the project read through Jig now, for a person's Read again — `scan(folder)`, the
 Jig projects under a folder, by path — connect,
 disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,
@@ -88,8 +90,9 @@ the adapter's memory on the project's entry and goes out on the workspace read a
 listeners hear it at the start and at the end. Those reasons, the plan's `wouldStop` and the
 `manualSteps` of a plan or a run are Jig's own text, and JigClient has cut their paths. While it runs the adapter runs no other Jig in the
 project: a read is skipped and the last one stays — kept by `stop()` too, so a new subscription does
-not read it — and a write is `refused: upgrading` without Jig; the run itself starts once the reads
-and writes under way have ended. `disconnect` answers `upgrading` meanwhile. Upgrade starts and
+not read it —, a task's documents answer `unreadable: upgrading` and a write `refused: upgrading`,
+both without Jig; the run itself starts once the reads, the document reads and the writes under way
+have ended. `disconnect` answers `upgrading` meanwhile. Upgrade starts and
 disconnects run one at a time, so of two sent at once the second finds what the first did. It reads
 the project once the run ends (adr-20261027-upgrading-a-project-runs-in-the-background).
 

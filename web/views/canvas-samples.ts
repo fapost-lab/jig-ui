@@ -1,5 +1,5 @@
 // Sample data for the canvas: every state a component shows, in the shapes of api.ts.
-import type { Attention, Column, Project, ReadyDetails, Spec, SpecItem, Task, UpgradePlan } from '@/api';
+import type { Attention, Column, Project, ReadyDetails, Spec, SpecItem, Task, TaskArtifact, TaskArtifacts, UpgradePlan } from '@/api';
 import type { FinishedTask } from '@/lib/finished';
 import type { PlanState, UpgradeRun } from '@/lib/upgrade';
 
@@ -411,3 +411,46 @@ export const epics: Spec[] = [
   { ...specs[1]!, id: 'exports', title: 'Exports', queue: { position: 300, priority: 4 } },
   { ...specs[1]!, id: 'payouts', title: 'Payouts', queue: null },
 ];
+
+const hourAgo = new Date(Date.now() - 3_600_000).toISOString();
+
+/** A task's documents: written ones, an empty one, one Jig cannot read. */
+export const documents: TaskArtifacts = {
+  state: 'ready',
+  artifacts: [
+    { kind: 'task', state: 'present', reason: null, updatedAt: hourAgo, bytes: 1749 },
+    { kind: 'design', state: 'present', reason: null, updatedAt: hourAgo, bytes: 5288 },
+    { kind: 'plan', state: 'present', reason: null, updatedAt: hourAgo, bytes: 2140 },
+    { kind: 'verification', state: 'empty', reason: null, updatedAt: hourAgo, bytes: 0 },
+    { kind: 'handoff', state: 'unavailable', reason: 'outside workspace', updatedAt: null, bytes: null },
+  ],
+};
+
+/** The design open, as Markdown with what a document carries: headings, a list, code, a table, a quote. */
+export const openDocument: TaskArtifact = {
+  state: 'ready',
+  kind: 'design',
+  updatedAt: hourAgo,
+  bytes: 5288,
+  content: [
+    '# Design — task-artifacts',
+    '',
+    '## What changes',
+    '',
+    "A task's full details page gets a **Documents** section, each one opened on a click.",
+    '',
+    '- `readArtifacts(root, task)` runs `jig task artifacts <task> --json`',
+    '- `readArtifact(root, task, kind)` runs `jig task artifact read <task> <kind> --json`',
+    '',
+    '```ts',
+    "export const ARTIFACTS_JIG_VERSION = '0.39.0';",
+    '```',
+    '',
+    '| state | listed |',
+    '| --- | --- |',
+    '| present | yes |',
+    '| missing | no |',
+    '',
+    '> A document shows the paths its authors wrote.',
+  ].join('\n'),
+};

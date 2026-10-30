@@ -6,7 +6,7 @@ domains: []
 paths:
   - "web/**"
 summary: MAY/MUST/MUST NOT for web/ layers (views → components → components/ui), styling, lib decisions with tests, and the canvas
-reviewed_at: 2026-10-25
+reviewed_at: 2026-10-30
 ---
 # The page in Vue
 
@@ -35,6 +35,8 @@ views/ and App.vue
 MUST:     be the only callers of call(), client and onChange()
 ```
 
+- `v-html` only for what `rendered()` (`lib/markdown.ts`) gives — Markdown cleaned by DOMPurify —
+  with an `eslint-disable-next-line vue/no-v-html` naming it (adr-20261030-a-task-document-is-shown-as-written).
 - Styling is Tailwind utilities and the theme's tokens (`bg-background`, `text-muted-foreground`…);
   no `<style>` blocks. A colour that means something comes from `lib/tones.ts` only.
 - Variants go through class-variance-authority, as shadcn-vue's own do.

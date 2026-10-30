@@ -14,6 +14,8 @@ import {
   MIN_JIG_VERSION,
   moveInQueue,
   planUpgrade,
+  readArtifact,
+  readArtifacts,
   readQueue,
   readSpecs,
   readStatus,
@@ -489,6 +491,44 @@ describe('resuming a task', () => {
     ['queue-stale.json', 'stale-revision'],
   ])('carries the refusal in %s as %s', async (json, code) => {
     await expect(resumeTask(answering(`case-${cases++}`, json, 1), 'beta', 1)).rejects.toEqual(refusal(code));
+  });
+});
+
+// task-artifact*.json are what Jig 0.39.0 printed in this project; task-artifacts.json with an empty document and one
+// out of the workspace put in, in the shape its lib/task.sh prints.
+describe("a task's documents", () => {
+  it('lists the ones that are there, in Jig order, an unavailable one with its reason', async () => {
+    const dir = logging(`case-${cases++}`, 'task-artifacts.json');
+    expect(await readArtifacts(dir, 'task-artifacts')).toEqual([
+      { kind: 'task', state: 'present', reason: null, updatedAt: '2026-10-30T06:59:36Z', bytes: 1749 },
+      { kind: 'discovery', state: 'present', reason: null, updatedAt: '2026-10-30T06:57:46Z', bytes: 1993 },
+      { kind: 'design', state: 'present', reason: null, updatedAt: '2026-10-30T06:59:35Z', bytes: 5288 },
+      { kind: 'verification', state: 'empty', reason: null, updatedAt: '2026-10-30T07:10:00Z', bytes: 0 },
+      { kind: 'handoff', state: 'unavailable', reason: 'outside workspace', updatedAt: null, bytes: null },
+    ]);
+    expect(args(dir)).toEqual(['task', 'artifacts', 'task-artifacts', '--json']);
+  });
+
+  it('leaves out a kind it does not know, and refuses a state it does not', async () => {
+    const later = changed('task-artifacts.json', (d) => (d.artifacts[0].kind = 'retrospective'));
+    expect((await readArtifacts(answering(`case-${cases++}`, later), 'x')).map((a) => a.kind)).not.toContain('retrospective');
+    const odd = changed('task-artifacts.json', (d) => (d.artifacts[0].state = 'stale'));
+    await expect(readArtifacts(answering(`case-${cases++}`, odd), 'x')).rejects.toBeInstanceOf(JigShapeError);
+  });
+
+  it('reads one as it is written', async () => {
+    const dir = logging(`case-${cases++}`, 'task-artifact-read.json');
+    const read = await readArtifact(dir, 'task-artifacts', 'discovery');
+    expect(read).toMatchObject({ kind: 'discovery', updatedAt: '2026-10-30T06:57:46Z', bytes: 1993 });
+    expect(read.content).toMatch(/^# Discovery — task-artifacts\n\nRe-classified T2 → T3/);
+    expect(args(dir)).toEqual(['task', 'artifact', 'read', 'task-artifacts', 'discovery', '--json']);
+  });
+
+  it('carries not-found for a document not there and for a task Jig does not know', async () => {
+    await expect(readArtifact(answering(`case-${cases++}`, 'task-artifact-missing.json', 1), 'x', 'spec')).rejects.toEqual(
+      refusal('not-found'),
+    );
+    await expect(readArtifacts(answering(`case-${cases++}`, 'task-artifacts-unknown.json', 1), 'x')).rejects.toEqual(refusal('not-found'));
   });
 });
 

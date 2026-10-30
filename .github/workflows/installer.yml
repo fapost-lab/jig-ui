@@ -30,6 +30,23 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # npm serves a version a minute or two after publishing it: npx would start the `latest` before.
+      # Asked as npx asks, for the abbreviated document, which npm's CDN caches apart from the full one.
+      - name: Wait until npm serves the released version as latest
+        if: inputs.version
+        shell: bash
+        env:
+          RELEASED: ${{ inputs.version }}
+        run: |
+          for _ in $(seq 20); do
+            latest=$(curl -fsS -H 'Accept: application/vnd.npm.install-v1+json' https://registry.npmjs.org/@fapost%2fjig-ui |
+              node -p "JSON.parse(require('fs').readFileSync(0, 'utf8'))['dist-tags'].latest") || latest=
+            [ "$latest" = "$RELEASED" ] && exit 0
+            echo "npm serves ${latest:-nothing} as latest, not $RELEASED yet"
+            sleep 15
+          done
+          echo "::error::npm still serves ${latest:-nothing} as latest after five minutes, not $RELEASED."
+          exit 1
       - name: Install with no Node.js on PATH, then ask Jig UI its version
         shell: bash
         env:

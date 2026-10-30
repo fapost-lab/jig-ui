@@ -7,7 +7,7 @@ publishing (OIDC). There is no npm token in the repository secrets.
 
 - **A merge to `main` that changes `version` in `package.json` to a stable one** (no `-`)
   publishes that version under `latest`, runs `install.sh` on
-  Linux, macOS and Windows against it (`installer.yml`), and then creates its GitHub Release
+  Linux, macOS and Windows against it (`installer.yml`, once npm serves it as `latest`), and then creates its GitHub Release
   carrying `install.sh`, which creates the tag `v<version>` on the merge commit. The line in
   `docs/installation.mdx` downloads the script from the latest release.
 - **Any other merge to `main`** publishes `<major>.<minor>.<patch + 1>-next.<run number>` under the

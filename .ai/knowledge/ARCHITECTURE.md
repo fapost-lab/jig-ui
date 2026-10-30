@@ -126,10 +126,13 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `jig-ui` command that runs `npx @fapost/jig-ui` with that Node.js, so the package updates as it
   does for npx and running the line again updates Node.js. It runs from a terminal, Git Bash on
   Windows; what it may write is a rule in `RULES.md`.
-- **Release flow.** A merge to `main` runs the CI matrix, builds `dist/` in a job without
-  credentials, and publishes `<version>-next.<run>` under npm's `next` tag; a `v*` tag on a
-  commit of `main` publishes `latest`, runs `install.sh` on each OS against it, and then creates
-  the GitHub Release that carries `install.sh`. Details in `RELEASING.md`.
+- **Release flow.** A merge to `main` runs the CI matrix and builds `dist/` in a job without
+  credentials. A merge that changes `version` in `package.json` to a stable one releases
+  it: publishes it under `latest`, runs `install.sh` on each OS against it, and then
+  creates the GitHub Release that carries `install.sh`, which creates the tag on the merge commit.
+  Any other merge publishes `<next patch>-next.<run>` under `next`, which sorts after the latest
+  release. A `v*` tag pushed by hand on a commit of `main` still releases its version; a version
+  already on npm is not published again, so a failed release run is re-run. Details in `RELEASING.md`.
 
 ## Intended — not built yet
 

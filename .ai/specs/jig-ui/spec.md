@@ -212,14 +212,16 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
   checks.
 - Phase 4 comes from a colleague's use of 0.5.0, relayed by the maintainer (2026-10-30): sorting and
   filters, a settings dialog, deciding knowledge from the page, and the project card's buttons; the
-  maintainer added search, a "needs me" filter and closing a task, on the agent's proposal. The task
-  documents the colleague also asked for shipped in 0.5.0. Phase 4 was cut at depth easy: the agent
+  maintainer added search on the agent's proposal. The task documents the colleague also asked for
+  shipped in 0.5.0. Phase 4 was cut at depth easy: the agent
   took the reversible decisions below as assumptions, and the maintainer accepted them.
 - Sorting and filtering the board are a view: they change nothing in Jig and keep nothing but the
-  page's address. The queue's order stays the default, being the order agents follow. "Needs me" is
-  the tasks Jig's attention items name, not a rule of Jig UI's own. Rejected: a sort written to the
-  queue — the order is a person's decision, a sort is a look at it. Rejected: a sort per column — the
-  colleague asked for one for all.
+  page's address. The queue's order stays the default, being the order agents follow. Rejected: a sort
+  written to the queue — the order is a person's decision, a sort is a look at it. Rejected: a sort
+  per column — the colleague asked for one for all. Rejected (maintainer, 2026-10-30, task
+  `board-sort-filter`): a "needs me" filter, which the agent proposed — the board's first column,
+  Needs you, is that already, read from a task's state; from Jig's attention items, as first written
+  here, a ready task would sit there whenever `agent.git` is `none`, the reason feature-board gives.
 - Settings are read and written only through `jig config`. The project's part, `.ai/config.yaml`, is
   committed and shared, so it is read-only until Jig can change it the way fapost-lab/jig#362 asks for
   a roadmap — committed on a branch of its own, never in the person's checkout; the person's part,
@@ -230,8 +232,10 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
   (adr-20261030-a-task-document-is-shown-as-written); the invariant naming what reaches `web/` gains
   knowledge documents in that item's task, by an ADR. A decision is Jig's command; Jig UI never edits
   a document's frontmatter.
-- Closing a task is the person's yes that Jig waits for (`jig-consolidate` §6), so the page offers it
-  only when Jig's `close` action is offered, and otherwise shows Jig's reason.
+- Closing a task from the page was proposed by the agent for Phase 4 and found built already: a ready
+  card's ✕ (task `close-ready-task`, adr-20261029-close-a-ready-task-from-the-board), which checks the
+  revision by a read before Jig's `task set`. The item narrows to passing the revision to Jig once
+  fapost-lab/jig#365 is released (maintainer, 2026-10-30).
 - The project's name on its card opens its board, and what a person does rarely — Settings,
   Disconnect — moves into a ⋯ menu (the colleague, 2026-10-30, who left the exact place open "to
   play with"); the Board button stays, as the action people look for.

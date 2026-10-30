@@ -10,7 +10,7 @@ paths:
   - web/components/QueueMenu.vue
   - server/board/columns.ts
 summary: Queue order by native HTML5 drag and drop, drops only where one jig queue move lands, and a card menu as the one-press alternative; the page copies Jig's level order
-reviewed_at: 2026-10-26
+reviewed_at: 2026-10-30
 ---
 # The page drags with the browser's own drag and drop, and a card menu is its one-press alternative
 
@@ -36,6 +36,10 @@ single-pointer alternative to every drag. Decided at the design gate, 2026-10-22
 - Every card has a "⋯" menu (Reka `DropdownMenu`): To top, Up, Down, To bottom, and the priority
   P0–P5 or none. Up and Down are computed by the same placement rule. The menu also asks or
   takes back a pause, and resumes a paused task (tasks `pause-request`, `resume-from-page`).
+  *(Amended by task `board-sort-filter`, 2026-10-30: on a board sorted other than by the queue a card
+  offers no move within its column — no drop, and no To top, Up, Down or To bottom in the menu —
+  since its place there is not the queue's; on a filtered board the moves stay, among the cards
+  shown.)*
 
 ## Alternatives
 

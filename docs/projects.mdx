@@ -195,6 +195,22 @@ sees merged, stays. The history of finished work is the project's merged pull re
 groups of one-line rows, each group folding away; **Specs** shows the project's specs
 ([Specs](#specs)). The browser remembers the choice.
 
+## Sorting and finding tasks
+
+The bar above Board and List sorts and filters every column at once; it changes nothing in the
+project.
+
+- **Sort**: **Queue** — the order of the project's queue, the one agents follow — is the default.
+  **Priority** puts P0 first and tasks with no priority last; **Class** puts T0 first and
+  unclassified tasks last. Tasks that tie keep the queue's order.
+- **Class** and **Priority** show only the tasks of the classes or priorities you tick; **None** is
+  a task with no class, or no priority. Nothing ticked shows them all.
+- **Find a task** keeps the tasks whose id or goal holds the text, in any case.
+
+While a filter is on, the bar says how many of the project's tasks are shown, and **Clear** shows
+them all again. The sort and the filters are part of the page's address: a reload keeps them, and a
+link to the board with them opens it the same way.
+
 ## Filing a task
 
 **New task** above the board opens a form: an id and a goal of one line. **File it** runs
@@ -218,6 +234,11 @@ queued tasks first, then the ones not queued yet, in Jig's order. Agents see the
   put it there — for example inside the run of tasks on another epic.
 - **The ⋯ menu** on a card or row does the same without a mouse: **To top**, **Up**, **Down**,
   **To bottom**, and **Priority** from P0 to P5, or none (`jig queue set --priority`).
+
+On a board sorted by **Priority** or **Class** a card is not dragged within its column and its
+menu has no **To top**, **Up**, **Down** or **To bottom**: its place there is not the queue's.
+Sort by **Queue** to order the work. A filter keeps both: a card moves among the cards shown,
+and **To top** or **To bottom** past the hidden ones too.
 
 A queue starts empty: a task joins it the first time it is moved, so the first card you drag
 goes to the top of the queue or right after the last queued task above it.

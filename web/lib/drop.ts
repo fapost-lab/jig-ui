@@ -28,8 +28,11 @@ export function useDrop(onMove: (task: string, place: Place) => void, onPause: (
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
   }
 
-  /** On `dragover` of the list's element; its cards are the children marked `data-card`, in `cards`' order. */
-  function over(event: DragEvent, list: string, cards: Task[]): void {
+  /**
+   * On `dragover` of the list's element; its cards are the children marked `data-card`, in `cards`' order. Without
+   * `cards` — a board sorted other than by Jig's queue — the list allows no drop of its own cards.
+   */
+  function over(event: DragEvent, list: string, cards?: Task[]): void {
     const d = dragged.value;
     if (!d) return;
     if (d.list !== list) {
@@ -38,6 +41,7 @@ export function useDrop(onMove: (task: string, place: Place) => void, onPause: (
       event.preventDefault(); // allows the drop here
       return;
     }
+    if (!cards) return;
     const items = [...(event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[data-card]')];
     const below = items.findIndex((el) => {
       const box = el.getBoundingClientRect();

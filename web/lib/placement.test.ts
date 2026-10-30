@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Task } from '../api';
-import { placement, step } from './placement';
+import { ends, placement, step } from './placement';
 
 const task = (id: string, level?: string | null, position = 100): Task => ({
   id,
@@ -63,5 +63,23 @@ describe('step', () => {
     expect(step(column, 'q1', 1)).toEqual({ after: 'q2' });
     expect(step(column, 'q1', -1)).toBeUndefined();
     expect(step(column, 'l2', 1)).toBeUndefined();
+  });
+});
+
+describe('ends', () => {
+  it.each([
+    ['the first queued card goes no higher', 'q1', false, { top: false, bottom: true }],
+    ['a card not queued can join the top, even first', 'l1', false, { top: true, bottom: true }],
+    ['the last queued card of the column goes no lower', 'q2', false, { top: true, bottom: false }],
+    ['among the cards a filter shows, hidden ones may be beyond either end', 'q1', true, { top: true, bottom: true }],
+  ])('%s', (_, id, filtered, offered) => {
+    const shown = id === 'q2' ? column.slice(0, 2) : id === 'l1' ? [column[3]!, column[4]!] : column;
+    expect(
+      ends(
+        shown,
+        shown.find((t) => t.id === id)!,
+        filtered,
+      ),
+    ).toEqual(offered);
   });
 });

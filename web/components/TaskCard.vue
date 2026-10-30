@@ -19,6 +19,10 @@
     details?: ReadyDetails | 'unavailable';
     /** The task's column, for its queue menu; without it the card has none. */
     cards?: Task[];
+    /** The board is sorted other than by Jig's queue: the menu offers no move. */
+    sorted?: boolean;
+    /** `cards` are only those a filter shows. */
+    filtered?: boolean;
     /** A change of its place, priority or pause is on its way to Jig. */
     busy?: boolean;
     /** It changed between the board a refused change was made on and the board read after it. */
@@ -57,7 +61,8 @@
       <QueueMenu
         v-if="cards"
         :task="task"
-        :cards="cards"
+        :cards="sorted ? undefined : cards"
+        :filtered="filtered"
         :disabled="busy"
         @move="(place) => $emit('move', place)"
         @prioritise="(p) => $emit('prioritise', p)"

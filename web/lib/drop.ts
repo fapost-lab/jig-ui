@@ -41,7 +41,10 @@ export function useDrop(onMove: (task: string, place: Place) => void, onPause: (
       event.preventDefault(); // allows the drop here
       return;
     }
-    if (!cards) return;
+    if (!cards) {
+      gap.value = undefined; // a gap left by another list would shade it
+      return;
+    }
     const items = [...(event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[data-card]')];
     const below = items.findIndex((el) => {
       const box = el.getBoundingClientRect();

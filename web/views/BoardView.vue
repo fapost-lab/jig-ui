@@ -19,7 +19,7 @@
   import { movable } from '@/lib/epics';
   import { lastWins } from '@/lib/last-wins';
   import { closeRefusal, refusal } from '@/lib/refusal';
-  import { filtered, fromQuery, sift, type Sift, toQuery } from '@/lib/sift';
+  import { filtered, fromQuery, reorders, sift, type Sift, toQuery } from '@/lib/sift';
   import { toneText } from '@/lib/tones';
 
   const props = defineProps<{
@@ -129,6 +129,8 @@
   );
 
   const shownCount = computed(() => sifted.value.reduce((n, c) => n + c.cards.length, 0));
+
+  const sorted = computed(() => !reorders(sifting.value));
 
   /**
    * The task whose change is on its way to Jig, and what the last change came to when Jig refused it — with the cards
@@ -327,7 +329,7 @@
       v-else-if="view === 'board'"
       :project="id"
       :columns="sifted"
-      :sorted="sifting.sort !== 'queue'"
+      :sorted="sorted"
       :filtered="filtered(sifting)"
       :selected="selected"
       :details="details"
@@ -367,7 +369,7 @@
       v-else
       :project="id"
       :columns="sifted"
-      :sorted="sifting.sort !== 'queue'"
+      :sorted="sorted"
       :filtered="filtered(sifting)"
       :selected="selected"
       :details="details"

@@ -45,6 +45,9 @@ export function toQuery({ sort, classes, priorities, text }: Sift): Record<strin
   return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== ''));
 }
 
+/** The board offers a move within a column: it shows the queue's order, where "after the card above" means a place. */
+export const reorders = ({ sort }: Sift): boolean => sort === 'queue';
+
 /** A filter is on: the board shows fewer cards than Jig gave. */
 export const filtered = ({ classes, priorities, text }: Sift): boolean => classes.length + priorities.length > 0 || text.trim() !== '';
 

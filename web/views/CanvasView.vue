@@ -276,7 +276,7 @@
 
     <CanvasSection
       title="QueueMenu"
-      note="press to open: To top, Up, Down, To bottom, Priority, the pause — first queued, in the middle, not queued, last, paused under a Jig that cannot resume it (no pause to ask, Resume off), paused and resumable, a pause asked, while its change is on its way, on a sorted board (no move)"
+      note="press to open: To top, Up, Down, To bottom, Priority, the pause — first queued, in the middle, not queued, last, paused under a Jig that cannot resume it (no pause to ask, Resume off), paused and resumable, a pause asked, while its change is on its way, on a sorted board (no move), on a filtered board (To top and To bottom at either end of the cards shown)"
     >
       <div class="flex flex-wrap items-center gap-6">
         <span
@@ -288,6 +288,7 @@
         </span>
         <span class="flex items-center gap-1">{{ tasks[1]!.id }}<QueueMenu :task="tasks[1]!" :cards="tasks" disabled /></span>
         <span class="flex items-center gap-1">{{ tasks[1]!.id }}<QueueMenu :task="tasks[1]!" /></span>
+        <span class="flex items-center gap-1">{{ tasks[0]!.id }}<QueueMenu :task="tasks[0]!" :cards="tasks" filtered /></span>
       </div>
     </CanvasSection>
 

@@ -79,4 +79,13 @@ describe('useDrop on a sorted board', () => {
     expect(onPause.mock.calls.map(([id]) => id)).toEqual(['a']);
     expect(onMove).not.toHaveBeenCalled();
   });
+
+  it('clears the gap another list left when the drag comes back over its own', () => {
+    const drag = useDrop(vi.fn(), vi.fn(), vi.fn());
+    drag.start(event(), 'backlog', task('a', true));
+    drag.over(event(), 'paused');
+    expect(drag.gap.value?.list).toBe('paused');
+    drag.over(event(), 'backlog');
+    expect(drag.gap.value).toBeUndefined();
+  });
 });

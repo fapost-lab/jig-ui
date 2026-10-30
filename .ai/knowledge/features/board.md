@@ -12,8 +12,9 @@ paths:
   - web/components/FinishedList.vue
   - web/lib/finished.ts
   - web/lib/refusal.ts
+  - web/lib/sift.ts
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
-reviewed_at: 2026-10-28
+reviewed_at: 2026-10-30
 ---
 # Board
 
@@ -85,6 +86,17 @@ done, or moving.
   Jig has — a finished task's too, which only the list of finished tasks shows — is refused with a line saying
   so; the button waits while a request is on its way, so a double click files once. Class,
   domains and a longer description stay with the terminal or the agent that starts the task.
+- A bar above Board and List sorts and filters every column at once (`web/components/BoardFilter.vue`,
+  the decisions in `web/lib/sift.ts`): sort by the queue's order (the default), priority or class,
+  ties in the queue's order; show only chosen classes or priorities, or the tasks whose id or goal
+  holds a text. It is a view: nothing is written to Jig or stored; it lives in the board's address
+  (`#/projects/<id>?sort=priority&class=T1,T2&priority=P0,none&q=…`), so a reload or a link keeps
+  it. Sorted other than by the queue, a card offers no move within its column — no drop, and no
+  To top, Up, Down or To bottom in its menu — since its place there is not the queue's; a drop on
+  another column, the priority and the pause stay. A filter keeps the moves: a drop or Up anchors on
+  the nearest card shown, which is still one `jig queue move`, and To top and To bottom stay offered
+  at either end of the cards shown, since hidden ones may stand beyond them (`ends` in
+  `web/lib/placement.ts`).
 - The order of the columns is not the order of the rules: what waits for the person comes first
   (maintainer, task `design-system`, 2026-10-18).
 - The finished list holds what `jig task list --all` returns, read with the live tasks in one Jig
@@ -106,7 +118,7 @@ done, or moving.
   housekeeping, not with the task. Attention stays on the workspace page.
 - vue-router for the board's address — rejected for two screens in `project-board`; adopted
   with the design system when the page reached four (adr-20261018-page-built-from-shadcn-vue-with-router-and-canvas). The address stays
-  `#/projects/<id>`.
+  `#/projects/<id>`, with the bar's sort and filters as its query (task `board-sort-filter`).
 - Resuming from the page (task `resume-from-page`, 2026-10-26). Waited for Jig: 0.31.0's
   `jig task resume` took no `--revision` and no `--json` (fapost-lab/jig#295, in 0.35.0), and the
   maintainer chose to show the command meanwhile (task `pause-request`, 2026-10-22). Built as a
@@ -138,5 +150,12 @@ done, or moving.
   for the list — rejected: the header already sits in the New task form's Collapsible, and a
   trigger binds to the nearest one.
 - Board and List as two addresses — rejected: the switch is a way of looking at one board.
+- Sorting and filtering (task `board-sort-filter`, 2026-10-30, a colleague's request through the
+  maintainer). The view in the address, not in `localStorage` as Board or List is — a filter is
+  something to send in a link, and a reload must not silently hide tasks it kept from a past visit.
+  A sort written to the queue — rejected: the order is a person's decision, a sort a look at it. A
+  sort per column — rejected: one bar for all was asked. A "needs me" filter — rejected: the Needs
+  you column is that already. Moves kept on a sorted board — rejected: "after the card above" names
+  a queue position the person cannot see there.
 - The view remembered in Jig UI's settings file — rejected: a preference of one browser need
   not survive it.

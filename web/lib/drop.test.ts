@@ -61,3 +61,22 @@ describe('useDrop out of Paused', () => {
     expect(onMove).not.toHaveBeenCalled();
   });
 });
+
+describe('useDrop on a sorted board', () => {
+  it('allows no drop within the list, and still a pause on Paused', () => {
+    const onMove = vi.fn();
+    const onPause = vi.fn();
+    const drag = useDrop(onMove, onPause, vi.fn());
+    drag.start(event(), 'backlog', task('a', true));
+    const within = event();
+    drag.over(within, 'backlog');
+    expect(within.preventDefault).not.toHaveBeenCalled();
+    expect(drag.gap.value).toBeUndefined();
+    const paused = event();
+    drag.over(paused, 'paused');
+    expect(paused.preventDefault).toHaveBeenCalledOnce();
+    drag.drop('paused');
+    expect(onPause.mock.calls.map(([id]) => id)).toEqual(['a']);
+    expect(onMove).not.toHaveBeenCalled();
+  });
+});

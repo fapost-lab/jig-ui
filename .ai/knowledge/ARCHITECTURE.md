@@ -80,7 +80,7 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   the token is never a process argument (adr-20261017-browser-opens-through-a-redirect-file).
 - `web/` — the Vue 3 page, built from shadcn-vue components on Tailwind (adr-20261018-page-built-from-shadcn-vue-with-router-and-canvas,
   convention-vue). `router.ts` — vue-router in hash mode: `#/` the workspace, `#/projects/<id>`
-  a board, `#/projects/<id>/tasks/<task>` a task's details, `#/canvas` every component in every
+  a board — its query the board's sort and filters (`sort`, `class`, `priority`, `q`), `#/projects/<id>/tasks/<task>` a task's details, `#/canvas` every component in every
   state (loaded lazily, linked from nowhere), anything else `#/`. `App.vue` — the header's
   project dropdown and the theme switch over the current view. `views/` — one per address (and the canvas's
   helpers), the only callers of `call()`, `client` and `onChange()` besides `App.vue`; `components/` — Jig UI's own, props in and events out;

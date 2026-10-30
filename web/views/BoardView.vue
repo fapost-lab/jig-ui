@@ -1,8 +1,10 @@
 <script setup lang="ts">
   import { Columns3, Milestone, Plus, Rows3 } from '@lucide/vue';
   import { computed, onUnmounted, ref, watch } from 'vue';
+  import { useRoute, useRouter } from 'vue-router';
   import { type Board, call, client, onChange, type Place, readAgain, readTask, type ReadyDetails, type Specs, type Written } from '@/api';
   import BoardColumns from '@/components/BoardColumns.vue';
+  import BoardFilter from '@/components/BoardFilter.vue';
   import BoardList from '@/components/BoardList.vue';
   import EpicMenu from '@/components/EpicMenu.vue';
   import FinishedList from '@/components/FinishedList.vue';
@@ -17,6 +19,7 @@
   import { movable } from '@/lib/epics';
   import { lastWins } from '@/lib/last-wins';
   import { closeRefusal, refusal } from '@/lib/refusal';
+  import { filtered, fromQuery, sift, type Sift, toQuery } from '@/lib/sift';
   import { toneText } from '@/lib/tones';
 
   const props = defineProps<{
@@ -112,6 +115,20 @@
   );
 
   const liveIds = computed(() => cards.value.map((t) => t.id));
+
+  /** How Board and List look at the board — sort and filters — kept in the page's address, so a reload or a link keeps it. */
+  const route = useRoute();
+  const router = useRouter();
+  const sifting = computed({
+    get: () => fromQuery(route.query),
+    set: (next: Sift) => void router.replace({ query: toQuery(next) }),
+  });
+
+  const sifted = computed(() =>
+    typeof board.value === 'object' && board.value.state === 'ready' ? sift(board.value.columns, sifting.value) : [],
+  );
+
+  const shownCount = computed(() => sifted.value.reduce((n, c) => n + c.cards.length, 0));
 
   /**
    * The task whose change is on its way to Jig, and what the last change came to when Jig refused it — with the cards
@@ -289,6 +306,14 @@
 
     <FinishedList v-if="showFinished && finished.length > 0" :tasks="finished" class="max-h-48 shrink-0 overflow-y-auto border-b" />
 
+    <BoardFilter
+      v-if="typeof board === 'object' && board.state === 'ready' && view !== 'specs'"
+      v-model="sifting"
+      :shown="shownCount"
+      :total="cards.length"
+      class="shrink-0"
+    />
+
     <p v-if="notice" role="status" class="flex shrink-0 items-center gap-2 border-b px-3 py-1.5" :class="toneText.attention">
       {{ notice.text }}
       <button type="button" class="ml-auto underline underline-offset-2" @click="notice = undefined">dismiss</button>
@@ -301,7 +326,9 @@
     <BoardColumns
       v-else-if="view === 'board'"
       :project="id"
-      :columns="board.columns"
+      :columns="sifted"
+      :sorted="sifting.sort !== 'queue'"
+      :filtered="filtered(sifting)"
       :selected="selected"
       :details="details"
       :pending="pending"
@@ -339,7 +366,9 @@
     <BoardList
       v-else
       :project="id"
-      :columns="board.columns"
+      :columns="sifted"
+      :sorted="sifting.sort !== 'queue'"
+      :filtered="filtered(sifting)"
       :selected="selected"
       :details="details"
       :pending="pending"

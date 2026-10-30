@@ -15,6 +15,10 @@
     details?: ReadyDetails | 'unavailable';
     pending?: string;
     changed?: string[];
+    /** Sorted other than by Jig's queue: a card moves neither by a drop within its column nor from its menu. */
+    sorted?: boolean;
+    /** A filter hides some cards: a card moves among those shown, and to either end of its column. */
+    filtered?: boolean;
   }>();
 
   const emit = defineEmits<{
@@ -42,7 +46,7 @@
       :key="column.id"
       :aria-labelledby="`column-${column.id}`"
       :class="gap?.list === column.id && gap.index < 0 && 'bg-muted'"
-      @dragover="(e) => drag.over(e, column.id, column.cards)"
+      @dragover="(e) => drag.over(e, column.id, sorted ? undefined : column.cards)"
       @drop.prevent="drag.drop(column.id)"
     >
       <h2 :id="`column-${column.id}`" class="sticky top-0 z-10 border-b bg-background px-3 py-2">
@@ -65,6 +69,8 @@
             :open="selected === task.id"
             :details="selected === task.id ? details : undefined"
             :cards="column.cards"
+            :sorted="sorted"
+            :filtered="filtered"
             :busy="pending === task.id"
             :changed="changed?.includes(task.id)"
             @toggle="$emit('toggle', task.id)"

@@ -31,3 +31,20 @@ export function step(cards: Task[], task: string, by: -1 | 1): Place | undefined
   const gap = by < 0 ? from - 1 : from + 2;
   return gap < 0 || gap > cards.length ? undefined : placement(cards, task, gap);
 }
+
+/**
+ * Whether To top and To bottom would move the task: not when it is queued and already the first, or the last, of its
+ * column. With `cards` only those a filter shows, hidden ones may stand beyond it, so both are offered.
+ */
+export function ends(
+  cards: Task[],
+  task: Task,
+  filtered: boolean,
+): {
+  top: boolean;
+  bottom: boolean;
+} {
+  const at = cards.findIndex((t) => t.id === task.id);
+  const settled = !filtered && task.queue !== null;
+  return { top: !(settled && at === 0), bottom: !(settled && at === cards.length - 1) };
+}

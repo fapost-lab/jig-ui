@@ -61,15 +61,15 @@ instead of being overwritten.
 ## Phase 4 — Daily work from the page
 
 From a colleague's use of 0.5.0 (2026-10-30). Goal: a person finds the task they need on a full
-board, reads and changes their own Jig settings, decides the knowledge waiting for them and closes a
-landed task, without a terminal. Done when each of those is a click on the page and each write is a
+board, reads and changes their own Jig settings, and decides the knowledge waiting for them, without a
+terminal. Done when each of those is a click on the page and each write is a
 Jig command.
 
-- [ ] `board-sort-filter` — sort and filter the board — one bar above Board and List, for every column at once: sort by the queue's order (the default), by priority or by class; filter by class, by priority, by "needs me" — the tasks Jig's attention items name — and by text in a task's id or goal; kept in the page's address, so a reload or a shared link shows the same view; while sorted by anything but the queue's order a drop within a column is not offered, a drop on another column still is (after: project board — it orders and filters that board's cards; reorder and prioritise by drag — a sorted view must not offer a reorder it cannot mean)
+- [x] `board-sort-filter` — sort and filter the board — one bar above Board and List, for every column at once: sort by the queue's order (the default), by priority or by class; filter by class, by priority and by text in a task's id or goal; kept in the page's address, so a reload or a shared link shows the same view; while sorted by anything but the queue's order a drop within a column is not offered, a drop on another column still is (after: project board — it orders and filters that board's cards; reorder and prioritise by drag — a sorted view must not offer a reorder it cannot mean)
 - [ ] project card actions — the project's name on its card opens its board; the card's corner keeps Board and a ⋯ menu with Settings and Disconnect (after: workspace dashboard — the card is there)
 - [ ] settings — a dialog from the project card's ⋯ menu, in two parts: the project's settings, from `.ai/config.yaml`, shared through git and shown read-only; and the person's own in this clone, from `.ai/config.local.yaml`, changed through `jig config set|unset --local` — a checkbox for a yes/no key, a choice for a key with a fixed set of values, a field for the rest, each with Jig's description and where its value comes from; a secret (the Telegram token) is never shown, only set or cleared (after: project card actions — opened from its menu; Jig — every key as JSON with its value, source, allowed values and description, and `config set` refusals as codes, fapost-lab/jig#363)
 - [ ] knowledge decisions — on a project's page, the knowledge waiting for a person: each proposed document shown as written, each linked source that changed since it was approved shown as a diff; Accept or Reject a proposal, Keep or Drop a changed source, through `jig knowledge accept|reject|reviewed`, the decision committed without moving the person's checkout and shipped as far as `agent.git` allows (after: task details — a document is shown as a task's documents are; Jig — proposals and changed sources as JSON, and the decision committed on a branch of its own, fapost-lab/jig#364)
-- [ ] close a task from the page — a task Jig offers to close (its `close` action offered: landed, knowledge decision recorded) gets Close in its card's menu and on its details, through `jig task set <id> status consolidated` with the revision of the read the person saw (after: task details — the action is shown there; Jig — the close with `--revision <n> --json` and refusals as codes, fapost-lab/jig#365)
+- [ ] a close checked by Jig — the ready card's close (task `close-ready-task`) passes the revision of the read the person saw to Jig and reads its refusal by code, instead of checking the revision by a read of its own first (after: Jig — the close with `--revision <n> --json` and refusals as codes, fapost-lab/jig#365)
 
 ## Waves
 
@@ -91,7 +91,7 @@ Jig command.
 16. install without Node.js
 17. editing a roadmap from the page
 18. sort and filter the board; project card actions
-19. settings; knowledge decisions; close a task from the page
+19. settings; knowledge decisions; a close checked by Jig
 
 <!--
 Rules (jig-idea §8):

@@ -5,6 +5,7 @@
   import ActionList from '@/components/ActionList.vue';
   import AttentionItem from '@/components/AttentionItem.vue';
   import BoardColumns from '@/components/BoardColumns.vue';
+  import BoardFilter from '@/components/BoardFilter.vue';
   import BoardList from '@/components/BoardList.vue';
   import ColumnHeader from '@/components/ColumnHeader.vue';
   import ConnectForm from '@/components/ConnectForm.vue';
@@ -210,6 +211,14 @@
       <UpgradePanel v-for="(run, i) in runs" :key="`run-${i}`" project="legacy-shop" :run="run" :plan="undefined" />
     </CanvasSection>
 
+    <CanvasSection title="BoardFilter" note="Jig's order and no filter; sorted by priority with filters and text on">
+      <BoardFilter :model-value="{ sort: 'queue', classes: [], priorities: [], text: '' }" :shown="12" :total="12" />
+      <BoardFilter
+        :model-value="{ sort: 'priority', classes: ['T1', 'T2'], priorities: ['P0', 'none'], text: 'login' }"
+        :shown="3"
+        :total="12"
+      />
+    </CanvasSection>
     <CanvasSection title="NewTaskForm" note="empty, on its way, the id taken">
       <NewTaskForm :busy="false" />
       <NewTaskForm :busy="true" task="fix-login" goal="Log in with the token after a restart." />
@@ -267,7 +276,7 @@
 
     <CanvasSection
       title="QueueMenu"
-      note="press to open: To top, Up, Down, To bottom, Priority, the pause — first queued, in the middle, not queued, last, paused under a Jig that cannot resume it (no pause to ask, Resume off), paused and resumable, a pause asked, while its change is on its way"
+      note="press to open: To top, Up, Down, To bottom, Priority, the pause — first queued, in the middle, not queued, last, paused under a Jig that cannot resume it (no pause to ask, Resume off), paused and resumable, a pause asked, while its change is on its way, on a sorted board (no move)"
     >
       <div class="flex flex-wrap items-center gap-6">
         <span
@@ -278,6 +287,7 @@
           {{ t.id }}<QueueMenu :task="t" :cards="tasks" />
         </span>
         <span class="flex items-center gap-1">{{ tasks[1]!.id }}<QueueMenu :task="tasks[1]!" :cards="tasks" disabled /></span>
+        <span class="flex items-center gap-1">{{ tasks[1]!.id }}<QueueMenu :task="tasks[1]!" /></span>
       </div>
     </CanvasSection>
 

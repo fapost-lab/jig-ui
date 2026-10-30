@@ -1,6 +1,6 @@
 ---
-title: "Changelog"
-description: "What each release of Jig UI changed."
+title: 'Changelog'
+description: 'What each release of Jig UI changed.'
 ---
 
 Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is on the
@@ -11,6 +11,8 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 - The board [sorts and filters](/projects#sorting-and-finding-tasks) every column at once: by the
   queue's order, by priority or by class; tasks of chosen classes or priorities; and the tasks whose
   id or goal holds a text. The page's address keeps the view.
+- On a project's card the name opens its [board](/projects#the-board), beside **Board**;
+  **Disconnect** moved into the card's **⋯** menu.
 
 ## 0.5.1 — 2026-10-30
 
@@ -42,7 +44,7 @@ and a task's documents open on its details page.
   checkout; **Check all merges** does every project. **Upgrade…** is no longer offered meanwhile, so a
   second upgrade branch is not cut. Needs Jig 0.39.0 in the project.
 - When Jig refuses an upgrade for a reason of its own, the card says what Jig said — for example
-  `cannot determine the framework source root; pass --from <dir>` — not only *Jig refused the upgrade*.
+  `cannot determine the framework source root; pass --from <dir>` — not only _Jig refused the upgrade_.
 - `jig-ui stop`, and stopping Jig UI running in the background, now stop an upgrade under way, as
   Ctrl+C always did: it no longer runs on with nobody to see how it ended.
 - The Projects page lists every project at once when it opens and fills each in as it is read, under
@@ -99,8 +101,8 @@ this machine's Jig up to date, and the Specs view orders epics and asks your age
 Projects on Jig 0.37.0 are read again, and the page keeps Jig itself up to date: it marks the
 projects behind this machine's Jig and upgrades them; a paused task resumes from the board.
 
-- A project on Jig 0.37.0 with an archived task is read again: Jig UI said its Jig *answers in a
-  form this Jig UI does not read*. An archived task is not shown, as Jig shows none in its lists.
+- A project on Jig 0.37.0 with an archived task is read again: Jig UI said its Jig _answers in a
+  form this Jig UI does not read_. An archived task is not shown, as Jig shows none in its lists.
 
 - [Upgrade a project's Jig from the page](/projects#upgrading-a-projects-jig): **Upgrade…** on a
   marked project shows what `jig upgrade` would do, runs it in the project's main checkout, and

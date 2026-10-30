@@ -210,6 +210,31 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
 - Public documentation lives in `docs/` of this repository and is published with Mintlify
   (maintainer, 2026-10-14). The requirements page states the Node.js requirement the installer
   checks.
+- Phase 4 comes from a colleague's use of 0.5.0, relayed by the maintainer (2026-10-30): sorting and
+  filters, a settings dialog, deciding knowledge from the page, and the project card's buttons; the
+  maintainer added search, a "needs me" filter and closing a task, on the agent's proposal. The task
+  documents the colleague also asked for shipped in 0.5.0. Phase 4 was cut at depth easy: the agent
+  took the reversible decisions below as assumptions, and the maintainer accepted them.
+- Sorting and filtering the board are a view: they change nothing in Jig and keep nothing but the
+  page's address. The queue's order stays the default, being the order agents follow. "Needs me" is
+  the tasks Jig's attention items name, not a rule of Jig UI's own. Rejected: a sort written to the
+  queue — the order is a person's decision, a sort is a look at it. Rejected: a sort per column — the
+  colleague asked for one for all.
+- Settings are read and written only through `jig config`. The project's part, `.ai/config.yaml`, is
+  committed and shared, so it is read-only until Jig can change it the way fapost-lab/jig#362 asks for
+  a roadmap — committed on a branch of its own, never in the person's checkout; the person's part,
+  `.ai/config.local.yaml`, is theirs alone and gitignored, and changes in place, as `jig-setup` does.
+  Both are per clone, as Jig keeps them. A secret is never sent to the page. Rejected: Jig UI writing
+  either file — RULES let it write nothing in a project.
+- Knowledge reaches the page as written, as a task's documents do
+  (adr-20261030-a-task-document-is-shown-as-written); the invariant naming what reaches `web/` gains
+  knowledge documents in that item's task, by an ADR. A decision is Jig's command; Jig UI never edits
+  a document's frontmatter.
+- Closing a task is the person's yes that Jig waits for (`jig-consolidate` §6), so the page offers it
+  only when Jig's `close` action is offered, and otherwise shows Jig's reason.
+- The project's name on its card opens its board, and what a person does rarely — Settings,
+  Disconnect — moves into a ⋯ menu (the colleague, 2026-10-30, who left the exact place open "to
+  play with"); the Board button stays, as the action people look for.
 
 ## Open questions
 
@@ -232,6 +257,12 @@ them to Decisions.
   its task — with a revision and an item handle, committed on the spec's branch without moving the
   checkout. The roadmap item on editing a roadmap from the page waits for the commands Jig ships,
   and is shaped by them.
+- For Jig, asked 2026-10-30, each shaping a Phase 4 item: settings as JSON — every key with its value,
+  where it comes from, its allowed values and a description, and `config set` refusals as codes
+  (fapost-lab/jig#363); knowledge proposals and changed linked sources as JSON, and a decision
+  committed on a branch of its own without moving the checkout (fapost-lab/jig#364); closing a
+  task with `--revision <n> --json` and its refusals as codes, as `jig task resume` has
+  (fapost-lab/jig#365).
 
 - Raised by Jig's maintainer (2026-10-25): a person with many projects does not follow each Jig
   upgrade by hand. Should the workspace show which projects run an older Jig than the machine's,
@@ -251,3 +282,5 @@ them to Decisions.
 - That Git Bash on Windows can unpack Node.js's `.zip` (its `unzip`, or Windows' own `tar.exe`),
   and that a `jig-ui` in `~/bin` is on the PATH of Git Bash and of an agent's shell — checked by
   the installation item, on a Windows machine without Node.js.
+- That a P0 under a P3 in Backlog asked for a sort by priority, not for a queue that orders itself by
+  priority — tested by the colleague using the sort.

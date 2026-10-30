@@ -39,8 +39,13 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      release: ${{ steps.publish.outputs.release }}
+    # One queue for main and tags: two runs never publish at once. GitHub keeps one pending run per
+    # group, so a third cancels the one waiting; a release cancelled so is not made by a later merge
+    # (it did not change the version) but warned about, and released with a tag pushed by hand.
     concurrency:
-      group: release-${{ github.ref }}
+      group: release
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -58,42 +63,82 @@ jobs:
           name: dist
           path: dist
 
-      - name: Publish a prerelease from main
-        if: github.ref_type == 'branch'
-        run: |
-          BASE="$(node -p "require('./package.json').version")"
-          npm version "${BASE}-next.${{ github.run_number }}" --no-git-tag-version --ignore-scripts
-          npm publish --tag next --ignore-scripts
-
-      - name: Publish a release from a tag
-        if: github.ref_type == 'tag'
+      # A push to main that changes `version` in package.json to a stable one releases it: the version
+      # pull request is the release, and github-release below creates the tag on its merge commit.
+      # Any other push publishes `<next patch>-next.<run>`, which sorts after the latest release, so
+      # the version is never raised after a release. A `v*` tag pushed by hand still releases its
+      # version. A run of a release re-run stays a release, and publishes nothing npm already has.
+      - name: Publish
+        id: publish
         env:
+          REF_TYPE: ${{ github.ref_type }}
           TAG: ${{ github.ref_name }}
+          RUN: ${{ github.run_number }}
+          BEFORE: ${{ github.event.before }}
         run: |
           VERSION="$(node -p "require('./package.json').version")"
-          if [ "$TAG" != "v${VERSION}" ]; then
-            echo "Tag ${TAG} does not match package.json version v${VERSION}" >&2
-            exit 1
+          PREVIOUS=
+          if [ "$REF_TYPE" = branch ]; then
+            # The version main had before this push; the parent when the push started the branch.
+            case "$BEFORE" in ''|*[!0]*) FROM="$BEFORE" ;; *) FROM="${GITHUB_SHA}^" ;; esac
+            PREVIOUS="$(git show "${FROM}:package.json" 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version" 2>/dev/null || true)"
           fi
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "Tagged commit ${GITHUB_SHA} is not on main" >&2
-            exit 1
+          RELEASE=
+          if [ "$REF_TYPE" = tag ]; then
+            if [ "$TAG" != "v${VERSION}" ]; then
+              echo "Tag ${TAG} does not match package.json version v${VERSION}" >&2
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+              echo "Tagged commit ${GITHUB_SHA} is not on main" >&2
+              exit 1
+            fi
+            PUBLISH="$VERSION"
+            case "$VERSION" in
+              *-*) NPM_TAG=next ;;
+              *) NPM_TAG=latest RELEASE="$VERSION" ;;
+            esac
+          elif [[ "$VERSION" != *-* ]] && [ "$VERSION" != "$PREVIOUS" ]; then
+            PUBLISH="$VERSION" NPM_TAG=latest RELEASE="$VERSION"
+          else
+            if [[ "$VERSION" != *-* ]] && [ -z "$(git tag -l "v${VERSION}")" ]; then
+              echo "::warning::${VERSION} is not released: re-run the run of the merge that set it, or push the tag v${VERSION} on that commit"
+            fi
+            case "$VERSION" in
+              *-*) BASE="$VERSION" ;;
+              *) IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"; BASE="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+            esac
+            PUBLISH="${BASE}-next.${RUN}" NPM_TAG=next
           fi
-          case "$VERSION" in
-            *-*) npm publish --tag next --ignore-scripts ;;
-            *) npm publish --ignore-scripts ;;
+          # A run that published and then failed, or a tag for a version a merge already released:
+          # the version is on npm, and only what follows the publish is left to do.
+          # Asked without npm, which would send setup-node's placeholder token.
+          ON_NPM="$(curl -sS --retry 3 --retry-all-errors --max-time 30 -o /dev/null -w '%{http_code}' \
+            "https://registry.npmjs.org/@fapost%2fjig-ui/${PUBLISH}")"
+          case "$ON_NPM" in
+            200) echo "@fapost/jig-ui@${PUBLISH} is already on npm" ;;
+            404)
+              [ "$PUBLISH" = "$VERSION" ] || npm version "$PUBLISH" --no-git-tag-version --ignore-scripts
+              npm publish --tag "$NPM_TAG" --ignore-scripts
+              ;;
+            *) echo "npm answered ${ON_NPM} for @fapost/jig-ui@${PUBLISH}" >&2; exit 1 ;;
           esac
+          echo "release=${RELEASE}" >> "$GITHUB_OUTPUT"
 
   # Runs install.sh for real on each OS, against what was just published, before a release carries it.
   installer:
-    if: github.ref_type == 'tag' && !contains(github.ref_name, '-')
+    if: needs.publish.outputs.release != ''
     needs: publish
     uses: ./.github/workflows/installer.yml
+    with:
+      version: ${{ needs.publish.outputs.release }}
 
   # A stable release's GitHub Release carries install.sh: the installation line downloads it from
-  # releases/latest. Nothing is installed here, next to a token that can write the repository.
+  # releases/latest. Released from a merge, creating it creates the tag on the merge commit; a tag
+  # made with this run's token starts no workflow, so nothing publishes twice. Nothing is installed
+  # here, next to a token that can write the repository.
   github-release:
-    if: github.ref_type == 'tag' && !contains(github.ref_name, '-')
+    if: needs.publish.outputs.release != ''
     needs: [publish, installer]
     runs-on: ubuntu-latest
     permissions:
@@ -105,7 +150,13 @@ jobs:
       - name: Create the GitHub Release with install.sh
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: v${{ needs.publish.outputs.release }}
         run: |
-          gh release create "$TAG" install.sh --repo "$GITHUB_REPOSITORY" --verify-tag --title "$TAG" \
-            --notes "What changed: https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/docs/changelog.mdx"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "Release ${TAG} already exists"
+            exit 0
+          fi
+          # A run for a hand tag and the merge's run may both get here; the second finds the first's.
+          gh release create "$TAG" install.sh --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --title "$TAG" \
+            --notes "What changed: https://github.com/${GITHUB_REPOSITORY}/blob/${TAG}/docs/changelog.mdx" ||
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null

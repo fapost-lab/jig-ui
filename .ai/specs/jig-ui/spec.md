@@ -187,10 +187,26 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
   (maintainer, 2026-10-28). Epics are ordered and prioritised through the queue, which holds them
   beside tasks (`epic:<spec-id>`) with the same writes and revision; filing a phase's tasks and
   continuing a spec go to the person's agent as a request to copy, as an upgrade's steps by hand
-  do; editing a roadmap from the page stays a fog item until Jig has a command for it. Rejected:
+  do; editing a roadmap from the page stays a fog item until Jig has a command for it, lifted
+  below (2026-10-30). Rejected:
   Jig UI editing `roadmap.md` itself — RULES let it write nothing in a project, and a spec lives
   on a branch of its own. Rejected: dropping the fog item — the maintainer keeps it for when Jig
   can carry it.
+- Editing a roadmap from the page asks Jig for three writes (maintainer, 2026-10-30): add an item to
+  a phase, move an item within its phase or to another, and file an item's task — `jig task new <id>
+  --goal`, as the page already files a backlog task, after which the item names the task and
+  `jig spec link` links it; the task is filed with no class, which the person's agent gives it. Each
+  write carries the revision of the read the person saw, and names the item by a handle that
+  `jig spec list --json` gives it, since an item has none today. The edit is committed on the spec's
+  branch — `spec/<id>`, or the epic — in a tree of Jig's own, never moving the person's checkout, and
+  shipped as far as `agent.git` allows, as `jig spec ship` does; edits in a row share one pull
+  request, and until it reaches the default branch the spec shows the edit waiting in it. Asked of
+  Jig in fapost-lab/jig#362. Rejected: adding and moving only, filing left to the agent's request —
+  the fog item names all three, and Jig decides how to cut them. Rejected: filing only — adding an
+  item is what a person thinks of while looking at the plan. Rejected: an edit only when the checkout
+  is on the spec's branch — from the page it would refuse almost every time, the main checkout being
+  on the default branch or a task's. Rejected: an uncommitted edit in the working tree — a dirty tree
+  stops `jig task start`, and the edit is easily lost.
 - Public documentation lives in `docs/` of this repository and is published with Mintlify
   (maintainer, 2026-10-14). The requirements page states the Node.js requirement the installer
   checks.
@@ -212,9 +228,10 @@ them to Decisions.
   one item and respaces a level inside the same write only when no gap is left). For Jig's
   `contract-extensions`: a reorder is one command that moves one item (sparse position),
   never a renumbering the UI issues as several commands.
-- For Jig: a command that changes a roadmap — add an item, move it, file its task — with a
-  revision, saying which branch the change lands on. Until there is one, the fog item on editing
-  a roadmap from the page stays fog (2026-10-28).
+- For Jig, asked in fapost-lab/jig#362 (2026-10-30): roadmap writes — add an item, move it, file
+  its task — with a revision and an item handle, committed on the spec's branch without moving the
+  checkout. The roadmap item on editing a roadmap from the page waits for the commands Jig ships,
+  and is shaped by them.
 
 - Raised by Jig's maintainer (2026-10-25): a person with many projects does not follow each Jig
   upgrade by hand. Should the workspace show which projects run an older Jig than the machine's,

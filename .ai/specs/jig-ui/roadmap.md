@@ -56,7 +56,7 @@ instead of being overwritten.
 - [x] `spec-agent-request` — a request for the agent on a spec — a spec offers a request to copy for the person's agent: file the tasks of a phase that has items with no task, or continue the spec while it has fog items (after: specs and epics — it sits on a spec's row)
 - [ ] fog: hosted and self-hosted Jig UI — a connector on the machine with the projects behind the ProjectSource port; first form is a read-only snapshot with a revision; accounts and file access rules are not stated
 - [x] `install-without-node` — install without Node.js — one line in Git Bash on Windows, or a terminal on macOS and Linux (`curl -fsSL https://github.com/fapost-lab/jig-ui/releases/latest/download/install.sh | bash`), puts the official Node.js 24, checked against nodejs.org's checksums, in Jig UI's own folder unless Node.js 24 or later is already there, and adds a `jig-ui` command that runs `npx @fapost/jig-ui` with it; the Release workflow attaches the script to each stable release, and the requirements and installation pages give both ways (after: package and release pipeline — the script ships with a release)
-- [ ] fog: editing a roadmap from the page — adding, moving and filing its items needs a Jig command that changes a roadmap with a revision and says which branch the change lands on (`spec/<id>`, the epic, committed or not); none exists, and Jig UI writes no project file
+- [ ] editing a roadmap from the page — on a spec's row a person adds an item to a phase, moves an item within its phase or to another, and files an item's task (`jig task new <id> --goal`, then the item names it and `jig spec link` links it), each with the revision of the read they saw; the edit is committed on `spec/<id>` or the epic without moving the person's checkout, shipped as far as `agent.git` allows, and shown waiting in its pull request until it lands (after: specs and epics — it sits on a spec's row; Jig — roadmap writes with a revision and an item handle, fapost-lab/jig#362)
 
 ## Waves
 
@@ -76,6 +76,7 @@ instead of being overwritten.
 14. upgrade from the page
 15. order and prioritise epics; a request for the agent on a spec
 16. install without Node.js
+17. editing a roadmap from the page
 
 <!--
 Rules (jig-idea §8):

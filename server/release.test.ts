@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { DIST_TAGS, later, newerRelease } from './release.js';
 
@@ -43,6 +46,20 @@ describe('newerRelease', () => {
   ] as const)('on %s with %o, a Node.js at %s is told %s', async (platform, env, execPath, stop) => {
     const newer = newerRelease('0.5.1', { fetch: tags({ latest: '0.6.0' }), env, execPath, platform, home: '/home/me' });
     expect((await newer())?.stop).toBe(stop);
+  });
+
+  it('knows its own Node.js when the data folder is reached through a symlink', async () => {
+    const real = realpathSync.native(mkdtempSync(join(tmpdir(), 'jig-ui-release-')));
+    mkdirSync(join(real, 'data', 'jig-ui', 'node'), { recursive: true });
+    symlinkSync(join(real, 'data'), join(real, 'link'), 'junction'); // a junction needs no rights on Windows
+    const env = process.platform === 'win32' ? { LOCALAPPDATA: join(real, 'link') } : { XDG_DATA_HOME: join(real, 'link') };
+    // Node.js resolves symlinks in its own path.
+    const execPath = join(real, 'data', 'jig-ui', 'node', 'bin', 'node');
+    try {
+      expect((await newerRelease('0.5.1', { fetch: tags({ latest: '0.6.0' }), env, execPath })())?.stop).toBe('jig-ui stop');
+    } finally {
+      rmSync(real, { recursive: true, force: true });
+    }
   });
 
   it('says nothing for the same or an older release, an answer it cannot read, a refusal or no network', async () => {

@@ -239,6 +239,22 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
 - The project's name on its card opens its board, and what a person does rarely — Settings,
   Disconnect — moves into a ⋯ menu (the colleague, 2026-10-30, who left the exact place open "to
   play with"); the Board button stays, as the action people look for.
+- Three more Phase 4 items came from the same colleague (2026-10-31): Find projects missed a project
+  kept inside another; the list of projects needs an order; nothing said a newer Jig UI was out. The
+  maintainer's answers: walk into repositories; the list always by name, A–Z; a notice with the
+  command. Rejected: a switch between by name and "needs you" first, the agent's proposal — one order
+  is enough for the list, and the card shown first already goes to what needs the person. Rejected:
+  updating Jig UI from the page — the server would replace and restart itself, for what is one line
+  in a terminal.
+- Find projects walks into a repository too; the "never walks into a repository" of
+  adr-20261029-finding-projects-shows-their-paths is amended in that item's task. Typing the outer
+  project's folder did not help either: the walk stopped at its `.git`. A submodule stays passed
+  over: telling its `.git` file from a worktree's means opening the file, which the walk does not.
+- The notice of a newer Jig UI is Jig UI's first request of its own to the internet: npm's registry,
+  for one public version number, at most once a day, carrying nothing about the person or their
+  projects; offline or refused, the page says nothing. It gets an ADR in that item's task. A running
+  Jig UI keeps running when `npx @fapost/jig-ui` is run again — it opens the page — so without the
+  notice a person may stay on an old version without knowing.
 
 ## Open questions
 
@@ -288,3 +304,7 @@ them to Decisions.
   the installation item, on a Windows machine without Node.js.
 - That a P0 under a P3 in Backlog asked for a sort by priority, not for a queue that orders itself by
   priority — tested by the colleague using the sort.
+- That the colleague's project inside another is a clone of its own, with a `.git` folder, not a
+  submodule: the item finds the first and passes over the second — checked by the colleague with
+  Find projects once it ships.
+- That a check once a day is soon enough to learn of a release — tested by use.

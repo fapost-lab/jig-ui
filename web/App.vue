@@ -5,6 +5,7 @@
   import ProjectSwitcher from './components/ProjectSwitcher.vue';
   import ThemeToggle from './components/ThemeToggle.vue';
   import { lastWins } from './lib/last-wins';
+  import { byName } from './lib/projects';
   import { toneText } from './lib/tones';
 
   const route = useRoute();
@@ -18,7 +19,7 @@
 
   const loadProjects = lastWins(
     async () => (await (await call(() => client.api.workspace.$get()))?.json())?.projects,
-    (read) => (projects.value = read),
+    (read) => (projects.value = byName(read)),
   );
 
   onMounted(async () => {

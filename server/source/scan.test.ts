@@ -23,7 +23,8 @@ const app = repo('home/code/app');
 const connected = repo('home/code/connected');
 const options = { home, connected: new Set([connected]), platform: 'darwin' as const };
 repo('home/code/plain', false);
-repo('home/code/app/vendor/inner'); // inside a repository
+const inner = repo('home/code/app/vendor/inner'); // inside a project
+const kept = repo('home/code/plain/tools/kept'); // inside a repository without Jig
 const deep = repo('home/a/b/c/d/deep'); // 5 below home
 repo('home/a/b/c/d/e/deeper'); // 6 below
 repo('home/.hidden/hid');
@@ -41,7 +42,7 @@ symlinkSync(join(root, 'home/code'), join(root, 'home/link'), 'junction'); // a 
 describe('scanFolder', () => {
   it('finds the main checkouts with Jig, counts the connected ones, and passes over what it must', async () => {
     expect(await scanFolder(home, options)).toEqual({
-      found: [deep, app, join(home, 'AppData/app')].sort(),
+      found: [deep, app, inner, kept, join(home, 'AppData/app')].sort(),
       connected: 1,
       skipped: ['Documents'],
       stopped: false,
@@ -51,13 +52,13 @@ describe('scanFolder', () => {
   it('looks through a folder macOS asks about once it is named, and every folder of a home elsewhere', async () => {
     expect((await scanFolder(join(home, 'Documents'), options)).found).toEqual([join(home, 'Documents/doc')]);
     expect((await scanFolder(home, { ...options, platform: 'linux' })).found).toEqual(
-      [app, deep, join(home, 'AppData/app'), join(home, 'Documents/doc'), join(home, 'Library/lib')].sort(),
+      [app, inner, kept, deep, join(home, 'AppData/app'), join(home, 'Documents/doc'), join(home, 'Library/lib')].sort(),
     );
   });
 
   it("passes over a Windows home's AppData without a word", async () => {
     expect(await scanFolder(home, { ...options, platform: 'win32' })).toEqual({
-      found: [app, deep, join(home, 'Documents/doc'), join(home, 'Library/lib')].sort(),
+      found: [app, inner, kept, deep, join(home, 'Documents/doc'), join(home, 'Library/lib')].sort(),
       connected: 1,
       skipped: [],
       stopped: false,
@@ -69,8 +70,8 @@ describe('scanFolder', () => {
     expect(await scanFolder(home, { ...options, folders: 1 })).toEqual({ found: [], connected: 0, skipped: ['Documents'], stopped: true });
   });
 
-  it('finds the folder named when it is a project, and nothing in a folder that is not there', async () => {
-    expect((await scanFolder(app, options)).found).toEqual([app]);
+  it('finds the folder named when it is a project, the projects inside it, and nothing in a folder that is not there', async () => {
+    expect((await scanFolder(app, options)).found).toEqual([app, inner]);
     expect(await scanFolder(join(root, 'missing'), options)).toEqual({ found: [], connected: 0, skipped: [], stopped: false });
   });
 

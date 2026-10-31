@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Attention, Project } from '../api';
-import { chosen, landed, matching, readOnes, readProgress, type Reading } from './projects';
+import { byName, chosen, landed, matching, readOnes, readProgress, type Reading } from './projects';
 
 const item: Attention = {
   kind: 'gate-waiting',
@@ -27,6 +27,14 @@ const quiet = ready('quiet');
 const waiting = ready('Waiting-Room', [item]);
 const moved: Project = { id: 'moved', state: 'unavailable', reason: 'missing', upgrade: null };
 const slow: Reading = { id: 'slow', state: 'reading' };
+
+describe('byName', () => {
+  it('orders by id A–Z, case aside, numbers by value, and leaves the list it was given alone', () => {
+    const given = [{ id: 'web' }, { id: 'App10' }, { id: 'api' }, { id: 'app2' }];
+    expect(byName(given).map((p) => p.id)).toEqual(['api', 'app2', 'App10', 'web']);
+    expect(given.map((p) => p.id)).toEqual(['web', 'App10', 'api', 'app2']);
+  });
+});
 
 describe('matching', () => {
   it('keeps the projects whose id holds what was typed, whatever its case', () => {

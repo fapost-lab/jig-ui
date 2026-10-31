@@ -9,7 +9,7 @@
   import { Button } from '@/components/ui/button';
   import { Progress } from '@/components/ui/progress';
   import { lastWins } from '@/lib/last-wins';
-  import { chosen, landed, type Listed, readOnes, readProgress } from '@/lib/projects';
+  import { byName, chosen, landed, type Listed, readOnes, readProgress } from '@/lib/projects';
   import { withConnected } from '@/lib/scan';
   import { toneRule, toneText } from '@/lib/tones';
   import {
@@ -26,7 +26,7 @@
 
   const route = useRoute();
   const router = useRouter();
-  /** The connected projects; on the first load each is listed before its read lands. */
+  /** The connected projects, by name; on the first load each is listed before its read lands. */
   const projects = ref<Listed[]>();
   /** The projects read so far: what the upgrade lines and Upgrade all are worked out over. */
   const read = computed(() => readOnes(projects.value ?? []));
@@ -70,7 +70,7 @@
     async () => (await (await call(() => client.api.workspace.$get()))?.json()) ?? undefined,
     (read) => {
       if (!read) return;
-      projects.value = read.projects;
+      projects.value = byName(read.projects);
       machine.value = read.machine;
     },
   );
@@ -83,7 +83,7 @@
   async function first(): Promise<void> {
     const ids = (await (await call(() => client.api.projects.$get()))?.json())?.projects;
     if (ids && !projects.value) {
-      projects.value = ids.map((id) => ({ id, state: 'reading' as const }));
+      projects.value = byName(ids.map((id) => ({ id, state: 'reading' as const })));
       await Promise.allSettled(
         ids.map(async (id) => {
           const res = await call(() => client.api.projects[':id'].$get({ param: { id: encodeURIComponent(id) } }));

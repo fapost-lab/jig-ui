@@ -57,6 +57,19 @@ package npx ran, which npx downloads again when it is next asked for.
 Jig UI runs once per machine. Running `npx @fapost/jig-ui` while it is already running opens the
 running one in the browser and exits — after connecting the project, when you run it in one.
 
+## Updating
+
+Jig UI asks npm, once a day at most, whether a newer release is out — for a build of the
+[development channel](#development-channel), a newer build of that channel. When one is, a line under
+the page's header says so, with the command that stops the running Jig UI: `npx @fapost/jig-ui stop`,
+or `jig-ui stop` when it was [installed without Node.js](#without-nodejs). Then start Jig UI again
+the way you started it, and the new release starts. A running Jig UI stays the version it started
+with until it is stopped: running `npx @fapost/jig-ui` again only opens it.
+
+The request asks npm's registry for the package's newest version numbers and carries nothing about you
+or your projects. Without a network, or on any error, the page says nothing. To turn it off, set
+`NO_UPDATE_NOTIFIER=1` where Jig UI starts.
+
 ## Running it in the background
 
 To keep Jig UI running without a terminal window, start it in the background:

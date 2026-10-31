@@ -17,6 +17,7 @@ import {
   RegistryUnreadable,
   type Written,
 } from '../source/project-source.js';
+import type { Newer } from '../release.js';
 import { localOnly, tokenAccess } from './access.js';
 
 /**
@@ -44,6 +45,8 @@ export interface AppOptions {
   webRoot?: string;
   /** Shuts the server down; `POST /api/instance/stop` calls it after answering. Without it the route is absent. */
   stop?: () => void;
+  /** A newer Jig UI on npm, asked by the running instance only (`server/release.ts`); without it nothing is asked. */
+  newer?: () => Promise<Newer | null>;
 }
 
 /** How often an idle stream sends a comment, so a closed tab is noticed and its subscription ends. */
@@ -113,10 +116,14 @@ function upgradeRefused(c: Context, code: string, reasons: string[] = []) {
  * The API, chained so that its type carries every route's answers: the page derives its types
  * from `AppType` and never declares them a second time.
  */
-function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
+function apiRoutes(source: ProjectSource, version: string, stop?: () => void, newer?: () => Promise<Newer | null>) {
   return (
     new Hono()
+      // The CLI's check that an instance is up: it never waits on anything outside this process.
       .get('/api/instance', (c) => c.json({ version }, 200))
+
+      // A newer Jig UI on npm; the registry may take seconds (adr-20261031-jig-ui-asks-npm-for-a-newer-release).
+      .get('/api/instance/newer', async (c) => c.json({ newer: (await newer?.()) ?? null }, 200))
 
       .post('/api/instance/stop', (c) => {
         if (!stop) return refuse(c, 404, 'not-found', 'This instance cannot be stopped from here.');
@@ -436,7 +443,15 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void) {
 /** The API's type, for the page; `import type` only, so no server code reaches its bundle. */
 export type AppType = ReturnType<typeof apiRoutes>;
 
-export function createApp({ port, token, source, version = readPackageVersion(), webRoot = DEFAULT_WEB_ROOT, stop }: AppOptions): Hono {
+export function createApp({
+  port,
+  token,
+  source,
+  version = readPackageVersion(),
+  webRoot = DEFAULT_WEB_ROOT,
+  stop,
+  newer,
+}: AppOptions): Hono {
   const app = new Hono();
   // Before the guard, so its refusals carry them too; HSTS means nothing on http://127.0.0.1.
   app.use(secureHeaders({ strictTransportSecurity: false }));
@@ -451,7 +466,7 @@ export function createApp({ port, token, source, version = readPackageVersion(),
     return refuse(c, 500, 'internal', 'Jig UI hit an error it did not expect; its terminal says what.');
   });
 
-  app.route('/', apiRoutes(source, version, stop));
+  app.route('/', apiRoutes(source, version, stop, newer));
   app.all('/api/*', (c) => c.json({ error: 'not found' }, 404));
 
   if (existsSync(join(webRoot, 'index.html'))) {

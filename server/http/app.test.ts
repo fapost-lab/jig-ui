@@ -39,6 +39,26 @@ describe('createApp', () => {
     expect(await res.json()).toEqual({ version: readPackageVersion() });
   });
 
+  it('names a newer Jig UI on /api/instance/newer when the instance was given a way to ask, and none without', async () => {
+    const newer = vi.fn(async () => ({ version: '9.0.0', stop: 'jig-ui stop' }));
+    const withNewer = createApp({ port: PORT, token: TOKEN, source: localSource(join(webRoot, 'config')), webRoot, newer });
+    const res = await withNewer.request('/api/instance/newer', { headers: { host: HOST, cookie: COOKIE } });
+    expect(await res.json()).toEqual({ newer: { version: '9.0.0', stop: 'jig-ui stop' } });
+    expect(await (await get('/api/instance/newer', { host: HOST, cookie: COOKIE })).json()).toEqual({ newer: null });
+  });
+
+  it('answers /api/instance at once while the registry has not answered', async () => {
+    const stuck = createApp({
+      port: PORT,
+      token: TOKEN,
+      source: localSource(join(webRoot, 'config')),
+      webRoot,
+      newer: () => new Promise(() => {}),
+    });
+    const res = await stuck.request('/api/instance', { headers: { host: HOST, cookie: COOKIE } });
+    expect(await res.json()).toEqual({ version: readPackageVersion() });
+  });
+
   it('answers an unknown API path with 404 only after the token', async () => {
     expect((await get('/api/nope', { host: HOST, cookie: COOKIE })).status).toBe(404);
     expect((await get('/api/nope', { host: HOST })).status).toBe(401);

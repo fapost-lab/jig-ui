@@ -1,14 +1,17 @@
 <script setup lang="ts">
   import { computed, onMounted, onUnmounted, ref } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
-  import { call, client, failure, onChange, type Project } from './api';
+  import { call, client, failure, type Newer, onChange, type Project } from './api';
   import ProjectSwitcher from './components/ProjectSwitcher.vue';
   import ThemeToggle from './components/ThemeToggle.vue';
   import { lastWins } from './lib/last-wins';
+  import { toneText } from './lib/tones';
 
   const route = useRoute();
   const router = useRouter();
   const version = ref<string>();
+  /** A newer Jig UI on npm, as the server last heard; asked once a day at most. */
+  const newer = ref<Newer>(null);
   const projects = ref<Project[]>([]);
   /** The project whose board or task is open; the workspace and the canvas have none. */
   const current = computed(() => (typeof route.params.id === 'string' ? route.params.id : undefined));
@@ -20,6 +23,8 @@
 
   onMounted(async () => {
     version.value = (await (await call(() => client.api.instance.$get()))?.json())?.version;
+    // Asked after the version: the registry may take seconds, the version none.
+    newer.value = (await (await call(() => client.api.instance.newer.$get()))?.json())?.newer ?? null;
   });
 
   onUnmounted(onChange(() => void loadProjects()));
@@ -46,6 +51,10 @@
         @pick="(id) => router.push(`/projects/${encodeURIComponent(id)}`)"
         ><ThemeToggle
       /></ProjectSwitcher>
+      <p v-if="newer" class="shrink-0 border-b px-4 py-1.5" :class="toneText.attention">
+        Jig UI {{ newer.version }} is out. To update, run <code>{{ newer.stop }}</code
+        >, then start Jig UI again.
+      </p>
       <main class="min-h-0 flex-1 overflow-auto">
         <!-- Keyed on the path: a view reads once when it mounts, so a new path mounts it again; the workspace's
              `?project=` only picks the card it shows from what it read. -->

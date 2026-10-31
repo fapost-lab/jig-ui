@@ -14,8 +14,8 @@ paths:
   - web/api.ts
   - web/views/WorkspaceView.vue
   - web/components/ConnectForm.vue
-summary: "Find projects: a scan of a folder (home by default) reading listings only, never into a repo, hidden folder or node_modules, skipping macOS-guarded home folders; its findings are shown by path in ~/ form — amends the no-path rule of adr-20261014-project-source-port-keeps-hosting-open"
-reviewed_at: 2026-10-30
+summary: "Find projects: a scan of a folder (home by default) reading listings only, into repositories too (amended by task projects-inside-project) but never into a hidden folder or node_modules, skipping macOS-guarded home folders; its findings are shown by path in ~/ form — amends the no-path rule of adr-20261014-project-source-port-keeps-hosting-open"
+reviewed_at: 2026-10-31
 ---
 # Finding projects shows the folders it found by path, and runs nothing in them
 
@@ -68,3 +68,16 @@ maintainer on 2026-10-29.
 - A project in a folder macOS asks about, or deeper than 5, is found only when its folder is typed.
 - The walk measured 48 ms over a home folder of 105 folders (macOS, 2026-10-29); the limit of
   20 000 folders bounds a larger one.
+
+## Amendment — the walk goes into repositories (task `projects-inside-project`, 2026-10-31)
+
+"Never walks into a repository" is withdrawn: the walk goes on into every repository — a folder
+whose `.git` is a directory, found or not, and one whose `.git` is a file, walked into but never
+found — within the same depth and folder limits. A colleague's project kept inside
+another was not found, and typing the outer project's folder did not help either, since the walk
+stopped at its `.git` (spec `jig-ui`, Phase 4, the maintainer's choice). Measured over the
+maintainer's home folder (macOS, 2026-10-31): 361 folders and 34 ms, against 24 folders and 3 ms
+stopping at repositories, the same projects found. Rejected: one or two levels into a repository
+only — `packages/<name>` of a repository two folders below home is already four deep, and the depth
+limit bounds the walk anyway; skipping what `.gitignore` names — it opens a file, which the walk
+does not. Everything else above stands; a `.git` file is still passed over.

@@ -21,8 +21,8 @@ root. `~/` stands for your home folder.
 field, or in your home folder when the field is empty. Jig UI lists each one it finds that is not
 connected yet, by its path, with **Connect**, and counts the ones already connected. It reads only
 folder names — it runs nothing in a project before you connect it — goes 5 folders deep and through
-at most 20 000 folders, and does not look inside a repository, a hidden folder or `node_modules`. On
-macOS it passes over Desktop, Documents, Downloads, Movies, Music and Pictures in your home folder,
+at most 20 000 folders, and does not look inside a hidden folder or `node_modules`. It looks inside
+a repository too, so a project kept inside another is found. On macOS it passes over Desktop, Documents, Downloads, Movies, Music and Pictures in your home folder,
 because macOS asks before an app reads them, and says so: type one, `~/Documents` for example, and
 choose **Find projects** to look there. It also passes over, without saying so, `Library` on macOS
 and `AppData` on Windows, which hold apps' data.

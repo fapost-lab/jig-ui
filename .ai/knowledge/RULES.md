@@ -28,6 +28,12 @@ are added as sections of this file.
   command it did not write, and installs Node.js only after its SHA-256 sum matched nodejs.org's; it
   edits no shell profile and no system setting. (spec `jig-ui`, task `install-without-node`. Checked
   by `server/install.test.ts` and the Installer workflow.)
+- The running Jig UI makes one request of its own to the internet: npm's dist-tags of
+  `@fapost/jig-ui`, at most once a day, none while `NO_UPDATE_NOTIFIER` is set, carrying nothing
+  about the person or their projects; `createApp` asks only when `main.ts` gives it the check, and
+  `GET /api/instance`, the CLI's check that an instance is up, never waits on it.
+  (adr-20261031-jig-ui-asks-npm-for-a-newer-release. Checked by `server/release.test.ts`; in review:
+  no other `fetch` or outbound request in `server/`.)
 - The API and the page name connected projects by id; no path reaches `web/` but Find projects'
   answer — the folder it looked through and what it found there, under the folder the person named,
   with `~` for the home folder — and a task's documents, whose content is shown as its authors wrote it.

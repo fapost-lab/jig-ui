@@ -5,6 +5,7 @@ import { type CliCommand, DEFAULT_PORT, parseCliArgs } from './args.js';
 import { createApp, readPackageVersion } from './http/app.js';
 import { stopJig } from './jig/client.js';
 import { openBrowser } from './open-browser.js';
+import { newerRelease } from './release.js';
 import { configDir } from './registry/config-dir.js';
 import { connectThrough, type InstanceInfo, probeInstance, readInstance, removeInstance, writeInstance } from './registry/instance.js';
 import { loadToken, resetToken } from './registry/token.js';
@@ -136,7 +137,11 @@ async function runServer(command: Extract<CliCommand, { kind: 'run' | 'serve' }>
     });
   };
   const server = serve(
-    { fetch: createApp({ port, token, source: localSource(dir), version, stop: shutdown }).fetch, hostname: HOST, port },
+    {
+      fetch: createApp({ port, token, source: localSource(dir), version, stop: shutdown, newer: newerRelease(version) }).fetch,
+      hostname: HOST,
+      port,
+    },
     () => {
       void (async () => {
         await writeInstance(dir, { port, token, pid: process.pid, version });

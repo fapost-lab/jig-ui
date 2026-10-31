@@ -76,6 +76,11 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   folders, by path.
   Directions: `http/` → `board/`, `source/`; `board/` → `source/` (types); `source/` → `jig/`,
   `registry/`, `watch/`.
+- `server/release.ts` — whether a newer Jig UI is out on the build's channel, asked of npm's
+  registry at most once a day by the running instance and answered on `GET /api/instance/newer`, with
+  the stop command for how Jig UI was started; the page's header says it in one line
+  (adr-20261031-jig-ui-asks-npm-for-a-newer-release). `main.ts` gives it to `createApp`; `http/`
+  knows only its type.
 - `server/open-browser.ts` — opens the browser through `open.html` in the config directory, so
   the token is never a process argument (adr-20261017-browser-opens-through-a-redirect-file).
 - `web/` — the Vue 3 page, built from shadcn-vue components on Tailwind (adr-20261018-page-built-from-shadcn-vue-with-router-and-canvas,

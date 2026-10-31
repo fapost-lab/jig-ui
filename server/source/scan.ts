@@ -38,8 +38,9 @@ export interface ScanOptions {
 
 /**
  * The Jig projects under `folder`, a real path: each folder with a `.git` directory — a main checkout — and Jig's
- * script. It reads folder listings only: it runs no Jig and no git and opens no file. It never walks into a repository,
- * a hidden folder, `node_modules` or a symbolic link, and passes over a folder it may not read.
+ * script. It reads folder listings only: it runs no Jig and no git and opens no file. It walks into a repository too, as
+ * a project may keep another inside it, but never into a hidden folder, `node_modules` or a symbolic link, and passes
+ * over a folder it may not read.
  */
 export async function scanFolder(
   folder: string,
@@ -62,15 +63,11 @@ export async function scanFolder(
     } catch {
       return;
     }
-    const git = entries.find((e) => e.name === '.git');
-    if (git) {
-      // A `.git` file is a worktree's (connect refuses it), a submodule's or a `--separate-git-dir` clone's: passed over,
-      // as the ADR says; its path typed in the field connects the last two.
-      if (git.isDirectory() && hasJig(dir)) {
-        if (connected.has(dir)) scan.connected++;
-        else scan.found.push(dir);
-      }
-      return;
+    // A `.git` file is a worktree's (connect refuses it), a submodule's or a `--separate-git-dir` clone's: passed over,
+    // as the ADR says; its path typed in the field connects the last two.
+    if (entries.some((e) => e.name === '.git' && e.isDirectory()) && hasJig(dir)) {
+      if (connected.has(dir)) scan.connected++;
+      else scan.found.push(dir);
     }
     if (level >= depth) return;
     const inHome = dir === home;

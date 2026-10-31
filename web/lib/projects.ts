@@ -11,6 +11,10 @@ export type Listed = Project | Reading;
 
 const isRead = (p: Listed): p is Project => p.state !== 'reading';
 
+/** The projects by id, A–Z: case aside, and numbers by value, so `app2` comes before `app10`. */
+export const byName = <P extends { id: string }>(projects: P[]): P[] =>
+  [...projects].sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true, sensitivity: 'base' }));
+
 /** The projects whose id holds what was typed, whatever its case; every project when nothing is. */
 export function matching<P extends { id: string }>(projects: P[], query: string): P[] {
   const typed = query.trim().toLowerCase();

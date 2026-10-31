@@ -18,14 +18,14 @@ paths:
   - web/lib/scan.ts
   - web/components/ConnectForm.vue
 summary: "The workspace page: a list of the connected projects with search and the chosen one's card — Jig's attention items, the mark and count of projects whose Jig is older than the machine's, their upgrade from the card — and Find projects, which lists the Jig projects in a folder not connected yet"
-reviewed_at: 2026-10-30
+reviewed_at: 2026-10-31
 ---
 # Workspace — every connected project on one page
 
 ## What
 
-The page at `#/` (`web/views/WorkspaceView.vue`): a list of the connected projects with a search
-over their ids (`web/components/ProjectList.vue`) and, beside it, one project's card
+The page at `#/` (`web/views/WorkspaceView.vue`): a list of the connected projects by id, A–Z
+(`byName` in `web/lib/projects.ts`, as the header's dropdown is too), with a search over their ids (`web/components/ProjectList.vue`) and, beside it, one project's card
 (`web/components/ProjectCard.vue`). The card is the project `?project=<id>` names, else the first
 that needs the person — not readable, or with an attention item — else the first
 (`web/lib/projects.ts`); a click in the list sets `?project=`, and a project just connected is

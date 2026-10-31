@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { posix, win32 } from 'node:path';
 
@@ -44,10 +45,19 @@ export interface ReleaseDeps {
   timeoutMs?: number;
 }
 
+/** `dir` with its symlinks resolved, as Node.js resolves them in `process.execPath`; as written when it is not there. */
+function real(dir: string): string {
+  try {
+    return realpathSync.native(dir);
+  } catch {
+    return dir;
+  }
+}
+
 /** The folder of the Node.js `install.sh` downloads when the machine has none — `node` in Jig UI's data folder — with its separator. */
 function ownNode(env: NodeJS.ProcessEnv, platform: NodeJS.Platform, home: string): string | undefined {
-  if (platform === 'win32') return env.LOCALAPPDATA && win32.join(env.LOCALAPPDATA, 'jig-ui', 'node') + win32.sep;
-  return posix.join(env.XDG_DATA_HOME || posix.join(home, '.local', 'share'), 'jig-ui', 'node') + posix.sep;
+  if (platform === 'win32') return env.LOCALAPPDATA && real(win32.join(env.LOCALAPPDATA, 'jig-ui', 'node')) + win32.sep;
+  return real(posix.join(env.XDG_DATA_HOME || posix.join(home, '.local', 'share'), 'jig-ui', 'node')) + posix.sep;
 }
 
 /**

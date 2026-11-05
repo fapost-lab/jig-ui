@@ -67,7 +67,7 @@ Jig's contract says a cache behind the forge "can only withhold a close the comm
   closes the window.
 - Jig 0.40.0 counts its own note of which session works a task as a write: run with an agent
   session's id in its environment (`CLAUDE_CODE_SESSION_ID`, a Jig UI started from Claude Code), the
-  close is refused as `stale-revision` against any board, a fresh one included. Started from a
-  terminal or as a service, Jig UI passes no such id.
+  close is refused as `stale-revision` against any board, a fresh one included (fapost-lab/jig#389).
+  Started from a terminal or as a service, Jig UI passes no such id.
 - A close of a task whose pull request is still open is shown and refused by Jig, with its reason.
 - Closing cannot be undone from the board.

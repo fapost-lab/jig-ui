@@ -290,8 +290,9 @@ A drop on any other column does nothing.
 A card in **Ready** whose task can be closed carries a **✕** beside its ⋯ menu. Press it,
 then **Close task** in the question below it, to close the task as done: Jig UI runs
 `jig task set <id> status consolidated` — the command Jig's own `close` action names — in the
-project, after a read shows that nothing was written there since the board you saw. The card leaves the
-board and shows in the list of finished tasks.
+project, checked against the board you saw: from Jig 0.40.0 Jig itself refuses the close when
+anything was written there since; with an older Jig, Jig UI reads the project just before. The card
+leaves the board and shows in the list of finished tasks.
 
 Jig decides whether the task may close, not Jig UI. It closes a task only once its knowledge
 decision is recorded and its pull request has merged, and it asks the forge about the merge as it

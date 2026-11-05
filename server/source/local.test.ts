@@ -57,7 +57,7 @@ function project(
     tasks?: unknown;
     specs?: unknown;
     queue?: unknown;
-    /** What `queue move`, `set`, `request`, `cancel`, `task new` and `task resume` print, once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
+    /** What `queue move`, `set`, `request`, `cancel`, `task new`, `task resume` and `task set … --json` print, once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
     write?: unknown;
     /** What `upgrade --dry-run` prints, as `data`, or a whole envelope as a string. */
     plan?: unknown;
@@ -124,7 +124,7 @@ case "$*" in
   "task list --all --json") cat tasks.json ;;
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
-  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*|"task set "*" --json") while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
   "task artifacts "*) while [ -f hold-artifacts ]; do sleep 0.05; done; cat artifacts.json; if grep -q '"error"' artifacts.json; then exit 1; fi ;;
   "task artifact read "*) cat artifact.json; if grep -q '"error"' artifact.json; then exit 1; fi ;;
   "task set "*) cat set.err >&2; exit ${answers.set?.code ?? 0} ;;
@@ -742,6 +742,19 @@ describe('localSource, writing the queue', () => {
       const set = ran.indexOf('task set unheard status consolidated');
       expect(ran.slice(0, set)).toContain('queue list --json');
       expect(ran.slice(set + 1)).toEqual(expect.arrayContaining(['task list --all --json']));
+    });
+
+    it('has Jig 0.40.0 check the close against the revision of the read', async () => {
+      const dir = project('json-closer', '0.40.0', { tasks: ready, write: { task: {} } });
+      await source.connect(dir);
+      expect(await source.close('json-closer', 'unheard', 7)).toEqual({ state: 'written' });
+      expect(sets(dir)).toEqual(['task set unheard status consolidated --revision 7 --json']);
+    });
+
+    it("carries Jig 0.40.0's refusal by its code, with its reason", async () => {
+      const dir = project('not-closer', '0.40.0', { tasks: ready, write: 'not-closable' });
+      await source.connect(dir);
+      expect(await source.close('not-closer', 'cached-open', 7)).toEqual({ state: 'refused', code: 'not-closable', reasons: ['refused'] });
     });
 
     it('refuses a task it does not offer to close without running Jig', async () => {

@@ -1,0 +1,1 @@
+{"schema":1,"revision":1793894314,"generated_at":"2026-11-05T16:00:13Z","error":{"code":"not-closable","message":"task set: status consolidated requires knowledge_consolidated true; record the knowledge decision first: jig task set e1 knowledge_consolidated true"}}

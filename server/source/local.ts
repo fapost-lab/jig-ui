@@ -716,13 +716,14 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
   async function writing(
     id: string,
     taskIds: string[],
-    write: (root: string) => Promise<void>,
+    write: (root: string, jigVersion: string) => Promise<void>,
     specIds: string[] = [],
     allowed: (task: Task) => boolean = () => true,
   ): Promise<Written | undefined> {
     const project = (await readProjects(configDir)).find((p) => p.id === id);
     if (!project) return undefined;
-    const { tasks, specs } = await shown(project);
+    const { view, tasks, specs } = await shown(project);
+    if (view.state !== 'ready') return view;
     if (tasks.state !== 'ready') return tasks;
     const open = specs.state === 'ready' ? specs.specs.filter((s) => s.epic?.state === 'open').map((s) => s.id) : [];
     if (!taskIds.every((t) => tasks.tasks.some((live) => live.id === t && allowed(live))) || !specIds.every((s) => open.includes(s))) {
@@ -732,7 +733,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     // Jig replaces its own scripts while it upgrades: the write waits for the person to try again.
     if (entry.upgrade?.state === 'running') return { state: 'refused', code: 'upgrading' };
     let written: Written = { state: 'written' };
-    const run = write(project.path);
+    const run = write(project.path, view.jigVersion);
     entry.writes.add(run);
     try {
       await run;
@@ -894,7 +895,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       return writing(
         id,
         [taskId],
-        (root) => closeTask(root, taskId, revision),
+        (root, jigVersion) => closeTask(root, taskId, revision, jigVersion),
         [],
         (t) => t.closable,
       );

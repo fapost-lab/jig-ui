@@ -366,8 +366,16 @@
       </div>
     </CanvasSection>
 
-    <CanvasSection title="FinishedList" note="closed with its pull request merged; abandoned; one without a goal">
-      <FinishedList :tasks="finished" class="border" />
+    <CanvasSection
+      title="FinishedList"
+      note="closed with its pull request merged; abandoned; one without a goal; the read under way; none left; a read that failed, with Read again"
+    >
+      <div class="flex flex-col gap-3">
+        <FinishedList :read="{ state: 'ready', tasks: finished }" class="border" />
+        <FinishedList class="border" />
+        <FinishedList :read="{ state: 'ready', tasks: [] }" class="border" />
+        <FinishedList :read="{ id: 'jig-ui', state: 'unreadable', code: 'timeout' }" class="border" />
+      </div>
     </CanvasSection>
 
     <CanvasSection

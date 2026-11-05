@@ -2,7 +2,19 @@
   import { Columns3, Milestone, Plus, Rows3 } from '@lucide/vue';
   import { computed, onUnmounted, ref, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
-  import { type Board, call, client, onChange, type Place, readAgain, readTask, type ReadyDetails, type Specs, type Written } from '@/api';
+  import {
+    type Board,
+    call,
+    client,
+    type Finished,
+    onChange,
+    type Place,
+    readAgain,
+    readTask,
+    type ReadyDetails,
+    type Specs,
+    type Written,
+  } from '@/api';
   import BoardColumns from '@/components/BoardColumns.vue';
   import BoardFilter from '@/components/BoardFilter.vue';
   import BoardList from '@/components/BoardList.vue';
@@ -30,14 +42,32 @@
 
   const param = { id: encodeURIComponent(props.id) };
 
-  /** The finished tasks Jig still keeps, shown under the header only when the person asks; hidden on every visit. */
-  const finished = computed(() => (typeof board.value === 'object' && board.value.state === 'ready' ? board.value.finished : []));
+  /** How many finished tasks Jig still keeps; the tasks are read only when the person asks, and hidden on every visit. */
+  const finishedCount = computed(() => (typeof board.value === 'object' && board.value.state === 'ready' ? board.value.finishedCount : 0));
   const showFinished = ref(false);
   // With the last one gone the toggle goes too; the next one to finish is not shown unasked.
   watch(
-    () => finished.value.length === 0,
+    () => finishedCount.value === 0,
     (none) => none && (showFinished.value = false),
   );
+
+  /** The finished tasks as last read; none while the first read since opening the list runs. */
+  const finished = ref<Finished>();
+  // A run with the list closed lands nothing, yet still keeps an older read from landing. Any failure is this list's, not the project's.
+  const loadFinished = lastWins(
+    async () => {
+      if (!showFinished.value) return undefined;
+      const res = await call(() => client.api.projects[':id'].finished.$get({ param }));
+      return res?.status === 200 ? (await res.json()).finished : ({ id: props.id, state: 'unreadable', code: 'failed' } as const);
+    },
+    (read) => (finished.value = read),
+  );
+
+  function readFinishedAfresh(): void {
+    finished.value = undefined;
+    void loadFinished();
+  }
+  watch(showFinished, readFinishedAfresh);
 
   const load = lastWins(
     async () => {
@@ -54,7 +84,7 @@
     reading.value = true;
     const read = await readAgain(props.id);
     reading.value = false;
-    if (read) await Promise.all([load(), loadSpecs()]);
+    if (read) await Promise.all([load(), loadSpecs(), loadFinished()]);
   }
 
   const specs = ref<Specs | 'not-connected'>();
@@ -270,6 +300,7 @@
       if (project !== undefined && project !== props.id) return;
       void load();
       void loadSpecs();
+      void loadFinished();
       void readSelected();
     }),
   );
@@ -280,8 +311,8 @@
     <Collapsible v-model:open="filing" class="shrink-0" @update:open="filingRefusal = undefined">
       <div class="flex shrink-0 items-center gap-3 border-b px-3 py-1.5">
         <h1 class="font-semibold">{{ id }}</h1>
-        <Toggle v-if="finished.length > 0" v-model="showFinished" variant="outline" size="sm">
-          {{ finished.length }} finished {{ finished.length === 1 ? 'task' : 'tasks' }}
+        <Toggle v-if="finishedCount > 0" v-model="showFinished" variant="outline" size="sm">
+          {{ finishedCount }} finished {{ finishedCount === 1 ? 'task' : 'tasks' }}
         </Toggle>
         <ToggleGroup
           v-if="typeof board === 'object' && board.state === 'ready'"
@@ -306,7 +337,12 @@
       </CollapsibleContent>
     </Collapsible>
 
-    <FinishedList v-if="showFinished && finished.length > 0" :tasks="finished" class="max-h-48 shrink-0 overflow-y-auto border-b" />
+    <FinishedList
+      v-if="showFinished"
+      :read="finished"
+      class="max-h-48 shrink-0 overflow-y-auto border-b"
+      @read-again="readFinishedAfresh"
+    />
 
     <BoardFilter
       v-if="typeof board === 'object' && board.state === 'ready' && view !== 'specs'"

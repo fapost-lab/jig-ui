@@ -14,7 +14,7 @@ paths:
   - web/lib/refusal.ts
   - web/lib/sift.ts
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
-reviewed_at: 2026-10-30
+reviewed_at: 2026-11-05
 ---
 # Board
 
@@ -99,8 +99,12 @@ done, or moving.
   `web/lib/placement.ts`).
 - The order of the columns is not the order of the rules: what waits for the person comes first
   (maintainer, task `design-system`, 2026-10-18).
-- The finished list holds what `jig task list --all` returns, read with the live tasks in one Jig
-  run: a closed task until housekeeping sees its branch merged — a task of an epic, the epic on
+- The board's read holds only how many finished tasks there are (`hidden` of `jig task list`, less
+  `archived`), which keeps the toggle's number, and a project's change signal, without reading them.
+  The list holds what `jig task list --status consolidated` and `--status abandoned` return, read
+  through `GET /api/projects/:id/finished` when the person opens it and on each change while it is
+  open; it is kept nowhere, and its failure is the list's own (a line and Read again), never the
+  project's `unreadable`. That leaves: a closed task until housekeeping sees its branch merged — a task of an epic, the epic on
   the default branch — and moves its workspace to trash (one with no branch, or none seen merged,
   stays), an abandoned one for `housekeeping.abandoned_ttl` (14 days by default). An archived task
   (Jig 0.37.0: an abandoned one past that time, one nobody touched for `housekeeping.stale_after`,
@@ -108,7 +112,8 @@ done, or moving.
   showed it would be the one place it still turns up. Each row is the
   id, closed or abandoned, the goal, the pull request and the day Jig last changed the task, the
   latest first; a finished task has no details and no actions. The list starts hidden on every
-  visit, and closes when the last finished task leaves; nothing remembers it.
+  visit, and closes when the last finished task leaves; nothing remembers it. An empty read under
+  a count above zero — housekeeping between the two reads — says Jig keeps none now.
 
 ## Decisions and rejected alternatives
 
@@ -142,8 +147,12 @@ done, or moving.
   choice): Jig forgets a closed task once housekeeping sees it merged (an epic's, once the epic
   lands), so a column would hold the latest closed tasks and the abandoned ones, which is no
   history; the merged pull requests are. Reading
-  them on demand, through a route of their own — rejected for `--all` in the board's read: no new
-  route and no Jig run of its own. Each task Jig keeps adds about 0.06 s to the task list (0.26 s
+  them on demand, through a route of their own — first rejected for `--all` in the board's read (no
+  new route and no Jig run of its own), then taken as the note below foresaw (task
+  `closed-tasks-on-demand`, 2026-11-05, the maintainer's request): on a real project `--all` answered
+  99 KB against 25 KB, about 0.4 s more in the read of four parallel runs whose single timeout makes the
+  whole project `unreadable`. The count stayed on the toggle because Jig's plain list already says
+  it. Each task Jig keeps adds about 0.06 s to the task list (0.26 s
   live only, 0.45 s with three finished, measured 2026-10-25), hidden while `jig status`, read
   beside it, takes longer (0.84 s): from about ten kept tasks — an epic's, kept until it lands — the
   board waits on the list, and the finished ones are worth a read of their own, on demand. A Collapsible

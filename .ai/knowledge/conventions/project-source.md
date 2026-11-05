@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-10-30
+reviewed_at: 2026-11-05
 ---
 # ProjectSource — how the server reaches a project
 
@@ -46,7 +46,8 @@ Callers (`board/`, and `http/` for task details and the change stream) depend on
 The port is `ProjectSource` in `server/source/project-source.ts` — the workspace, the connected ids
 (`connected()`, read from the registry without running Jig) and one project as the workspace shows it
 (`project(id)`), for a page that lists the projects before their reads land, a project's
-live tasks and the finished ones Jig still keeps (`tasks(id)`, for the board), one live task in full (`task(id, taskId)`), a task's documents (`artifacts(id, taskId)`, and one as it
+live tasks and how many finished ones Jig still keeps (`tasks(id)`, for the board), those finished tasks (`finished(id)`,
+read through Jig at each call and kept nowhere, so a failure stays its own answer and never becomes the project's state), one live task in full (`task(id, taskId)`), a task's documents (`artifacts(id, taskId)`, and one as it
 is written, `artifact(id, taskId, kind)`, read through Jig at each call), its specs
 (`specs(id)`), `readAgain(id)` — the project read through Jig now, for a person's Read again — `scan(folder?)`, the
 Jig projects under a folder — the source's own home folder when none is given — by path — connect,
@@ -90,8 +91,8 @@ the adapter's memory on the project's entry and goes out on the workspace read a
 listeners hear it at the start and at the end. Those reasons, the plan's `wouldStop` and the
 `manualSteps` of a plan or a run are Jig's own text, and JigClient has cut their paths. While it runs the adapter runs no other Jig in the
 project: a read is skipped and the last one stays — kept by `stop()` too, so a new subscription does
-not read it —, a task's documents answer `unreadable: upgrading` and a write `refused: upgrading`,
-both without Jig; the run itself starts once the reads, the document reads and the writes under way
+not read it —, a task's documents and the finished tasks answer `unreadable: upgrading` and a write `refused: upgrading`,
+all without Jig; the run itself starts once the reads, the on-demand reads and the writes under way
 have ended. `disconnect` answers `upgrading` meanwhile. Upgrade starts and
 disconnects run one at a time, so of two sent at once the second finds what the first did. It reads
 the project once the run ends (adr-20261027-upgrading-a-project-runs-in-the-background).

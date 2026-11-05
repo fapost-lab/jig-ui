@@ -45,8 +45,33 @@ const attention = {
   url: null,
 };
 
+interface ListAnswer {
+  tasks?: {
+    status: string;
+  }[];
+  hidden?: number;
+  archived?: number;
+}
+
+/** What Jig's three lists print of `tasks`, as it sorts them out: the live ones with the rest counted, and each status alone. */
+function lists(answer: ListAnswer) {
+  const rows = answer.tasks ?? [];
+  const only = (status: string) => ({ ...answer, tasks: rows.filter((t) => t.status === status), hidden: 0 });
+  const live = rows.filter((t) => !['consolidated', 'abandoned', 'archived'].includes(t.status));
+  return {
+    live: {
+      ...answer,
+      tasks: live,
+      hidden: (answer.hidden ?? 0) + rows.length - live.length,
+      archived: (answer.archived ?? 0) + rows.filter((t) => t.status === 'archived').length,
+    },
+    consolidated: only('consolidated'),
+    abandoned: only('abandoned'),
+  };
+}
+
 /**
- * A git clone whose Jig answers `--version`, `status --json`, `task list --all --json` and `spec list --json` from files, and
+ * A git clone whose Jig answers `--version`, `status --json`, `task list --json`, `task list --status <s> --json` and `spec list --json` from files, and
  * logs every call to `calls.log`. `status` given as a string is printed as is, with exit 1.
  */
 function project(
@@ -55,6 +80,8 @@ function project(
   answers: {
     status?: unknown;
     tasks?: unknown;
+    /** What `task list --status abandoned` prints instead of the list's abandoned ones: a refusal's code, or an envelope's `data`. */
+    abandoned?: unknown;
     specs?: unknown;
     queue?: unknown;
     /** What `queue move`, `set`, `request`, `cancel`, `task new` and `task resume` print, once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
@@ -90,7 +117,9 @@ function project(
     join(dir, 'status.json'),
     refused ? (answers.status as string) : envelope(answers.status ?? { attention: [], housekeeping: null }),
   );
-  writeFileSync(join(dir, 'tasks.json'), envelope(answers.tasks ?? { tasks: [], hidden: 0, housekeeping: null }));
+  const listed = lists((answers.tasks ?? { tasks: [], hidden: 0, housekeeping: null }) as ListAnswer);
+  writeFileSync(join(dir, 'tasks.json'), envelope(listed.live));
+  writeFileSync(join(dir, 'consolidated.json'), envelope(listed.consolidated));
   writeFileSync(join(dir, 'specs.json'), typeof answers.specs === 'string' ? answers.specs : envelope(answers.specs ?? { specs: [] }));
   writeFileSync(join(dir, 'queue.json'), envelope(answers.queue ?? { items: [] }));
   const write = answers.write ?? { ref: 'task:x', item: null };
@@ -104,6 +133,7 @@ function project(
     typeof data === 'string'
       ? JSON.stringify({ schema: 1, revision: 9, generated_at: 'x', error: { code: data, message: 'refused' } })
       : envelope(data);
+  writeFileSync(join(dir, 'abandoned.json'), answer(answers.abandoned ?? listed.abandoned));
   writeFileSync(join(dir, 'artifacts.json'), answer(answers.artifacts ?? { task: 'x', artifacts: [] }));
   writeFileSync(join(dir, 'artifact.json'), answer(answers.artifact ?? 'not-found'));
   writeFileSync(join(dir, 'plan.json'), typeof answers.plan === 'string' ? answers.plan : envelope(answers.plan ?? {}));
@@ -121,7 +151,9 @@ echo "$*" >> calls.log
 case "$*" in
   --version) echo "jig ${version}" ;;
   "status --json") cat status.json; exit ${refused ? 1 : 0} ;;
-  "task list --all --json") cat tasks.json ;;
+  "task list --json") cat tasks.json ;;
+  "task list --status consolidated --json") cat consolidated.json ;;
+  "task list --status abandoned --json") while [ -f hold-finished ]; do sleep 0.05; done; cat abandoned.json; if grep -q '"error"' abandoned.json; then exit 1; fi ;;
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
   "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
@@ -299,7 +331,7 @@ describe('localSource', () => {
       { id: 'broken', state: 'unreadable', code: 'not-initialised', upgrade: null },
     ]);
     expect(calls(old)).not.toContain('status --json');
-    expect(calls(old)).not.toContain('task list --all --json');
+    expect(calls(old)).not.toContain('task list --json');
     expect(calls(old)).not.toContain('spec list --json');
   });
 
@@ -472,7 +504,7 @@ describe('localSource', () => {
     await source.disconnect('newer');
   });
 
-  it("lists a project's live tasks as a board reads them, and the finished ones Jig keeps", async () => {
+  it("lists a project's live tasks as a board reads them, and how many finished ones Jig keeps", async () => {
     await source.connect(
       project('waiting', '0.31.0', {
         tasks: {
@@ -500,16 +532,7 @@ describe('localSource', () => {
     );
     expect(await source.tasks('busy')).toEqual({
       state: 'ready',
-      finished: [
-        {
-          id: 'closed',
-          status: 'consolidated',
-          goal: 'Goal of closed',
-          updatedAt: '2026-10-24',
-          pullRequest: { url: 'https://github.com/o/r/pull/9', state: 'merged' },
-        },
-        { id: 'dropped', status: 'abandoned', goal: null, updatedAt: '2026-10-17', pullRequest: null },
-      ],
+      finishedCount: 2,
       revision: 7,
       tasks: [
         {
@@ -540,9 +563,22 @@ describe('localSource', () => {
         expect.objectContaining({ id: 'd', status: 'ready' }),
       ],
     });
+    expect(await source.finished('busy')).toEqual({
+      state: 'ready',
+      tasks: [
+        {
+          id: 'closed',
+          status: 'consolidated',
+          goal: 'Goal of closed',
+          updatedAt: '2026-10-24',
+          pullRequest: { url: 'https://github.com/o/r/pull/9', state: 'merged' },
+        },
+        { id: 'dropped', status: 'abandoned', goal: null, updatedAt: '2026-10-17', pullRequest: null },
+      ],
+    });
     expect(await source.tasks('waiting')).toEqual({
       state: 'ready',
-      finished: [],
+      finishedCount: 0,
       revision: 7,
       tasks: [
         expect.objectContaining({ id: 'f', started: false, gate: null, autopilot: null }),
@@ -604,6 +640,63 @@ describe('localSource', () => {
   });
 });
 
+describe('localSource, the finished tasks', () => {
+  const source = localSource(join(root, 'finished-config'));
+  const rows = [
+    task('live', 'active'),
+    task('zed', 'consolidated'),
+    task('dropped', 'abandoned', false, { goal: null }),
+    task('closed', 'consolidated'),
+  ];
+
+  it('reads none of them for the board, counts them, and leaves out the archived ones', async () => {
+    const dir = project('finished-board', '0.39.0', { tasks: { tasks: rows, hidden: 1, archived: 1, housekeeping: null } });
+    await source.connect(dir);
+    expect(await source.tasks('finished-board')).toMatchObject({
+      state: 'ready',
+      finishedCount: 3,
+      tasks: [expect.objectContaining({ id: 'live' })],
+    });
+    expect(new Set(calls(dir).filter((c) => c.startsWith('task list')))).toEqual(new Set(['task list --json']));
+  });
+
+  it("reads them when asked, each of Jig's two statuses, by id", async () => {
+    const dir = project('finished-read', '0.31.0', {
+      tasks: { tasks: [...rows, task('put-away', 'archived')], hidden: 0, housekeeping: null },
+    });
+    await source.connect(dir);
+    expect(await source.finished('finished-read')).toEqual({
+      state: 'ready',
+      tasks: [
+        { id: 'closed', status: 'consolidated', goal: 'Goal of closed', updatedAt: '2026-10-17', pullRequest: null },
+        { id: 'dropped', status: 'abandoned', goal: null, updatedAt: '2026-10-17', pullRequest: null },
+        { id: 'zed', status: 'consolidated', goal: 'Goal of zed', updatedAt: '2026-10-17', pullRequest: null },
+      ],
+    });
+    expect(calls(dir)).toEqual(expect.arrayContaining(['task list --status consolidated --json', 'task list --status abandoned --json']));
+  });
+
+  it('answers an empty list when Jig keeps none, and knows no project it does not have', async () => {
+    await source.connect(project('finished-none', '0.31.0'));
+    expect(await source.finished('finished-none')).toEqual({ state: 'ready', tasks: [] });
+    expect(await source.finished('nobody')).toBeUndefined();
+  });
+
+  it('keeps a failure to itself: the project stays as it was shown', async () => {
+    const dir = project('finished-failed', '0.31.0', { tasks: { tasks: rows, hidden: 0, housekeeping: null }, abandoned: 'failed' });
+    await source.connect(dir);
+    expect(await source.finished('finished-failed')).toEqual({ id: 'finished-failed', state: 'unreadable', code: 'failed' });
+    expect(await source.tasks('finished-failed')).toMatchObject({ state: 'ready', finishedCount: 3 });
+    expect(await source.project('finished-failed')).toMatchObject({ state: 'ready' });
+    expect(await source.readAgain('finished-failed')).toMatchObject({ state: 'ready' });
+  });
+
+  it('calls an answer of another shape incompatible', async () => {
+    await source.connect(project('finished-shape', '0.31.0', { abandoned: { tasks: 'none' } }));
+    expect(await source.finished('finished-shape')).toEqual({ id: 'finished-shape', state: 'incompatible', jigVersion: '0.31.0' });
+  });
+});
+
 describe('localSource, writing the queue', () => {
   const source = localSource(join(root, 'write-config'));
   const tasks = {
@@ -623,7 +716,7 @@ describe('localSource, writing the queue', () => {
     const ran = since(dir, from);
     const moved = ran.indexOf('queue move task:b --after task:a --revision 7 --json');
     expect(moved).toBeGreaterThanOrEqual(0);
-    expect(ran.slice(moved + 1)).toEqual(expect.arrayContaining(['task list --all --json', 'queue list --json']));
+    expect(ran.slice(moved + 1)).toEqual(expect.arrayContaining(['task list --json', 'queue list --json']));
     expect(await source.move('mover', 'a', 'top', 7)).toEqual({ state: 'written' });
     expect(await source.move('mover', 'a', 'bottom', 7)).toEqual({ state: 'written' });
     expect(writes(dir).slice(1)).toEqual(['queue move task:a --top --revision 7 --json', 'queue move task:a --bottom --revision 7 --json']);
@@ -678,7 +771,7 @@ describe('localSource, writing the queue', () => {
     const ran = since(dir, from);
     const filed = ran.indexOf('task new zeta --goal Do the thing --json');
     expect(filed).toBeGreaterThanOrEqual(0);
-    expect(ran.slice(filed + 1)).toEqual(expect.arrayContaining(['task list --all --json']));
+    expect(ran.slice(filed + 1)).toEqual(expect.arrayContaining(['task list --json']));
     expect(await source.fileTask('nobody', 'zeta', 'x')).toBeUndefined();
   });
 
@@ -741,7 +834,7 @@ describe('localSource, writing the queue', () => {
       const ran = since(dir, from);
       const set = ran.indexOf('task set unheard status consolidated');
       expect(ran.slice(0, set)).toContain('queue list --json');
-      expect(ran.slice(set + 1)).toEqual(expect.arrayContaining(['task list --all --json']));
+      expect(ran.slice(set + 1)).toEqual(expect.arrayContaining(['task list --json']));
     });
 
     it('refuses a task it does not offer to close without running Jig', async () => {
@@ -794,7 +887,7 @@ describe('localSource, writing the queue', () => {
     const from = calls(dir).length;
     expect(await source.move('stale', 'a', 'top', 3)).toEqual({ state: 'refused', code: 'stale-revision', reasons: ['refused'] });
     const ran = since(dir, from);
-    expect(ran.slice(ran.indexOf('queue move task:a --top --revision 3 --json') + 1)).toContain('task list --all --json');
+    expect(ran.slice(ran.indexOf('queue move task:a --top --revision 3 --json') + 1)).toContain('task list --json');
   });
 
   it('bases a write on the oldest of the reads the board is made of', async () => {
@@ -842,7 +935,7 @@ mkdir -p .ai/runtime/working && echo "$*" > .ai/runtime/working/session
 case "$*" in
   --version) echo "jig 0.31.0" ;;
   "status --json") cat status.json; if grep -q '"error"' status.json; then exit 1; fi ;;
-  "task list --all --json") cat tasks.json ;;
+  "task list --json") cat tasks.json ;;
   "spec list --json") echo '{"schema":1,"revision":1,"generated_at":"x","data":{"specs":[]}}' ;;
   "queue list --json") cat queue.json ;;
 esac
@@ -1294,6 +1387,8 @@ describe('localSource, upgrading a project', () => {
       state: 'unreadable',
       code: 'upgrading',
     });
+    expect(await source.finished('behind-documents')).toEqual({ id: 'behind-documents', state: 'unreadable', code: 'upgrading' });
+    expect(calls(dir).filter((c) => c.startsWith('task list --status'))).toEqual([]);
     expect(documents()).toBe(0);
     writeFileSync(join(dir, 'go'), '');
     await ended('behind-documents');
@@ -1311,6 +1406,21 @@ describe('localSource, upgrading a project', () => {
     rmSync(join(dir, 'hold-artifacts'));
     expect(await reading).toEqual({ state: 'ready', artifacts: [] });
     await until(() => upgrades() > before);
+    writeFileSync(join(dir, 'go'), '');
+    await ended('behind-documents');
+
+    // So does a read of the finished tasks.
+    rmSync(join(dir, 'go'));
+    writeFileSync(join(dir, 'hold-finished'), '');
+    const held = upgrades();
+    const listing = source.finished('behind-documents');
+    await until(() => calls(dir).includes('task list --status abandoned --json'));
+    expect(await source.upgrade('behind-documents')).toEqual({ state: 'started' });
+    await delay(300);
+    expect(upgrades()).toBe(held);
+    rmSync(join(dir, 'hold-finished'));
+    expect(await listing).toEqual({ state: 'ready', tasks: [] });
+    await until(() => upgrades() > held);
     writeFileSync(join(dir, 'go'), '');
     await ended('behind-documents');
   });

@@ -1,19 +1,33 @@
 <script setup lang="ts">
   import { ExternalLink } from '@lucide/vue';
   import { computed } from 'vue';
-  import { finished, type FinishedTask, latestFirst } from '@/lib/finished';
+  import type { Finished } from '@/api';
+  import { Button } from '@/components/ui/button';
+  import { finished, latestFirst, noFinished } from '@/lib/finished';
   import { toneText } from '@/lib/tones';
 
   const props = defineProps<{
-    /** The finished tasks Jig still keeps; shown the latest first. */
-    tasks: FinishedTask[];
+    /** The read of the finished tasks Jig still keeps, shown the latest first; none yet while it runs. */
+    read?: Finished;
   }>();
 
-  const rows = computed(() => latestFirst(props.tasks).map((task) => ({ task, ...finished(task) })));
+  defineEmits<{
+    readAgain: [];
+  }>();
+
+  const none = computed(() => props.read && noFinished(props.read));
+  const rows = computed(() =>
+    props.read?.state === 'ready' ? latestFirst(props.read.tasks).map((task) => ({ task, ...finished(task) })) : [],
+  );
 </script>
 
 <template>
-  <ul aria-label="Finished tasks">
+  <p v-if="read === undefined" class="px-3 py-1.5 text-muted-foreground">Reading the finished tasks…</p>
+  <p v-else-if="none" class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-muted-foreground">
+    {{ none }}
+    <Button v-if="read.state === 'unreadable'" variant="outline" size="xs" @click="$emit('readAgain')">Read again</Button>
+  </p>
+  <ul v-else aria-label="Finished tasks">
     <li v-for="{ task, word, tone, pr } in rows" :key="task.id" class="flex items-center gap-3 border-b px-3 py-1.5 last:border-b-0">
       <span class="w-40 shrink-0 truncate font-semibold" :title="task.id">{{ task.id }}</span>
       <span class="w-20 shrink-0" :class="toneText[tone]">{{ word }}</span>

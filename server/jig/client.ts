@@ -442,18 +442,42 @@ const TaskRow = z
   }));
 export type TaskSummary = z.output<typeof TaskRow>;
 
-const TaskList = z.object({ tasks: z.array(TaskRow) });
+/** `hidden` is what the selection left out; from Jig 0.37.0, which has `archived`, the archived ones among them. */
+const TaskList = z
+  .object({ tasks: z.array(TaskRow), hidden: count, archived: count.optional() })
+  .transform(({ tasks, hidden, archived = 0 }) => ({
+    tasks,
+    finished: hidden - archived,
+  }));
 
-/** The project's tasks, the finished ones too while Jig keeps their workspace (`jig task list --all --json`). */
+/** The project's live tasks and how many finished ones Jig left out of them, without reading those (`jig task list --json`). */
 export async function readTasks(
   root: string,
   platform: NodeJS.Platform = process.platform,
 ): Promise<{
   revision: number;
   tasks: TaskSummary[];
+  finished: number;
 }> {
-  const { revision, data } = await readJson(root, ['task', 'list', '--all'], platform);
+  const { revision, data } = await readJson(root, ['task', 'list'], platform);
   return { revision, ...parsed(TaskList, data) };
+}
+
+/**
+ * The closed and the abandoned tasks while Jig keeps their workspace, by id as Jig sorts a list. `--status` takes one
+ * status at a time, so this is two runs; an archived task is in neither.
+ */
+export async function readFinishedTasks(root: string, platform: NodeJS.Platform = process.platform): Promise<TaskSummary[]> {
+  // Both are waited for, a failure too: an upgrade starts once this read has ended, and must find no Jig still running.
+  const reads = await Promise.allSettled(
+    ['consolidated', 'abandoned'].map((status) => readJson(root, ['task', 'list', '--status', status], platform)),
+  );
+  return reads
+    .flatMap((read) => {
+      if (read.status === 'rejected') throw read.reason;
+      return parsed(TaskList, read.value.data).tasks;
+    })
+    .sort((a, b) => (a.id < b.id ? -1 : 1));
 }
 
 /** How far a roadmap or one of its phases is: items checked, all items, items with a task filed, fog items. */

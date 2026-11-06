@@ -63,8 +63,8 @@ export function waitingItems(spec: Spec): Set<string> {
   );
 }
 
-/** How far the edits waiting on a spec's branch went, when they have no pull request to link to. */
-export function waitingState(waiting: NonNullable<Spec['waiting']>): string {
+/** How far the edits waiting on a write branch of Jig's went — a spec's, the knowledge decisions' — when they have no pull request to link to. */
+export function waitingState(waiting: Pick<NonNullable<Spec['waiting']>, 'pushed'>): string {
   return waiting.pushed ? 'pushed, no pull request yet' : 'committed in this clone, not pushed';
 }
 

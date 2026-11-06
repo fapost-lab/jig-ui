@@ -102,7 +102,7 @@
       <p>{{ project.counts.active }} active · {{ project.counts.paused }} paused · {{ project.counts.ready }} ready</p>
       <p v-if="project.attention.length === 0" class="text-muted-foreground">Nothing needs you here.</p>
       <ul v-else class="flex flex-col gap-3" :aria-label="`What needs you in ${project.id}`">
-        <li v-for="(item, i) in project.attention" :key="i"><AttentionItem :item="item" /></li>
+        <li v-for="(item, i) in project.attention" :key="i"><AttentionItem :item="item" :project="project.id" /></li>
       </ul>
       <p v-if="project.housekeepingStale" class="text-muted-foreground">
         Pull request facts may be out of date: run <code>jig housekeeping</code> in the project.

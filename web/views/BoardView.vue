@@ -1,18 +1,21 @@
 <script setup lang="ts">
-  import { Columns3, Milestone, Plus, Rows3 } from '@lucide/vue';
+  import { BookCheck, Columns3, Milestone, Plus, Rows3 } from '@lucide/vue';
   import { computed, onUnmounted, ref, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
   import {
     type Board,
     call,
     client,
+    type Decision,
     type Edited,
     type ItemPlace,
+    type Knowledge,
     onChange,
     type Place,
     readAgain,
     readTask,
     type ReadyDetails,
+    type SourceDiff,
     type SpecItem,
     type Specs,
     type Written,
@@ -23,6 +26,7 @@
   import EpicMenu from '@/components/EpicMenu.vue';
   import FileItemDialog from '@/components/FileItemDialog.vue';
   import FinishedList from '@/components/FinishedList.vue';
+  import KnowledgeView from '@/components/KnowledgeView.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
   import SpecCard from '@/components/SpecCard.vue';
   import StateLine from '@/components/StateLine.vue';
@@ -32,6 +36,7 @@
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { conflict } from '@/lib/conflict';
   import { movable } from '@/lib/epics';
+  import { knowledgeRefusal, noKnowledge } from '@/lib/knowledge';
   import { lastWins } from '@/lib/last-wins';
   import { closeRefusal, refusal, roadmapRefusal, unnamedRefusal } from '@/lib/refusal';
   import { filtered, fromQuery, reorders, sift, type Sift, toQuery } from '@/lib/sift';
@@ -81,9 +86,15 @@
     (read) => (specs.value = read),
   );
 
-  /** Board, List or Specs, remembered by this browser only; storage that throws leaves the board. */
+  const route = useRoute();
+  const router = useRouter();
+
+  /**
+   * Board, List, Specs or Knowledge, remembered by this browser only; storage that throws leaves the board. A link that
+   * names one (`?view=knowledge`, from the workspace card) opens it, and the address drops it.
+   */
   const VIEW = 'jig-ui.board-view';
-  const VIEWS = ['board', 'list', 'specs'] as const;
+  const VIEWS = ['board', 'list', 'specs', 'knowledge'] as const;
   type View = (typeof VIEWS)[number];
   const isView = (v: unknown): v is View => VIEWS.includes(v as View);
   function storedView(): View {
@@ -103,6 +114,10 @@
     } catch {
       // Storage refused: the choice holds until the page closes.
     }
+  }
+  if (route.query.view !== undefined) {
+    show(route.query.view);
+    void router.replace({ query: { ...route.query, view: undefined } });
   }
 
   /** The task whose details are open: expanded on the board, in the pane of the list. Its details are read on demand. */
@@ -132,8 +147,6 @@
   const liveIds = computed(() => cards.value.map((t) => t.id));
 
   /** How Board and List look at the board — sort and filters — kept in the page's address, so a reload or a link keeps it. */
-  const route = useRoute();
-  const router = useRouter();
   const sifting = computed({
     get: () => fromQuery(route.query),
     set: (next: Sift) => void router.replace({ query: toQuery(next) }),
@@ -387,12 +400,91 @@
       client.api.projects[':id'].queue.priority.$post({ param, json: { task, priority, revision } }),
     );
 
+  /** What waits for a decision in the project's knowledge, read only while the view shows it, and each diff open there. */
+  const knowledge = ref<Knowledge | 'not-connected'>();
+  const diffs = ref<Partial<Record<string, SourceDiff | 'reading' | 'not-found'>>>({});
+  const loadKnowledge = lastWins(
+    async () => {
+      const res = await call(() => client.api.projects[':id'].knowledge.$get({ param }));
+      return res && (res.status === 404 ? ('not-connected' as const) : (await res.json()).knowledge);
+    },
+    (read) => {
+      knowledge.value = read;
+      // A diff stays open while its file is still listed as changed, and is read again with the list.
+      const changed = new Set(
+        typeof read === 'object' && read.state === 'ready' ? read.sources.filter((s) => s.state === 'changed').map((s) => s.id) : [],
+      );
+
+      for (const doc of Object.keys(diffs.value)) {
+        if (changed.has(doc)) void readDiff(doc);
+        else delete diffs.value[doc];
+      }
+    },
+  );
+
+  const noneKnown = computed(() => (typeof knowledge.value === 'object' ? noKnowledge(knowledge.value) : undefined));
+
+  async function readDiff(doc: string): Promise<void> {
+    if (diffs.value[doc] === undefined) diffs.value[doc] = 'reading';
+    const res = await call(() =>
+      client.api.projects[':id'].knowledge[':doc'].diff.$get({ param: { ...param, doc: encodeURIComponent(doc) } }),
+    );
+
+    // Closed meanwhile: nothing lands.
+    if (!res || !(doc in diffs.value)) return;
+    diffs.value[doc] = res.status === 200 ? (await res.json()).diff : 'not-found';
+  }
+
+  function toggleDiff(doc: string, open: boolean): void {
+    if (open) void readDiff(doc);
+    else delete diffs.value[doc];
+  }
+
+  /** The document whose decision is on its way to Jig. */
+  const deciding = ref<string>();
+
+  /**
+   * Sends one decision with the revision of the knowledge it was made on, then reads the knowledge again whatever came of
+   * it; Jig's note, or why it refused, goes to the notice.
+   */
+  async function decide(doc: string, decision: Decision): Promise<void> {
+    const shown = knowledge.value;
+    if (typeof shown !== 'object' || shown.state !== 'ready' || deciding.value !== undefined) return;
+    deciding.value = doc;
+    notice.value = undefined;
+    const res = await call(() =>
+      client.api.projects[':id'].knowledge.decide.$post({ param, json: { doc, decision, revision: shown.revision } }),
+    );
+
+    const body = res && (await res.json());
+    await loadKnowledge();
+    deciding.value = undefined;
+    if (!body) return;
+    if (!('error' in body)) {
+      // A project no longer ready is not written: the knowledge read again shows its state.
+      if ('note' in body && body.note) notice.value = { text: body.note, changed: [] };
+      return;
+    }
+    const { code } = body.error;
+    const reasons = 'reasons' in body.error && Array.isArray(body.error.reasons) ? body.error.reasons.map(String) : [];
+    notice.value = {
+      text:
+        code === 'stale-revision'
+          ? 'The knowledge changed since it was shown: here it is as it is now.'
+          : knowledgeRefusal(code, reasons, doc),
+      changed: [],
+    };
+  }
+
+  watch(view, (shown) => shown === 'knowledge' && void loadKnowledge());
+
   onUnmounted(
     onChange((project) => {
       if (project !== undefined && project !== props.id) return;
       void load();
       void loadSpecs();
       void readSelected();
+      if (view.value === 'knowledge') void loadKnowledge();
     }),
   );
 </script>
@@ -418,6 +510,7 @@
           <ToggleGroupItem value="board"><Columns3 />Board</ToggleGroupItem>
           <ToggleGroupItem value="list"><Rows3 />List</ToggleGroupItem>
           <ToggleGroupItem value="specs"><Milestone />Specs</ToggleGroupItem>
+          <ToggleGroupItem value="knowledge"><BookCheck />Knowledge</ToggleGroupItem>
         </ToggleGroup>
         <CollapsibleTrigger v-if="typeof board === 'object' && board.state === 'ready'" as-child>
           <Button variant="outline" size="sm"><Plus />New task</Button>
@@ -431,7 +524,7 @@
     <FinishedList v-if="showFinished && finished.length > 0" :tasks="finished" class="max-h-48 shrink-0 overflow-y-auto border-b" />
 
     <BoardFilter
-      v-if="typeof board === 'object' && board.state === 'ready' && view !== 'specs'"
+      v-if="typeof board === 'object' && board.state === 'ready' && (view === 'board' || view === 'list')"
       v-model="sifting"
       :shown="shownCount"
       :total="cards.length"
@@ -509,6 +602,21 @@
         :taken="filingItem.refusal?.code === 'already-exists'"
         @update:open="(open) => !open && (filingItem = undefined)"
         @file="fileItem"
+      />
+    </div>
+
+    <div v-else-if="view === 'knowledge'" class="min-h-0 flex-1 overflow-y-auto">
+      <p v-if="knowledge === undefined" class="p-3 text-muted-foreground">Reading the knowledge…</p>
+      <p v-else-if="knowledge === 'not-connected'" role="alert" class="p-3 text-destructive">No connected project is called {{ id }}.</p>
+      <p v-else-if="noneKnown" class="p-3 text-muted-foreground">{{ noneKnown }}</p>
+      <KnowledgeView
+        v-else-if="knowledge.state === 'ready'"
+        :knowledge="knowledge"
+        :diffs="diffs"
+        :busy="deciding"
+        :disabled="deciding !== undefined"
+        @decide="decide"
+        @toggle="toggleDiff"
       />
     </div>
 

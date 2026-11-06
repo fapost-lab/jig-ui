@@ -30,7 +30,7 @@ The minimum Jig the package reads is `MIN_JIG_VERSION` in `server/jig/client.ts`
 first Jig with a queue (0.29.0 was the first that prints JSON). A write a later Jig made possible
 does not raise it: it carries a version of its own, checked by the local adapter against the
 project's Jig before the page is offered the write — `RESUME_JIG_VERSION`, 0.35.0, for
-`resumeTask`, and `ARTIFACTS_JIG_VERSION`, 0.39.0, for a task's documents — so a project on an older Jig is still read, and only that write is missing. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
+`resumeTask`, and `ARTIFACTS_JIG_VERSION`, 0.39.0, for a task's documents — so a project on an older Jig is still read, and only that write is missing. `CLOSE_JIG_VERSION`, 0.40.0, is the other kind: the close is offered on any Jig, and the version picks how `closeTask` checks it. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
 found from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`), never a
 `bash` on PATH, which may be WSL's. It is asked once per process; a failed ask is not kept.
 
@@ -71,11 +71,13 @@ stash applied) is not read. Its success answer carries the revision before
 the write, so the caller reads again; a test pins each command's arguments and a refusal.
 `fileTask` (`jig task new <id> --goal <text>`) takes no revision — Jig has none for it — and its
 tests pin that a person's goal reaches Jig as one argument, unglobbed
-(adr-20261022-filing-a-task-carries-no-revision). `closeTask` (`jig task set <id> status consolidated`) is the
-one text write: Jig takes no `--revision` and prints no JSON for it, so it reads `queue list --json` first and refuses
-`stale-revision` itself when the clone's revision is not the caller's, then runs the command with a longer timeout (Jig
-asks the forge); a refusal is `failed` with Jig's `jig: error:` lines, through `withoutPaths`, as `reasons`
-(adr-20261029-close-a-ready-task-from-the-board). On Windows the arguments do not go on Git bash's
+(adr-20261022-filing-a-task-carries-no-revision). `closeTask` (`jig task set <id> status consolidated`) takes the
+project's Jig version and runs with a longer timeout (Jig asks the forge). From `CLOSE_JIG_VERSION` it is a write like
+the others, with `--revision <n>` and `--json`, and adds `not-closable`, Jig's reason as `reasons`; the closed task it
+answers is not read. On an older Jig it is the one text write: it reads `queue list --json` first and refuses
+`stale-revision` itself when the clone's revision is not the caller's; a refusal is `failed` with Jig's `jig: error:`
+lines, through `withoutPaths`, as `reasons` (adr-20261029-close-a-ready-task-from-the-board). A refusal's `reasons` lose
+the command's own name, of one word or two (`upgrade: `, `task set: `). On Windows the arguments do not go on Git bash's
 command line, which it parses itself: it globbed a one-word goal `out*` that Node left unquoted,
 and with `MSYS=noglob` it read `\"` as a backslash and a quote (both caught by the Windows CI leg).
 They go in the environment as `JIG_UI_ARG_<n>`, and the fixed script

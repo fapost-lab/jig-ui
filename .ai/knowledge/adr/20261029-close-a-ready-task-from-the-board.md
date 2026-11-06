@@ -12,8 +12,8 @@ paths:
   - server/http/app.ts
   - web/lib/refusal.ts
   - web/views/BoardView.vue
-summary: The Ready card's close runs jig task set status consolidated, offered when Jig offers close or only its forge cache is behind; revision checked by a read, refusal reasons shown
-reviewed_at: 2026-10-29
+summary: The Ready card's close runs jig task set status consolidated, offered when Jig offers close or only its forge cache is behind; from Jig 0.40.0 Jig claims it against the board's revision, before that a read checks it; refusal reasons shown
+reviewed_at: 2026-11-05
 ---
 # A ready task is closed from the board with Jig's close command, offered beyond Jig's cached offer and checked against the board's revision by a read
 
@@ -37,10 +37,15 @@ Jig's contract says a cache behind the forge "can only withhold a close the comm
   state `null`, `open` or `merged`). A task without the knowledge decision has no button.
 - The adapter runs it only for a task that is live and `closable` in the read it showed; anything else
   is `not-found`, Jig not run.
-- JigClient reads the clone's revision (`queue list --json`) and refuses `stale-revision` when it is
-  not the one the board was read at, then runs `jig task set <id> status consolidated`. Jig's refusal
-  is its `jig: error:` lines, paths cut out, carried as `reasons` and sent as the API error's
-  `message`; the page shows it.
+- From Jig 0.40.0 (`CLOSE_JIG_VERSION`; task `close-checked-by-jig`, fapost-lab/jig#365) JigClient
+  runs `jig task set <id> status consolidated --revision <n> --json` with the revision the board was
+  read at: Jig claims the write against it and refuses `stale-revision`, `not-found` or
+  `not-closable`, its message, paths cut out, carried as `reasons`.
+- With an older Jig, JigClient reads the clone's revision (`queue list --json`) and refuses
+  `stale-revision` when it is not the one the board was read at, then runs
+  `jig task set <id> status consolidated`. Jig's refusal is its `jig: error:` lines, paths cut out,
+  carried as `reasons`.
+- The reasons are sent as the API error's `message`; the page shows them.
 - The page asks before it closes: ✕, then **Close task** in a question on the card.
 
 ## Alternatives
@@ -56,8 +61,13 @@ Jig's contract says a cache behind the forge "can only withhold a close the comm
 
 ## Consequences
 
-- The check is a read and then a write, not one claim: a write by an agent in between is not seen.
-  The window is the time `task set` takes to start; closing a task is final, but Jig still checks
-  the merge and the knowledge decision itself. When Jig's `task set` takes `--revision`, pass it.
+- With a Jig older than 0.40.0 the check is a read and then a write, not one claim: a write by an
+  agent in between is not seen. The window is the time `task set` takes to start; closing a task is
+  final, but Jig still checks the merge and the knowledge decision itself. From 0.40.0 Jig's claim
+  closes the window.
+- Jig 0.40.0 counts its own note of which session works a task as a write: run with an agent
+  session's id in its environment (`CLAUDE_CODE_SESSION_ID`, a Jig UI started from Claude Code), the
+  close is refused as `stale-revision` against any board, a fresh one included (fapost-lab/jig#389).
+  Started from a terminal or as a service, Jig UI passes no such id.
 - A close of a task whose pull request is still open is shown and refused by Jig, with its reason.
 - Closing cannot be undone from the board.

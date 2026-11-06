@@ -41,7 +41,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   (feature-specs), a task's documents `jig task artifacts` and `jig task artifact read` (from Jig 0.39.0,
   adr-20261030-a-task-document-is-shown-as-written), and the writes `jig queue move`, `jig queue set --priority`, `jig queue request`
   and `cancel` (a pause), `jig task new` and `jig task resume` (from Jig 0.35.0), `jig task set <id>
-  status consolidated` (a close, text, checked against a revision read first), a project's settings
+  status consolidated` (a close: from Jig 0.40.0 with `--revision --json`, Jig checking it; before
+  that text, checked against a revision read first), a project's settings
   `jig config keys` and the person's own `jig config set|unset --local` (from Jig 0.40.0, feature-settings), and
   `jig upgrade`, its dry run and its run (from Jig 0.34.0), and `jig self-update` (its text line), each JSON answer checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
   fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue,

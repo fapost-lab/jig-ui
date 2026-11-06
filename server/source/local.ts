@@ -906,7 +906,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       return writing(
         id,
         [taskId],
-        (root) => closeTask(root, taskId, revision),
+        (root, jigVersion) => closeTask(root, taskId, revision, jigVersion),
         [],
         (t) => t.closable,
       );

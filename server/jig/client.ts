@@ -21,6 +21,8 @@ export const LAND_JIG_VERSION = '0.39.0';
 /** The first Jig that lists a task's documents and reads one as JSON (fapost-lab/jig#347). */
 export const ARTIFACTS_JIG_VERSION = '0.39.0';
 
+/** The first Jig whose close (`task set <id> status consolidated`) takes `--revision` and `--json` (fapost-lab/jig#365). */
+export const CLOSE_JIG_VERSION = '0.40.0';
 /** The first Jig that lists its settings as JSON and sets them with `--revision` and `--json` (fapost-lab/jig#363). */
 export const SETTINGS_JIG_VERSION = '0.40.0';
 
@@ -226,6 +228,7 @@ const CODES = new Set([
   'stash-conflict',
   'upgrade-blocked',
   'not-merged',
+  'not-closable',
   'unknown-key',
   'not-local',
   'invalid-value',
@@ -822,12 +825,24 @@ const CLOSE_TIMEOUT_MS = 60_000;
 /**
  * Closes a task as done (`jig task set <id> status consolidated`, the command of Jig's `close` action). Jig lets it
  * through only when the knowledge decision is recorded and the pull request, asked of the forge now, has merged — a
- * forge cache that has not heard of the merge yet withholds the action, never the command. The command takes no
- * `--revision` and prints no JSON (Jig 0.38.1): the clone's revision is read first, and a write since `revision` is
- * refused as `stale-revision` with nothing run — a read, not a claim: a write between it and the close is not seen; Jig's own refusal throws JigRefusal `failed` with its error lines,
- * without a path.
+ * forge cache that has not heard of the merge yet withholds the action, never the command. From `CLOSE_JIG_VERSION` on,
+ * Jig claims the write against `revision` itself: refused as `stale-revision`, `not-found`, or `not-closable` with Jig's
+ * reason as `reasons`; the closed task it answers is not read, the caller reads again. An older Jig takes no `--revision`
+ * and prints no JSON: the clone's revision is read first, and a write since `revision` is refused as `stale-revision`
+ * with nothing run — a read, not a claim: a write between it and the close is not seen; Jig's own refusal throws
+ * JigRefusal `failed` with its error lines, without a path.
  */
-export async function closeTask(root: string, task: string, revision: number, platform: NodeJS.Platform = process.platform): Promise<void> {
+export async function closeTask(
+  root: string,
+  task: string,
+  revision: number,
+  jigVersion: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  if (supports(jigVersion, CLOSE_JIG_VERSION)) {
+    await readJson(root, ['task', 'set', task, 'status', 'consolidated', '--revision', String(revision)], platform, CLOSE_TIMEOUT_MS);
+    return;
+  }
   if ((await readJson(root, ['queue', 'list'], platform)).revision !== revision) throw new JigRefusal('stale-revision');
   try {
     await jig(root, ['task', 'set', task, 'status', 'consolidated'], platform, CLOSE_TIMEOUT_MS);

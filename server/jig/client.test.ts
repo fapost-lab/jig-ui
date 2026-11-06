@@ -634,16 +634,39 @@ esac
 }
 const closeCalls = (dir: string) => readFileSync(join(dir, 'calls.log'), 'utf8').trim().split('\n');
 
+// task-set-close*.json are what Jig 0.40.0 printed in a scratch repository.
 describe('closeTask', () => {
-  it("reads the clone's revision, then runs the command of Jig's close action", async () => {
+  it('has Jig 0.40.0 check the close against the revision it was read at', async () => {
+    const dir = logging(`case-${cases++}`, 'task-set-close.json');
+    await closeTask(dir, 'beta', 1793894295, '0.40.0');
+    expect(args(dir)).toEqual(['task', 'set', 'beta', 'status', 'consolidated', '--revision', '1793894295', '--json']);
+  });
+
+  it.each([
+    ['task-set-close-stale.json', 'stale-revision'],
+    ['task-set-close-not-found.json', 'not-found'],
+  ])('carries the refusal in %s as %s', async (json, code) => {
+    await expect(closeTask(answering(`case-${cases++}`, json, 1), 'beta', 1, '0.40.0')).rejects.toEqual(refusal(code));
+  });
+
+  it("carries Jig's reason a task is not closable, as its own command says it", async () => {
+    await expect(closeTask(answering(`case-${cases++}`, 'task-set-close-not-closable.json', 1), 'e1', 1, '0.40.0')).rejects.toMatchObject({
+      code: 'not-closable',
+      reasons: [
+        'status consolidated requires knowledge_consolidated true; record the knowledge decision first: jig task set e1 knowledge_consolidated true',
+      ],
+    });
+  });
+
+  it("reads an older Jig's revision first, then runs the command of Jig's close action", async () => {
     const dir = closing(`case-${cases++}`, 41);
-    await closeTask(dir, 'beta', 41);
+    await closeTask(dir, 'beta', 41, '0.39.0');
     expect(closeCalls(dir)).toEqual(['queue list --json', 'task set beta status consolidated']);
   });
 
   it('refuses a revision the clone has moved past, running nothing', async () => {
     const dir = closing(`case-${cases++}`, 42);
-    await expect(closeTask(dir, 'beta', 41)).rejects.toEqual(refusal('stale-revision'));
+    await expect(closeTask(dir, 'beta', 41, '0.39.0')).rejects.toEqual(refusal('stale-revision'));
     expect(closeCalls(dir)).toEqual(['queue list --json']);
   });
 
@@ -654,7 +677,7 @@ describe('closeTask', () => {
       'a line that is not an error',
     ].join('\n');
     const dir = closing(`case-${cases++}`, 41, err, 1);
-    await expect(closeTask(dir, 'beta', 41)).rejects.toMatchObject({
+    await expect(closeTask(dir, 'beta', 41, '0.39.0')).rejects.toMatchObject({
       code: 'failed',
       reasons: [
         'status consolidated requires knowledge_consolidated true; record the knowledge decision first: jig task set beta knowledge_consolidated true',

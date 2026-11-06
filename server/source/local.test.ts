@@ -1034,6 +1034,9 @@ describe('localSource, editing a roadmap', () => {
       code: 'not-found',
     });
     expect(await source.moveItem('mover-items', 'shop', a, { phase: 9 }, 7)).toEqual({ state: 'refused', code: 'not-found' });
+    // The API takes any id: a flag never reaches Jig, since no handle of the read is one.
+    expect(await source.moveItem('mover-items', 'shop', '--top', 'top', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.moveItem('mover-items', 'shop', a, { after: '--bottom' }, 7)).toEqual({ state: 'refused', code: 'not-found' });
     expect(edits(dir)).toEqual([
       `spec item move shop ${c} --after ${a} --revision 7 --json`,
       `spec item move shop ${c} --top --revision 7 --json`,

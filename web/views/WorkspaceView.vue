@@ -1,16 +1,28 @@
 <script setup lang="ts">
   import { computed, onUnmounted, ref, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
-  import { call, client, type FoundProjects as Found, type Machine, onChange, type Project, readAgain } from '@/api';
+  import {
+    call,
+    client,
+    type FoundProjects as Found,
+    type Machine,
+    onChange,
+    type Project,
+    readAgain,
+    readSettings,
+    type Settings,
+  } from '@/api';
   import ConnectForm from '@/components/ConnectForm.vue';
   import FoundProjects from '@/components/FoundProjects.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProjectList from '@/components/ProjectList.vue';
+  import SettingsDialog from '@/components/SettingsDialog.vue';
   import { Button } from '@/components/ui/button';
   import { Progress } from '@/components/ui/progress';
   import { lastWins } from '@/lib/last-wins';
   import { byName, chosen, landed, type Listed, readOnes, readProgress } from '@/lib/projects';
   import { withConnected } from '@/lib/scan';
+  import { settingRefusal } from '@/lib/settings';
   import { toneRule, toneText } from '@/lib/tones';
   import {
     landedLine,
@@ -177,6 +189,71 @@
     reading.value.delete(id);
     if (read) await load();
   }
+
+  /** The project whose settings dialog is open, its settings (`undefined` while read), the key being written and what came of the last change. */
+  const settingsFor = ref<string>();
+  const settings = ref<Settings>();
+  const settingKey = ref<string>();
+  const settingNotice = ref<string>();
+  const settingsReading = ref(false);
+
+  const loadSettings = lastWins(
+    async () => {
+      const id = settingsFor.value;
+      if (id === undefined) return undefined;
+      const read = await readSettings(id);
+      return read === undefined ? undefined : { id, read };
+    },
+    ({ id, read }) => {
+      if (id !== settingsFor.value) return;
+      if (read === 'not-connected') settingsFor.value = undefined;
+      else settings.value = read;
+    },
+  );
+
+  function openSettings(id: string): void {
+    settingsFor.value = id;
+    settings.value = undefined;
+    settingNotice.value = undefined;
+    void loadSettings();
+  }
+
+  async function rereadSettings(): Promise<void> {
+    settingsReading.value = true;
+    await loadSettings();
+    settingsReading.value = false;
+  }
+
+  const settingsApi = client.api.projects[':id'].settings;
+
+  /** Sends one change of a setting with the revision of the settings shown, then reads them again whatever came of it. */
+  async function writeSetting(
+    key: string,
+    send: (id: string, revision: number) => ReturnType<typeof settingsApi.$post | typeof settingsApi.unset.$post>,
+  ): Promise<void> {
+    const [id, shown] = [settingsFor.value, settings.value];
+    if (id === undefined || shown?.state !== 'ready' || settingKey.value !== undefined) return;
+    settingKey.value = key;
+    settingNotice.value = undefined;
+    const res = await call(() => send(id, shown.revision));
+    const error = res && res.status !== 200 ? (await res.json()).error : undefined;
+    await loadSettings();
+    settingKey.value = undefined;
+    if (error?.code === 'stale-revision')
+      settingNotice.value = 'The settings changed since they were shown: here they are as they are now.';
+    else if (error)
+      settingNotice.value = settingRefusal(
+        error.code,
+        'reasons' in error && Array.isArray(error.reasons) ? error.reasons.map(String) : [],
+        key,
+      );
+  }
+
+  const setSetting = (key: string, value: string) =>
+    writeSetting(key, (id, revision) => settingsApi.$post({ param: { id: encodeURIComponent(id) }, json: { key, value, revision } }));
+
+  const unsetSetting = (key: string) =>
+    writeSetting(key, (id, revision) => settingsApi.unset.$post({ param: { id: encodeURIComponent(id) }, json: { key, revision } }));
 
   const upgradeApi = client.api.projects[':id'].upgrade;
   const param = (id: string) => ({ param: { id: encodeURIComponent(id) } });
@@ -346,6 +423,7 @@
         :release="release"
         :reading="reading.has(shown.id)"
         class="min-w-0 flex-1"
+        @settings="openSettings(shown.id)"
         @disconnect="disconnect(shown.id)"
         @read-again="reread(shown.id)"
         @start="start(shown)"
@@ -356,5 +434,18 @@
         @dismiss="dismiss(shown.id)"
       />
     </div>
+    <SettingsDialog
+      v-if="settingsFor !== undefined"
+      :open="true"
+      :project="settingsFor"
+      :settings="settings"
+      :pending="settingKey"
+      :notice="settingNotice"
+      :reading="settingsReading"
+      @update:open="(open) => open || (settingsFor = undefined)"
+      @set="setSetting"
+      @unset="unsetSetting"
+      @read-again="rereadSettings"
+    />
   </div>
 </template>

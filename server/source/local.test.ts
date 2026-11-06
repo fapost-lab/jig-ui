@@ -57,7 +57,7 @@ function project(
     tasks?: unknown;
     specs?: unknown;
     queue?: unknown;
-    /** What `queue move`, `set`, `request`, `cancel`, `task new` and `task resume` print, once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
+    /** What `queue move`, `set`, `request`, `cancel`, `task new`, `task resume` and `config set|unset` print, once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
     write?: unknown;
     /** What `upgrade --dry-run` prints, as `data`, or a whole envelope as a string. */
     plan?: unknown;
@@ -75,6 +75,8 @@ function project(
     /** What `task artifacts` (once no file `hold-artifacts` is in the project) and `task artifact read` print: an envelope's `data`, or a refusal's code. */
     artifacts?: unknown;
     artifact?: unknown;
+    /** What `config keys` prints: an envelope's `data`. */
+    settings?: unknown;
     /** What `task set` prints on stderr, and its exit code. */
     set?: {
       err?: string;
@@ -105,6 +107,7 @@ function project(
       ? JSON.stringify({ schema: 1, revision: 9, generated_at: 'x', error: { code: data, message: 'refused' } })
       : envelope(data);
   writeFileSync(join(dir, 'artifacts.json'), answer(answers.artifacts ?? { task: 'x', artifacts: [] }));
+  writeFileSync(join(dir, 'settings.json'), envelope(answers.settings ?? { keys: [] }));
   writeFileSync(join(dir, 'artifact.json'), answer(answers.artifact ?? 'not-found'));
   writeFileSync(join(dir, 'plan.json'), typeof answers.plan === 'string' ? answers.plan : envelope(answers.plan ?? {}));
   writeFileSync(join(dir, 'upgrade.json'), typeof answers.upgrade === 'string' ? answers.upgrade : envelope(answers.upgrade ?? {}));
@@ -124,8 +127,9 @@ case "$*" in
   "task list --all --json") cat tasks.json ;;
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
-  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*|"config set "*|"config unset "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
   "task artifacts "*) while [ -f hold-artifacts ]; do sleep 0.05; done; cat artifacts.json; if grep -q '"error"' artifacts.json; then exit 1; fi ;;
+  "config keys --json") cat settings.json ;;
   "task artifact read "*) cat artifact.json; if grep -q '"error"' artifact.json; then exit 1; fi ;;
   "task set "*) cat set.err >&2; exit ${answers.set?.code ?? 0} ;;
   "upgrade --dry-run --json") cat plan.json ;;
@@ -700,6 +704,64 @@ describe('localSource, writing the queue', () => {
     const stashed = project('stashed', '0.35.0', { tasks, write: 'wrong-checkout' });
     await source.connect(stashed);
     expect(await source.resume('stashed', 'a', 7)).toEqual({ state: 'refused', code: 'wrong-checkout', reasons: ['refused'] });
+  });
+
+  describe('settings', () => {
+    const keys = [
+      {
+        key: 'agent.git',
+        value: 'pr',
+        set: true,
+        source: 'local',
+        scope: 'local only',
+        kind: 'choice',
+        allowed: ['none', 'commit', 'push', 'pr', 'merge'],
+        default: 'none',
+        description: 'How far the agent goes in git.',
+        secret: false,
+      },
+    ];
+    const configs = (dir: string) => calls(dir).filter((c) => c.startsWith('config '));
+
+    it("reads a project's settings through its Jig, with the revision they were read at", async () => {
+      await source.connect(project('configured', '0.40.0', { settings: { keys } }));
+      expect(await source.settings('configured')).toEqual({ state: 'ready', keys, revision: 7 });
+      expect(await source.settings('nobody')).toBeUndefined();
+    });
+
+    it('answers a Jig older than 0.40.0 as unsupported, and refuses its writes, running no config command', async () => {
+      const dir = project('old-config', '0.39.0', { settings: { keys } });
+      await source.connect(dir);
+      expect(await source.settings('old-config')).toEqual({
+        id: 'old-config',
+        state: 'unsupported',
+        jigVersion: '0.39.0',
+        minimum: '0.40.0',
+      });
+      expect(await source.setSetting('old-config', 'agent.git', 'pr', 7)).toEqual({ state: 'refused', code: 'unsupported' });
+      expect(await source.unsetSetting('old-config', 'agent.git', 7)).toEqual({ state: 'refused', code: 'unsupported' });
+      expect(configs(dir)).toEqual([]);
+    });
+
+    it("sets and unsets one of the person's own keys against the revision of the read", async () => {
+      const dir = project('setter', '0.40.0', { settings: { keys }, write: { keys } });
+      await source.connect(dir);
+      expect(await source.setSetting('setter', 'agent.git', 'merge', 7)).toEqual({ state: 'written' });
+      expect(await source.unsetSetting('setter', 'agent.git', 9)).toEqual({ state: 'written' });
+      expect(configs(dir)).toEqual([
+        'config set agent.git merge --local --revision 7 --json',
+        'config unset agent.git --local --revision 9 --json',
+      ]);
+    });
+
+    it("carries Jig's refusal of a value by its code, with its reason", async () => {
+      await source.connect(project('refused-setter', '0.40.0', { settings: { keys }, write: 'invalid-value' }));
+      expect(await source.setSetting('refused-setter', 'agent.git', 'sometimes', 7)).toEqual({
+        state: 'refused',
+        code: 'invalid-value',
+        reasons: ['refused'],
+      });
+    });
   });
 
   describe('closing a ready task', () => {

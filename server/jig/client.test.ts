@@ -17,6 +17,7 @@ import {
   readArtifact,
   readArtifacts,
   readQueue,
+  readSettings,
   readSpecs,
   readStatus,
   readTasks,
@@ -26,7 +27,9 @@ import {
   runUpgrade,
   selfUpdate,
   setPriority,
+  setSetting,
   supports,
+  unsetSetting,
   withoutPaths,
   writtenByReads,
 } from './client.js';
@@ -661,6 +664,90 @@ describe('closeTask', () => {
   });
 });
 
+// config-*.json are what Jig 0.40.0 printed in a scratch repository, with a Telegram token in its local file.
+describe('settings', () => {
+  it("reads every key with its value, where it comes from, who answers it and Jig's description", async () => {
+    const { revision, keys } = await readSettings(answering(`case-${cases++}`, 'config-keys.json'));
+    expect(revision).toBe(1793894345);
+    expect(keys).toHaveLength(43);
+    expect(keys.find((k) => k.key === 'agent.git')).toEqual({
+      key: 'agent.git',
+      value: 'pr',
+      set: true,
+      source: 'local',
+      scope: 'local only',
+      kind: 'choice',
+      allowed: ['none', 'commit', 'push', 'pr', 'merge'],
+      default: 'none',
+      description: expect.any(String),
+      secret: false,
+    });
+    expect(keys.find((k) => k.key === 'forge')).toMatchObject({ source: 'project', scope: 'project', value: 'auto' });
+    expect(keys.find((k) => k.key === 'notify.telegram.token')).toMatchObject({ value: null, set: true, secret: true });
+  });
+
+  it('reads a kind it does not know as text, and cuts every absolute path out of a value, its default and its description', async () => {
+    const json = changed('config-keys.json', (data) => {
+      Object.assign(data.keys[0], {
+        kind: 'colour',
+        value: '/Users/me/trees',
+        default: '/Users/me/x',
+        description: 'Kept in /Users/me/y.',
+      });
+    });
+    const [first] = (await readSettings(answering(`case-${cases++}`, json))).keys;
+    expect(first).toMatchObject({ kind: 'text', value: '…', default: '…', description: 'Kept in …' });
+  });
+
+  it("never passes a secret's value on, should Jig print one", async () => {
+    const json = changed('config-keys.json', (data) => {
+      Object.assign(
+        data.keys.find((k: { secret: boolean }) => k.secret),
+        { value: '123:abc', default: '456:def' },
+      );
+    });
+    const { keys } = await readSettings(answering(`case-${cases++}`, json));
+    expect(keys.find((k) => k.secret)).toMatchObject({ value: null, default: null, set: true });
+  });
+
+  it('refuses a scope it does not know', async () => {
+    const json = changed('config-keys.json', (data) => {
+      data.keys[0].scope = 'machine';
+    });
+    await expect(readSettings(answering(`case-${cases++}`, json))).rejects.toBeInstanceOf(JigShapeError);
+  });
+
+  it("sets one of the person's own keys in this clone against the revision it was read at", async () => {
+    const dir = logging(`case-${cases++}`, 'config-set.json');
+    await setSetting(dir, 'agent.git', 'pr', 1793894327);
+    expect(args(dir)).toEqual(['config', 'set', 'agent.git', 'pr', '--local', '--revision', '1793894327', '--json']);
+  });
+
+  it('takes one out of the local file', async () => {
+    const dir = logging(`case-${cases++}`, 'config-unset.json');
+    await unsetSetting(dir, 'notify.telegram.token', 1793894337);
+    expect(args(dir)).toEqual(['config', 'unset', 'notify.telegram.token', '--local', '--revision', '1793894337', '--json']);
+  });
+
+  it.each([
+    ['config-set-unknown-key.json', 'unknown-key'],
+    ['config-set-not-local.json', 'not-local'],
+    ['config-set-secret-key.json', 'secret-key'],
+    ['config-stale.json', 'stale-revision'],
+  ])('carries the refusal in %s as %s', async (json, code) => {
+    await expect(setSetting(answering(`case-${cases++}`, json, 1), 'k.k', 'v', 1)).rejects.toEqual(refusal(code));
+  });
+
+  it("carries Jig's reason a value is refused, without its command's name", async () => {
+    await expect(
+      setSetting(answering(`case-${cases++}`, 'config-set-invalid-value.json', 1), 'agent.git', 'sometimes', 1),
+    ).rejects.toMatchObject({
+      code: 'invalid-value',
+      reasons: ["agent.git: invalid value 'sometimes': not a level: none, commit, push, pr or merge"],
+    });
+  });
+});
+
 describe('selfUpdate', () => {
   it('runs jig self-update as text and answers its last line', async () => {
     const dir = selfUpdating(`case-${cases++}`, 'fetching\nself-update: updated 0.37.0 -> 0.38.0 (abc1234)\n');
@@ -708,12 +795,35 @@ describe('withoutPaths', () => {
     ['(record /Users/me/shop/.ai/runtime/working/x); then', '(record …); then'],
     ['in /c/Users/me/shop and', 'in … and'],
     ['at C:\\Users\\me\\shop.', 'at …'],
+    ['npm ci --cache=/Users/me/.npm', 'npm ci --cache=…'],
+    ['PATH=/opt/bin:$PATH make', 'PATH=… make'],
+    ['dirs: /a/b:/c/d', 'dirs: …'],
+    ['file:///Users/me/x', 'file:…'],
+    ['[/Users/me/cache, /Users/me/x]', '[… …'],
+    ['npm ci >/Users/me/ci.log', 'npm ci >…'],
+    ['a;/x b,/y c|/z d&/w', 'a;… b,… c|… d&…'],
+    ['src/**/*.ts, ./a/b, ../c, ~/d, 1/2', 'src/**/*.ts, ./a/b, ../c, ~/d, 1/2'],
+    ['make CPPFLAGS=-I/Users/me/include', 'make CPPFLAGS=-I…'],
+    ['docker run -v/Users/me/p:/app img', 'docker run -v… img'],
+    ['task-x/a-b/c', 'task-x/a-b/c'],
+    ['make CFLAGS="-I/Users/me/include" \'-L/Users/me/lib\'', 'make CFLAGS="-I…" \'-L…\''],
+    ['[-I/Users/me/a, -L/Users/me/b]', '[-I… -L…'],
+    ['cc -Wl,-L/Users/me/lib -Isrc/x pre-x/y', 'cc -Wl,-L… -Isrc… pre-x/y'],
+    ['cc -isystem/Users/me/inc; tar -xzf/Users/me/a.tgz', 'cc -isystem… tar -xzf…'],
+    ['npm ci --cache=${NPM_CACHE:-/Users/me/.npm}; cmd -/Users/me/x', 'npm ci --cache=${NPM_CACHE:-… cmd -…'],
+    ['https://gitlab.com/group/-/merge_requests', 'https://gitlab.com/group/-/merge_requests'],
     [
       'branch task/up-x, `git stash`, .gitattributes, https://example.com/a',
       'branch task/up-x, `git stash`, .gitattributes, https://example.com/a',
     ],
   ])('%s', (text, expected) => {
     expect(withoutPaths(text)).toBe(expected);
+  });
+
+  it('stays linear on a long run of word characters', () => {
+    const start = performance.now();
+    withoutPaths('a-'.repeat(50_000));
+    expect(performance.now() - start).toBeLessThan(1000);
   });
 });
 

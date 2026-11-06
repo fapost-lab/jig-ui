@@ -86,6 +86,12 @@ const isNewId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0
 /** A goal as `jig task new --goal` takes one: a line of text, at most 500 characters; Jig refuses the rest as `usage`. */
 const isGoal = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '' && v.length <= 500 && !/[\r\n]/.test(v);
 
+/** A setting's name as Jig spells one (`agent.git`): words joined by dots, never a flag. */
+const isKey = (v: unknown): v is string => typeof v === 'string' && /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/.test(v);
+
+/** A setting's value as the page sends one: a line of at most 500 characters; Jig checks the rest, an empty one included. */
+const isValue = (v: unknown): v is string => typeof v === 'string' && v.length <= 500 && !/[\r\n]/.test(v);
+
 /** The body of a write that names only a task: the task and the revision it was read at, `undefined` where invalid. */
 function taskAt(body: unknown) {
   const [task, revision] = [field(body, 'task'), field(body, 'revision')];
@@ -200,6 +206,13 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
         if (read.state !== 'ready') return c.json({ artifact: read }, 200);
         if (read.artifact === null) return refuse(c, 404, 'not-found', 'This task has no such document.');
         return c.json({ artifact: { state: read.state, ...read.artifact } }, 200);
+      })
+
+      // The settings, read through the project's Jig at each call: the project's, and the person's own in this clone.
+      .get('/api/projects/:id/settings', async (c) => {
+        const read = await source.settings(c.req.param('id'));
+        if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        return c.json({ settings: read }, 200);
       })
 
       .get('/api/projects/:id/specs', async (c) => {
@@ -319,6 +332,41 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
         if (task === undefined || revision === undefined) return refuse(c, 422, 'usage', 'Give a task and the revision it was read at.');
         return written(c, await source.close(c.req.param('id'), task, revision));
       })
+
+      // A setting is the person's own, in this clone's file only; the write carries the revision of the settings read.
+      .post(
+        '/api/projects/:id/settings',
+        validator('json', (body: unknown) => {
+          const [key, value, revision] = [field(body, 'key'), field(body, 'value'), field(body, 'revision')];
+          return {
+            key: isKey(key) ? key : undefined,
+            value: isValue(value) ? value : undefined,
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { key, value, revision } = c.req.valid('json');
+          if (key === undefined || value === undefined || revision === undefined) {
+            return refuse(c, 422, 'usage', 'Give a setting, its value on one line and the revision the settings were read at.');
+          }
+          return written(c, await source.setSetting(c.req.param('id'), key, value, revision));
+        },
+      )
+
+      .post(
+        '/api/projects/:id/settings/unset',
+        validator('json', (body: unknown) => {
+          const [key, revision] = [field(body, 'key'), field(body, 'revision')];
+          return { key: isKey(key) ? key : undefined, revision: isRevision(revision) ? revision : undefined };
+        }),
+        async (c) => {
+          const { key, revision } = c.req.valid('json');
+          if (key === undefined || revision === undefined) {
+            return refuse(c, 422, 'usage', 'Give a setting and the revision the settings were read at.');
+          }
+          return written(c, await source.unsetSetting(c.req.param('id'), key, revision));
+        },
+      )
 
       // A new task carries no revision: it writes nothing that exists (adr-20261022-filing-a-task-carries-no-revision).
       .post(

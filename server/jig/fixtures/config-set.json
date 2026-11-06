@@ -1,0 +1,1 @@
+{"schema":1,"revision":1793894327,"generated_at":"2026-11-05T16:35:48Z","data":{"keys":[{"key":"agent.git","value":"pr","set":true,"source":"local","scope":"local only","kind":"choice","allowed":["none","commit","push","pr","merge"],"default":"none","description":"How far your agent takes a finished task with git.","secret":false}]}}

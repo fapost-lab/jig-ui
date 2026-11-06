@@ -624,6 +624,58 @@ describe('/api/projects/:id/queue', () => {
     }
   });
 
+  it('reads the settings and writes one of them through the port, only a key, a one-line value and a revision', async () => {
+    const asked: unknown[][] = [];
+    let outcome: Written = { state: 'written' };
+    const old = { id: 'x', state: 'unsupported', jigVersion: '0.39.0', minimum: '0.40.0' } as const;
+    const source: ProjectSource = {
+      ...localSource(join(webRoot, 'fake-config')),
+      settings: (id) => Promise.resolve(id === 'x' ? { state: 'ready', keys: [], revision: 5 } : id === 'old' ? old : undefined),
+      setSetting: (...args) => {
+        asked.push(['set', ...args]);
+        return Promise.resolve(outcome);
+      },
+      unsetSetting: (...args) => {
+        asked.push(['unset', ...args]);
+        return Promise.resolve(outcome);
+      },
+    };
+    const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
+    const read = (id: string) => fake.request(`/api/projects/${id}/settings`, { headers: { host: HOST, cookie: COOKIE } });
+    expect(await (await read('x')).json()).toEqual({ settings: { state: 'ready', keys: [], revision: 5 } });
+    expect(await (await read('old')).json()).toEqual({ settings: old });
+    expect((await read('y')).status).toBe(404);
+    expect(await (await post(fake, '/api/projects/x/settings', { key: 'agent.git', value: 'pr', revision: 5 })).json()).toEqual({
+      written: true,
+    });
+    expect(await (await post(fake, '/api/projects/x/settings/unset', { key: 'agent.git', revision: 5 })).json()).toEqual({ written: true });
+    for (const body of [
+      { key: '--local', value: 'x', revision: 5 },
+      { key: 'agent', value: 'x', revision: 5 },
+      { key: 'agent.git', value: 'a\nb', revision: 5 },
+      { key: 'agent.git', value: 'x'.repeat(501), revision: 5 },
+      { key: 'agent.git', value: 'pr' },
+    ]) {
+      const res = await post(fake, '/api/projects/x/settings', body);
+      expect([res.status, ((await res.json()) as { error: { code: string } }).error.code]).toEqual([422, 'usage']);
+    }
+    expect((await post(fake, '/api/projects/x/settings/unset', { key: 'agent.git' })).status).toBe(422);
+    expect(asked).toEqual([
+      ['set', 'x', 'agent.git', 'pr', 5],
+      ['unset', 'x', 'agent.git', 5],
+    ]);
+    outcome = { state: 'refused', code: 'invalid-value', reasons: ["agent.git: invalid value 'sometimes'"] };
+    const refused = await post(fake, '/api/projects/x/settings', { key: 'agent.git', value: 'sometimes', revision: 5 });
+    expect([refused.status, await refused.json()]).toEqual([
+      422,
+      { error: { code: 'invalid-value', message: 'Jig refused the change.', reasons: ["agent.git: invalid value 'sometimes'"] } },
+    ]);
+    outcome = { state: 'refused', code: 'stale-revision' };
+    expect((await post(fake, '/api/projects/x/settings/unset', { key: 'agent.git', revision: 4 })).status).toBe(409);
+    expect((await post(fake, '/api/projects/x/settings', { key: 'agent.git', value: 'pr', revision: 5 }, {})).status).toBe(401);
+    expect((await fake.request('/api/projects/x/settings', { headers: { host: HOST } })).status).toBe(401);
+  });
+
   it("closes a task through the port, the revision required, and says Jig's reasons when it refuses", async () => {
     const closed: [string, string, number][] = [];
     let outcome: Written = { state: 'written' };

@@ -1,6 +1,6 @@
-import type { Artifact, ArtifactKind, Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade } from '../jig/client.js';
+import type { Artifact, ArtifactKind, Attention, Place, Setting, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade } from '../jig/client.js';
 
-export type { Artifact, ArtifactKind, Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade };
+export type { Artifact, ArtifactKind, Attention, Place, Setting, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade };
 export { ARTIFACT_KINDS } from '../jig/client.js';
 export { RegistryUnreadable } from '../registry/projects.js';
 
@@ -296,6 +296,18 @@ export type TaskArtifacts =
     }
   | Exclude<ProjectView, { state: 'ready' }>;
 
+/**
+ * The project's settings and the person's own in this clone, every key Jig reads, with the revision they were read at; or
+ * why they cannot be read — a project whose Jig is older than 0.40.0 is `unsupported`, with 0.40.0 as its minimum.
+ */
+export type ProjectSettings =
+  | {
+      state: 'ready';
+      keys: Setting[];
+      revision: number;
+    }
+  | Exclude<ProjectView, { state: 'ready' }>;
+
 /** One of a task's documents as it is written, `null` when the task or the document is not there; or why it cannot be read. */
 export type TaskArtifact =
   | {
@@ -434,6 +446,16 @@ export interface ProjectSource {
    * a taken id is Jig's `already-exists`. `undefined` when no project has that id.
    */
   fileTask(id: string, taskId: string, goal: string): Promise<Written | undefined>;
+  /** A connected project's settings, read through its Jig at each call; `undefined` when no project has that id. */
+  settings(id: string): Promise<ProjectSettings | undefined>;
+  /**
+   * Sets one of the person's own settings in the project's clone, never the project's file, against the revision of the
+   * settings read, then reads the project again. A project whose Jig is older than 0.40.0 is refused `unsupported`, Jig
+   * not run. `undefined` when no project has that id.
+   */
+  setSetting(id: string, key: string, value: string, revision: number): Promise<Written | undefined>;
+  /** Takes one of the person's own settings out of the clone's file, so the project's value or Jig's default answers, as `setSetting` writes. */
+  unsetSetting(id: string, key: string, revision: number): Promise<Written | undefined>;
   /**
    * What upgrading the project's Jig would do, changing nothing, for a project that shows Jig's `upgrade-available`
    * item; refused `not-found` without one, `running` while its upgrade runs. `undefined` when no project has that id.

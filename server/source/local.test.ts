@@ -84,7 +84,7 @@ function project(
     abandoned?: unknown;
     specs?: unknown;
     queue?: unknown;
-    /** What `queue move`, `set`, `request`, `cancel`, `task new` and `task resume` print, once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
+    /** What `queue move`, `set`, `request`, `cancel`, `task new`, `task resume`, `task set … --json` and `config set|unset` print, once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
     write?: unknown;
     /** What `upgrade --dry-run` prints, as `data`, or a whole envelope as a string. */
     plan?: unknown;
@@ -102,6 +102,10 @@ function project(
     /** What `task artifacts` (once no file `hold-artifacts` is in the project) and `task artifact read` print: an envelope's `data`, or a refusal's code. */
     artifacts?: unknown;
     artifact?: unknown;
+    /** What `config keys` prints: an envelope's `data`. */
+    settings?: unknown;
+    /** What `spec item add|move|file` prints once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
+    item?: unknown;
     /** What `task set` prints on stderr, and its exit code. */
     set?: {
       err?: string;
@@ -135,6 +139,8 @@ function project(
       : envelope(data);
   writeFileSync(join(dir, 'abandoned.json'), answer(answers.abandoned ?? listed.abandoned));
   writeFileSync(join(dir, 'artifacts.json'), answer(answers.artifacts ?? { task: 'x', artifacts: [] }));
+  writeFileSync(join(dir, 'settings.json'), envelope(answers.settings ?? { keys: [] }));
+  writeFileSync(join(dir, 'item.json'), answer(answers.item ?? { spec: 'x', item: {}, write: { note: null } }));
   writeFileSync(join(dir, 'artifact.json'), answer(answers.artifact ?? 'not-found'));
   writeFileSync(join(dir, 'plan.json'), typeof answers.plan === 'string' ? answers.plan : envelope(answers.plan ?? {}));
   writeFileSync(join(dir, 'upgrade.json'), typeof answers.upgrade === 'string' ? answers.upgrade : envelope(answers.upgrade ?? {}));
@@ -156,8 +162,10 @@ case "$*" in
   "task list --status abandoned --json") while [ -f hold-finished ]; do sleep 0.05; done; cat abandoned.json; if grep -q '"error"' abandoned.json; then exit 1; fi ;;
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
-  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*|"task set "*" --json"|"config set "*|"config unset "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "spec item "*) while [ -f hold ]; do sleep 0.05; done; cat item.json; if grep -q '"error"' item.json; then exit 1; fi ;;
   "task artifacts "*) while [ -f hold-artifacts ]; do sleep 0.05; done; cat artifacts.json; if grep -q '"error"' artifacts.json; then exit 1; fi ;;
+  "config keys --json") cat settings.json ;;
   "task artifact read "*) cat artifact.json; if grep -q '"error"' artifact.json; then exit 1; fi ;;
   "task set "*) cat set.err >&2; exit ${answers.set?.code ?? 0} ;;
   "upgrade --dry-run --json") cat plan.json ;;
@@ -385,11 +393,14 @@ describe('localSource', () => {
           release: 'minor',
           epic: { branch: 'epic/billing', state: 'open', checkedOut: true, missing: false, fetched: false },
           progress: { done: 1, total: 2, filed: 1, fog: 0 },
-          phases: [spec.phases[0]],
+          // Jig 0.31.0 prints no item handles and no waiting edits.
+          phases: [{ ...spec.phases[0], items: spec.phases[0]!.items.map((i) => ({ id: null, ...i })) }],
+          waiting: null,
           queue: null,
         },
       ],
       revision: 7,
+      editable: false,
     });
     expect(await source.specs('old')).toEqual({ id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0' });
     expect(await source.specs('nobody')).toBeUndefined();
@@ -481,7 +492,7 @@ describe('localSource', () => {
     const specs = JSON.stringify({ schema: 1, revision: 3, generated_at: 'x', data: { specs: [] } });
     const dir = project('older-specs', '0.31.0', { specs });
     await source.connect(dir);
-    expect(await source.specs('older-specs')).toEqual({ state: 'ready', specs: [], revision: 3 });
+    expect(await source.specs('older-specs')).toEqual({ state: 'ready', specs: [], revision: 3, editable: false });
     expect(await source.tasks('older-specs')).toMatchObject({ revision: 7 });
     await source.disconnect('older-specs');
   });
@@ -795,6 +806,64 @@ describe('localSource, writing the queue', () => {
     expect(await source.resume('stashed', 'a', 7)).toEqual({ state: 'refused', code: 'wrong-checkout', reasons: ['refused'] });
   });
 
+  describe('settings', () => {
+    const keys = [
+      {
+        key: 'agent.git',
+        value: 'pr',
+        set: true,
+        source: 'local',
+        scope: 'local only',
+        kind: 'choice',
+        allowed: ['none', 'commit', 'push', 'pr', 'merge'],
+        default: 'none',
+        description: 'How far the agent goes in git.',
+        secret: false,
+      },
+    ];
+    const configs = (dir: string) => calls(dir).filter((c) => c.startsWith('config '));
+
+    it("reads a project's settings through its Jig, with the revision they were read at", async () => {
+      await source.connect(project('configured', '0.40.0', { settings: { keys } }));
+      expect(await source.settings('configured')).toEqual({ state: 'ready', keys, revision: 7 });
+      expect(await source.settings('nobody')).toBeUndefined();
+    });
+
+    it('answers a Jig older than 0.40.0 as unsupported, and refuses its writes, running no config command', async () => {
+      const dir = project('old-config', '0.39.0', { settings: { keys } });
+      await source.connect(dir);
+      expect(await source.settings('old-config')).toEqual({
+        id: 'old-config',
+        state: 'unsupported',
+        jigVersion: '0.39.0',
+        minimum: '0.40.0',
+      });
+      expect(await source.setSetting('old-config', 'agent.git', 'pr', 7)).toEqual({ state: 'refused', code: 'unsupported' });
+      expect(await source.unsetSetting('old-config', 'agent.git', 7)).toEqual({ state: 'refused', code: 'unsupported' });
+      expect(configs(dir)).toEqual([]);
+    });
+
+    it("sets and unsets one of the person's own keys against the revision of the read", async () => {
+      const dir = project('setter', '0.40.0', { settings: { keys }, write: { keys } });
+      await source.connect(dir);
+      expect(await source.setSetting('setter', 'agent.git', 'merge', 7)).toEqual({ state: 'written' });
+      expect(await source.unsetSetting('setter', 'agent.git', 9)).toEqual({ state: 'written' });
+      expect(configs(dir)).toEqual([
+        'config set agent.git merge --local --revision 7 --json',
+        'config unset agent.git --local --revision 9 --json',
+      ]);
+    });
+
+    it("carries Jig's refusal of a value by its code, with its reason", async () => {
+      await source.connect(project('refused-setter', '0.40.0', { settings: { keys }, write: 'invalid-value' }));
+      expect(await source.setSetting('refused-setter', 'agent.git', 'sometimes', 7)).toEqual({
+        state: 'refused',
+        code: 'invalid-value',
+        reasons: ['refused'],
+      });
+    });
+  });
+
   describe('closing a ready task', () => {
     const close = { id: 'close', command: 'jig task set r status consolidated', offered: true, reason: null };
     const pr = (state: string | null) => ({ url: 'https://github.com/o/r/pull/1', state, ci: null, fetched_at: null });
@@ -835,6 +904,19 @@ describe('localSource, writing the queue', () => {
       const set = ran.indexOf('task set unheard status consolidated');
       expect(ran.slice(0, set)).toContain('queue list --json');
       expect(ran.slice(set + 1)).toEqual(expect.arrayContaining(['task list --json']));
+    });
+
+    it('has Jig 0.40.0 check the close against the revision of the read', async () => {
+      const dir = project('json-closer', '0.40.0', { tasks: ready, write: { task: {} } });
+      await source.connect(dir);
+      expect(await source.close('json-closer', 'unheard', 7)).toEqual({ state: 'written' });
+      expect(sets(dir)).toEqual(['task set unheard status consolidated --revision 7 --json']);
+    });
+
+    it("carries Jig 0.40.0's refusal by its code, with its reason", async () => {
+      const dir = project('not-closer', '0.40.0', { tasks: ready, write: 'not-closable' });
+      await source.connect(dir);
+      expect(await source.close('not-closer', 'cached-open', 7)).toEqual({ state: 'refused', code: 'not-closable', reasons: ['refused'] });
     });
 
     it('refuses a task it does not offer to close without running Jig', async () => {
@@ -973,6 +1055,168 @@ async function settled(dir: string, quiet = 500): Promise<number> {
 async function until(done: () => boolean, ms = 4_000): Promise<void> {
   for (let waited = 0; !done() && waited < ms; waited += 25) await delay(25);
 }
+
+describe('localSource, editing a roadmap', () => {
+  const source = localSource(join(root, 'roadmap-config'));
+  const item = (id: string, text: string, more: Record<string, unknown> = {}) => ({
+    id: `i-${id.repeat(12)}`,
+    text,
+    checked: false,
+    done: false,
+    task: null,
+    fog: false,
+    ...more,
+  });
+  const phase = (n: number, items: unknown[]) => ({ phase: n, title: `Phase ${n}`, done: 0, total: items.length, filed: 0, fog: 0, items });
+  const roadmap = [
+    phase(1, [item('a', 'Search'), item('b', 'Browse', { checked: true }), item('e', '`filed` — Rate', { task: 'filed' })]),
+    phase(2, [item('c', 'Pay')]),
+  ];
+  const shop = (waiting: unknown = null) => ({
+    id: 'shop',
+    title: 'Shop',
+    missing_files: [],
+    release: null,
+    epic: null,
+    progress: { done: 1, total: 4, filed: 1, fog: 0 },
+    phases: roadmap,
+    waiting,
+  });
+  const note = 'agent.git is commit: pushing spec/shop is yours';
+  const answered = { spec: 'shop', item: {}, write: { note } };
+  const tasks = { tasks: [task('filed', 'active', false, { branch: null })], hidden: 0, housekeeping: null };
+  const level = (value: string) => ({
+    keys: [
+      {
+        key: 'agent.git',
+        value,
+        set: true,
+        source: 'local',
+        scope: 'local',
+        kind: 'choice',
+        allowed: ['none', 'commit', 'push', 'pr', 'merge'],
+        default: 'none',
+        description: 'How far the agent may go.',
+        secret: false,
+      },
+    ],
+  });
+  const edits = (dir: string) => calls(dir).filter((c) => /^(spec item|task new|config keys) /.test(c));
+  const a = 'i-aaaaaaaaaaaa';
+  const c = 'i-cccccccccccc';
+
+  it("adds an item to a phase the read shows and answers Jig's note; a phase or spec it does not show runs nothing", async () => {
+    const dir = project('adder', '0.40.0', { tasks, specs: { specs: [shop()] }, item: answered });
+    await source.connect(dir);
+    expect(await source.addItem('adder', 'shop', 2, 'Pay by invoice', 7)).toEqual({ state: 'written', note });
+    expect(await source.addItem('adder', 'shop', 3, 'x', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.addItem('adder', 'other', 1, 'x', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.addItem('nobody', 'shop', 1, 'x', 7)).toBeUndefined();
+    expect(edits(dir)).toEqual(['spec item add shop --phase 2 --text Pay by invoice --revision 7 --json']);
+  });
+
+  it('moves an item after another, to the top or to another phase, naming only items and phases the read shows', async () => {
+    const dir = project('mover-items', '0.40.0', { tasks, specs: { specs: [shop()] }, item: answered });
+    await source.connect(dir);
+    expect(await source.moveItem('mover-items', 'shop', c, { after: a }, 7)).toEqual({ state: 'written', note });
+    expect(await source.moveItem('mover-items', 'shop', c, 'top', 7)).toEqual({ state: 'written', note });
+    expect(await source.moveItem('mover-items', 'shop', a, { phase: 2 }, 7)).toEqual({ state: 'written', note });
+    expect(await source.moveItem('mover-items', 'shop', 'i-ffffffffffff', 'top', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.moveItem('mover-items', 'shop', a, { after: 'i-ffffffffffff' }, 7)).toEqual({
+      state: 'refused',
+      code: 'not-found',
+    });
+    expect(await source.moveItem('mover-items', 'shop', a, { phase: 9 }, 7)).toEqual({ state: 'refused', code: 'not-found' });
+    // The API takes any id: a flag never reaches Jig, since no handle of the read is one.
+    expect(await source.moveItem('mover-items', 'shop', '--top', 'top', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.moveItem('mover-items', 'shop', a, { after: '--bottom' }, 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(edits(dir)).toEqual([
+      `spec item move shop ${c} --after ${a} --revision 7 --json`,
+      `spec item move shop ${c} --top --revision 7 --json`,
+      `spec item move shop ${a} --phase 2 --revision 7 --json`,
+    ]);
+  });
+
+  it("names items in the roadmap waiting on the spec's branch, where Jig resolves them", async () => {
+    const waiting = {
+      branch: 'spec/shop',
+      base: 'main',
+      commits: 1,
+      pushed: false,
+      pr: null,
+      progress: null,
+      phases: [phase(1, [item('a', 'Search'), item('d', 'New')]), phase(2, [])],
+    };
+    const dir = project('waiter', '0.40.0', { tasks, specs: { specs: [shop(waiting)] }, item: answered });
+    await source.connect(dir);
+    expect(await source.moveItem('waiter', 'shop', 'i-dddddddddddd', { phase: 2 }, 7)).toEqual({ state: 'written', note });
+    // On the base, not on the branch: moved or reworded there.
+    expect(await source.moveItem('waiter', 'shop', c, 'top', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(edits(dir)).toEqual(['spec item move shop i-dddddddddddd --phase 2 --revision 7 --json']);
+  });
+
+  it('files a new task, then names it on the item against the revision read after the filing', async () => {
+    const dir = project('item-filer', '0.40.0', { tasks, specs: { specs: [shop()] }, settings: level('commit'), item: answered });
+    await source.connect(dir);
+    expect(await source.fileItem('item-filer', 'shop', a, 'search', 'Search by name', 5)).toEqual({ state: 'written', note });
+    expect(edits(dir)).toEqual([
+      'config keys --json',
+      'task new search --goal Search by name --json',
+      `spec item file shop ${a} --task search --revision 7 --json`,
+    ]);
+  });
+
+  it("names a live task as it is, against the person's revision", async () => {
+    const dir = project('item-namer', '0.40.0', { tasks, specs: { specs: [shop()] }, item: answered });
+    await source.connect(dir);
+    expect(await source.fileItem('item-namer', 'shop', a, 'filed', null, 5)).toEqual({ state: 'written', note });
+    expect(edits(dir)).toEqual([`spec item file shop ${a} --task filed --revision 5 --json`]);
+  });
+
+  it('refuses at agent.git none before filing anything, as Jig would refuse the naming', async () => {
+    const dir = project('item-none', '0.40.0', { tasks, specs: { specs: [shop()] }, settings: level('none'), item: answered });
+    await source.connect(dir);
+    expect(await source.fileItem('item-none', 'shop', a, 'search', 'Search', 5)).toEqual({ state: 'refused', code: 'git-not-allowed' });
+    expect(edits(dir)).toEqual(['config keys --json']);
+  });
+
+  it('says the task was filed when Jig refuses to name it, with its reason', async () => {
+    const dir = project('item-unnamed', '0.40.0', {
+      tasks,
+      specs: { specs: [shop()] },
+      settings: level('commit'),
+      item: 'branch-checked-out',
+    });
+    await source.connect(dir);
+    expect(await source.fileItem('item-unnamed', 'shop', a, 'search', 'Search', 5)).toEqual({
+      state: 'refused',
+      code: 'branch-checked-out',
+      reasons: ['refused'],
+      filed: true,
+    });
+  });
+
+  it('runs nothing for a checked item, one that names a task, a new task without its goal, or a Jig older than 0.40.0', async () => {
+    const dir = project('item-refuser', '0.40.0', { tasks, specs: { specs: [shop()] }, settings: level('commit'), item: answered });
+    await source.connect(dir);
+    expect(await source.fileItem('item-refuser', 'shop', 'i-bbbbbbbbbbbb', 'x', 'X', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.fileItem('item-refuser', 'shop', 'i-eeeeeeeeeeee', 'x', 'X', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(await source.fileItem('item-refuser', 'shop', a, 'x', null, 7)).toEqual({ state: 'refused', code: 'usage' });
+    expect(edits(dir)).toEqual([]);
+    const old = project('item-old', '0.39.0', { tasks, specs: { specs: [shop()] }, item: answered });
+    await source.connect(old);
+    expect(await source.addItem('item-old', 'shop', 1, 'x', 7)).toEqual({ state: 'refused', code: 'unsupported' });
+    expect(await source.fileItem('item-old', 'shop', a, 'filed', null, 7)).toEqual({ state: 'refused', code: 'unsupported' });
+    expect(edits(old)).toEqual([]);
+  });
+
+  it('tells the page whether the project edits a roadmap', async () => {
+    await source.connect(project('editable', '0.40.0', { tasks, specs: { specs: [shop()] } }));
+    await source.connect(project('read-only', '0.39.0', { tasks, specs: { specs: [shop()] } }));
+    expect(await source.specs('editable')).toMatchObject({ state: 'ready', editable: true });
+    expect(await source.specs('read-only')).toMatchObject({ state: 'ready', editable: false });
+  });
+});
 
 describe('localSource, following changes', () => {
   const source = localSource(join(root, 'live-config'), { quietMs: 30, maxWaitMs: 200 });

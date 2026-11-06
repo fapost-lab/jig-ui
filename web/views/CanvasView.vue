@@ -2,6 +2,7 @@
   // The maintainer's page of every component in every variant and state, light and dark side by
   // side. A component added to components/ or components/ui/ gets a section here.
   import { Copy } from '@lucide/vue';
+  import { ref } from 'vue';
   import ActionList from '@/components/ActionList.vue';
   import AttentionItem from '@/components/AttentionItem.vue';
   import BoardColumns from '@/components/BoardColumns.vue';
@@ -20,9 +21,12 @@
   import ProjectList from '@/components/ProjectList.vue';
   import ProjectMark from '@/components/ProjectMark.vue';
   import ProjectSwitcher from '@/components/ProjectSwitcher.vue';
+  import SettingsDialog from '@/components/SettingsDialog.vue';
   import EpicMenu from '@/components/EpicMenu.vue';
   import QueueMenu from '@/components/QueueMenu.vue';
+  import FileItemDialog from '@/components/FileItemDialog.vue';
   import SpecCard from '@/components/SpecCard.vue';
+  import SpecItemMenu from '@/components/SpecItemMenu.vue';
   import SpecItemRow from '@/components/SpecItemRow.vue';
   import TaskBrief from '@/components/TaskBrief.vue';
   import TaskCard from '@/components/TaskCard.vue';
@@ -57,9 +61,11 @@
     plans,
     projects,
     runs,
+    settingStates,
     specItems,
     specs,
     tasks,
+    waitingSpecs,
   } from './canvas-samples';
 
   const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
@@ -67,6 +73,27 @@
   const iconSizes = ['icon-xs', 'icon-sm', 'icon', 'icon-lg'] as const;
   const badgeVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
   const tones = ['attention', 'good', 'bad', 'quiet'] as const;
+  /** The settings dialog's state open on the canvas: a dialog covers the page, so one at a time. */
+  const settingsOpen = ref<(typeof settingStates)[number]>();
+  /** The File task… dialog's state open on the canvas. */
+  const filingStates = [
+    { label: 'a new task', busy: false },
+    { label: 'filing', busy: true },
+    {
+      label: 'the id taken',
+      busy: false,
+      taken: true,
+      refusal: 'The project has a task called invoices already, maybe a finished one. Choose another id.',
+    },
+    {
+      label: 'filed, not named',
+      busy: false,
+      refusal:
+        'Filed invoices, but Jig did not name it on the item (spec/jig-ui is checked out in another checkout). Once that is resolved, File task… again with invoices.',
+    },
+  ];
+
+  const filingOpen = ref<(typeof filingStates)[number]>();
 </script>
 
 <template>
@@ -454,11 +481,72 @@
       />
     </CanvasSection>
 
-    <CanvasSection title="SpecItemRow" note="done with a live task; open with dependencies; a task no longer live; no task; fog">
+    <CanvasSection
+      title="SettingsDialog"
+      note="open one: the person's keys of each kind and the project's; saving; a refusal; reading; an old Jig; unreadable"
+    >
+      <div class="flex flex-wrap gap-2">
+        <Button v-for="state in settingStates" :key="state.label" variant="outline" size="xs" @click="settingsOpen = state">{{
+          state.label
+        }}</Button>
+      </div>
+    </CanvasSection>
+    <SettingsDialog
+      v-if="settingsOpen"
+      :open="true"
+      project="jig-ui"
+      :settings="settingsOpen.settings"
+      :pending="settingsOpen.pending"
+      :notice="settingsOpen.notice"
+      @update:open="settingsOpen = undefined"
+    />
+
+    <CanvasSection
+      title="SpecItemRow"
+      note="done with a live task; open with dependencies; a task no longer live; no task; fog; changed by a waiting edit; with its roadmap menu"
+    >
       <ul>
         <SpecItemRow v-for="(item, i) in specItems" :key="i" :item="item" project="jig-ui" :live="i < 2" />
+        <SpecItemRow :item="specItems[3]!" project="jig-ui" :live="false" waiting />
+        <SpecItemRow :item="specItems[3]!" project="jig-ui" :live="false">
+          <template #menu><SpecItemMenu :items="specItems" :index="3" :phase="1" :phases="[0, 1, 2]" /></template>
+        </SpecItemRow>
       </ul>
     </CanvasSection>
+
+    <CanvasSection
+      title="SpecItemMenu"
+      note="press to open: Up, Down, To Phase N, File task… — the first item (no Up), the second (Up to the top), one with no task (File task…), the last (no Down), alone in the only phase (nothing to move it by), while an edit is on its way"
+    >
+      <div class="flex flex-wrap items-center gap-6">
+        <span v-for="i in [0, 1, 3, 4]" :key="i" class="flex items-center gap-1"
+          >item {{ i + 1 }}<SpecItemMenu :items="specItems" :index="i" :phase="1" :phases="[0, 1, 2]"
+        /></span>
+        <span class="flex items-center gap-1">alone<SpecItemMenu :items="[specItems[3]!]" :index="0" :phase="1" :phases="[1]" /></span>
+        <span class="flex items-center gap-1"
+          >item 2<SpecItemMenu :items="specItems" :index="1" :phase="1" :phases="[0, 1, 2]" disabled
+        /></span>
+      </div>
+    </CanvasSection>
+
+    <CanvasSection title="FileItemDialog" note="open one; type the id of a live task (design-system) to see the goal go">
+      <div class="flex flex-wrap gap-2">
+        <Button v-for="state in filingStates" :key="state.label" variant="outline" size="xs" @click="filingOpen = state">{{
+          state.label
+        }}</Button>
+      </div>
+    </CanvasSection>
+    <FileItemDialog
+      v-if="filingOpen"
+      :open="true"
+      spec="jig-ui"
+      :item="specItems[3]!"
+      :live="['design-system', 'specs-and-epics']"
+      :busy="filingOpen.busy"
+      :refusal="filingOpen.refusal"
+      :taken="filingOpen.taken"
+      @update:open="filingOpen = undefined"
+    />
 
     <CanvasSection
       title="SpecCard"
@@ -476,6 +564,24 @@
           <EpicMenu :spec="spec" :specs="specs" :disabled="spec.id === 'lost-epic'" />
         </template>
       </SpecCard>
+    </CanvasSection>
+
+    <CanvasSection
+      title="SpecCard, editable"
+      note="its roadmap edited from the page (Jig 0.40.0): each item's menu and Add item under each numbered phase — none before the first; edits waiting on the spec's branch committed only, pushed, in a pull request, the roadmap there with the items they changed marked; while an edit is on its way"
+    >
+      <div class="flex flex-col gap-3">
+        <SpecCard :spec="specs[1]!" project="jig-ui" :live="[]" editable />
+        <SpecCard
+          v-for="spec in waitingSpecs"
+          :key="spec.id"
+          :spec="spec"
+          project="jig-ui"
+          :live="['design-system', 'specs-and-epics']"
+          editable
+        />
+        <SpecCard :spec="specs[0]!" project="jig-ui" :live="['design-system', 'specs-and-epics']" editable busy disabled />
+      </div>
     </CanvasSection>
   </div>
 </template>

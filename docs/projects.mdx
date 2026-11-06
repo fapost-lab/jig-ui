@@ -115,7 +115,7 @@ which changes nothing — and shows it on the card:
 a branch, places its files, commits, and then goes as far as the project's `agent.git` lets it —
 push, a pull request, a merge after CI. The card says *Upgrading…* meanwhile, in every browser tab and
 after a reload. Until it ends Jig UI neither reads the project nor changes it: a change from the
-board is refused, and the card offers no **Disconnect**. Then the card says what came of
+board is refused, and the card offers no **⋯** menu. Then the card says what came of
 it: merged, a pull request waiting for review with its link, pushed, committed, staged, nothing
 to do, or why Jig stopped. It stays until you choose **Dismiss** or upgrade again, and until Jig
 UI stops: it is not kept anywhere.
@@ -291,8 +291,9 @@ A drop on any other column does nothing.
 A card in **Ready** whose task can be closed carries a **✕** beside its ⋯ menu. Press it,
 then **Close task** in the question below it, to close the task as done: Jig UI runs
 `jig task set <id> status consolidated` — the command Jig's own `close` action names — in the
-project, after a read shows that nothing was written there since the board you saw. The card leaves the
-board and shows in the list of finished tasks.
+project, checked against the board you saw: from Jig 0.40.0 Jig itself refuses the close when
+anything was written there since; with an older Jig, Jig UI reads the project just before. The card
+leaves the board and shows in the list of finished tasks.
 
 Jig decides whether the task may close, not Jig UI. It closes a task only once its knowledge
 decision is recorded and its pull request has merged, and it asks the forge about the merge as it
@@ -335,8 +336,50 @@ after the tasks that belong to no epic too; it also sets the epic's priority, fr
 beside its progress. Jig UI runs `jig queue move` and `jig queue set` with the revision of the specs
 you saw, so a change made in the project meanwhile is refused and the specs are read again. An epic
 not moved or prioritised yet is not in the queue; it follows the ones that are, in Jig's order.
-Setting its priority puts it in the queue too, at the bottom. Editing a roadmap
-from the page is not here: ask your agent.
+Setting its priority puts it in the queue too, at the bottom.
+
+### Editing a roadmap
+
+With Jig 0.40.0 or later in the project, a spec's roadmap is edited on its card:
+
+- **Add item**, at the end of every numbered phase, adds a line to that phase. Items before the
+  first phase heading have none.
+- An item's ⋯ menu moves it **Up** or **Down** within its phase, or **To Phase N** — to the end of
+  another phase.
+- **File task…**, on an item not done that names no task, fog included, files the item's task and
+  names it on the item: give the task's id, and its goal, which starts as the item's own words.
+  A fog item's goal starts without its `fog:`. The task goes to
+  Backlog. The id of a task the board shows names that task instead, with no goal.
+
+Jig UI runs Jig's `jig spec item add`, `move` or `file` with the revision of the specs you saw, as
+for the epics. Jig commits each edit on the
+spec's branch, `spec/<spec-id>` — or the open epic — in a tree of its own, never in your checkout,
+and takes it as far as `agent.git` lets it: committed, pushed, a pull request. The line above the
+specs after an edit is Jig's note on the next step, such as *agent.git is commit: pushing
+spec/shop is yours*.
+
+While edits wait on that branch, the card says so — with a link to the pull request, or *pushed,
+no pull request yet*, or *committed in this clone, not pushed* — and shows the roadmap as it is on
+the branch, the one the next edit changes. Each item an edit added, moved to another phase or
+filed there is marked **waiting**. Once the pull request is merged and the project fetched, the
+roadmap is the default branch's again.
+
+Jig refuses edits when:
+
+- `agent.git` is `none` (Jig's default) in your clone: Jig commits nothing. Choose a level in the
+  project's **Settings**. Filing a new task is not even started then.
+- the spec's branch is checked out in a checkout of yours, as `jig spec new` and `jig spec resume`
+  leave it: switch that checkout to another branch first.
+- the project changed since you saw the specs: they are read again; try again on them.
+
+Filing a new task is two Jig commands: `jig task new`, which carries no revision, then
+`jig spec item file` with the revision Jig has right after it. So a change made in the project
+since you saw the specs does not refuse it: the item is found by Jig's own handle for it, and Jig
+refuses an item that names a task already. If Jig files the task but then refuses to name it on
+the item, the dialog says so and why; once that is resolved, **File task…** again with the same
+id names it, without filing a second task.
+
+Rewording, checking off or removing an item is not here: ask your agent.
 
 ## Task details
 
@@ -383,6 +426,28 @@ Watching stops when the last page closes; watching writes nothing in the project
 session has ended, the browser was closed since the page was opened, the token was reset, or Jig UI
 now runs on another port: run
 `jig-ui open`, or `npx @fapost/jig-ui`, to reopen it. A restart of Jig UI does not end it.
+
+## Settings
+
+**Settings…**, in the **⋯** menu on a project's card, shows the project's Jig settings as
+`jig config keys` lists them, in two parts. Each key says where its value comes from.
+
+- **Yours, in this clone** — the keys you can set for this clone alone, in its gitignored
+  `.ai/config.local.yaml`; a value set there wins over the project's. Change one here: a box for
+  yes or no, a list for a fixed set of values, a field for the rest (**Save**, or Enter). Jig UI
+  runs `jig config set <key> <value> --local` in the project. **Unset** runs
+  `jig config unset <key> --local`, and the key falls back to the project's value or Jig's default.
+- **The project's, shared through git** — the keys only `.ai/config.yaml` holds. They are shown,
+  not changed: change that file and commit it, so everyone on the project gets the change.
+
+Jig checks each change itself, against the settings you saw. A value it refuses is not written, and
+the dialog says why in Jig's words. A setting changed since the dialog read them — in a terminal, by
+an agent — is not overwritten: the dialog reads them again and says so.
+
+The Telegram token is never shown, only whether it is set. **Clear** removes it; set it with
+`jig notify setup` in a terminal in the project — Jig never takes it on a command line.
+
+Needs Jig 0.40.0 or later in the project.
 
 ## Disconnect a project
 

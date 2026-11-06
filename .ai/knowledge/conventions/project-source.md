@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-11-05
+reviewed_at: 2026-11-06
 ---
 # ProjectSource — how the server reaches a project
 
@@ -49,13 +49,18 @@ The port is `ProjectSource` in `server/source/project-source.ts` — the workspa
 live tasks and how many finished ones Jig still keeps (`tasks(id)`, for the board), those finished tasks (`finished(id)`,
 read through Jig at each call and kept nowhere, so a failure stays its own answer and never becomes the project's state), one live task in full (`task(id, taskId)`), a task's documents (`artifacts(id, taskId)`, and one as it
 is written, `artifact(id, taskId, kind)`, read through Jig at each call), its specs
-(`specs(id)`), `readAgain(id)` — the project read through Jig now, for a person's Read again — `scan(folder?)`, the
+(`specs(id)`), its settings (`settings(id)`, as `jig config keys` lists them with a revision of their own,
+read through Jig at each call), `readAgain(id)` — the project read through Jig now, for a person's Read again — `scan(folder?)`, the
 Jig projects under a folder — the source's own home folder when none is given — by path — connect,
 disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revision)`,
 `prioritise(id, taskId, priority, revision)`, `moveEpic(id, specId, place, revision)` and
 `prioritiseEpic(id, specId, priority, revision)` — a spec's open epic, among the top level of the
 queue — `requestPause(id, taskId, revision)`,
-`cancelPause(id, taskId, revision)`, `resume(id, taskId, revision)` and `fileTask(id, taskId, goal)`, which answer `written`, `refused` with Jig's code,
+`cancelPause(id, taskId, revision)`, `resume(id, taskId, revision)`, `fileTask(id, taskId, goal)`, and
+`setSetting(id, key, value, revision)` and `unsetSetting(id, key, revision)` — the person's own keys, always
+`--local` —, and a spec's roadmap edits `addItem(id, specId, phase, text, revision)`,
+`moveItem(id, specId, item, place, revision)` and `fileItem(id, specId, item, taskId, goal, revision)`,
+which answer `written` — with Jig's `note`, paths cut, where a roadmap edit carries one —, `refused` with Jig's code,
 or the project's state when it is not `ready`; and the upgrade of a project's Jig — `planUpgrade(id)`,
 `upgrade(id)`, which answers `started` before Jig has run, and `dismissUpgrade(id)`; its local adapter
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
@@ -84,6 +89,15 @@ lowest of its reads' revisions (status, task list, queue). `fileTask` is the exc
 new, so it names no live task and carries no revision; `http/` checks the id and the goal against
 Jig's grammar before the port sees them (adr-20261022-filing-a-task-carries-no-revision).
 
+A roadmap edit runs Jig only for the spec, the phase and the item handles of the roadmap the last
+read shows — the one on the spec's write branch while edits wait there — and below
+`ROADMAP_JIG_VERSION` answers `refused: unsupported`; the specs read says which (`editable`).
+`fileItem` with a live task id runs only `spec item file` with the person's revision. With a new id
+it is the one write of two Jig writes: `agent.git` read first (`none` is `refused: git-not-allowed`
+without Jig writing anything), `task new`, the revision read again, `spec item file` with it; a
+refusal after the task was filed answers `refused` with `filed: true`, and the same request again
+with the same id — now live — names it (adr-20261106-editing-a-roadmap-from-the-page).
+
 An upgrade is offered only for a project whose last read carries Jig's `upgrade-available` item
 (else `refused: not-found`), one at a time (`refused: running`). Its run — `running`, then `done`
 with Jig's answer or `refused` with Jig's code and, for `upgrade-blocked`, Jig's reasons — lives in
@@ -91,8 +105,8 @@ the adapter's memory on the project's entry and goes out on the workspace read a
 listeners hear it at the start and at the end. Those reasons, the plan's `wouldStop` and the
 `manualSteps` of a plan or a run are Jig's own text, and JigClient has cut their paths. While it runs the adapter runs no other Jig in the
 project: a read is skipped and the last one stays — kept by `stop()` too, so a new subscription does
-not read it —, a task's documents and the finished tasks answer `unreadable: upgrading` and a write `refused: upgrading`,
-all without Jig; the run itself starts once the reads, the on-demand reads and the writes under way
+not read it —, a task's documents, the settings and the finished tasks answer `unreadable: upgrading` and a write
+`refused: upgrading`, all without Jig; the run itself starts once the reads, the on-demand reads and the writes under way
 have ended. `disconnect` answers `upgrading` meanwhile. Upgrade starts and
 disconnects run one at a time, so of two sent at once the second finds what the first did. It reads
 the project once the run ends (adr-20261027-upgrading-a-project-runs-in-the-background).

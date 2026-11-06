@@ -122,3 +122,12 @@ itself — a pause request and a resume.
 
 Informal synonyms: legal move, button.
 Use in: source code, API, documentation.
+
+## Setting
+
+One of Jig's configuration keys in a project, as `jig config keys` lists it: the project's, answered
+by `.ai/config.yaml` and shared through git, or the person's own in a clone, answered by
+`.ai/config.local.yaml`. Not Jig UI's interface settings, which Jig UI keeps in its config directory.
+
+Informal synonyms: config key, option.
+Use in: source code, API, documentation.

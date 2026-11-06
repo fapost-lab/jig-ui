@@ -21,11 +21,20 @@ export const LAND_JIG_VERSION = '0.39.0';
 /** The first Jig that lists a task's documents and reads one as JSON (fapost-lab/jig#347). */
 export const ARTIFACTS_JIG_VERSION = '0.39.0';
 
+/** The first Jig whose close (`task set <id> status consolidated`) takes `--revision` and `--json` (fapost-lab/jig#365). */
+export const CLOSE_JIG_VERSION = '0.40.0';
+/** The first Jig that lists its settings as JSON and sets them with `--revision` and `--json` (fapost-lab/jig#363). */
+export const SETTINGS_JIG_VERSION = '0.40.0';
+/** The first Jig that names a roadmap's items, shows the edits waiting, and adds, moves and files them (fapost-lab/jig#362). */
+export const ROADMAP_JIG_VERSION = '0.40.0';
+
 const SCRIPT = '.ai/scripts/jig';
 /** A read's limit: 10 s ran out with several projects read at once, each four Jig runs (task `read-timeout`). */
 const TIMEOUT_MS = 30_000;
 /** A dry run compares every framework file; a real upgrade at `agent.git: merge` also waits for CI. */
 const PLAN_TIMEOUT_MS = 60_000;
+/** A roadmap write fetches before it commits, and may push and ask the forge for the pull request. */
+const ROADMAP_TIMEOUT_MS = 60_000;
 const UPGRADE_TIMEOUT_MS = 30 * 60_000;
 
 /** The directory whose changes may change what Jig reports: the main checkout's `.ai/`. */
@@ -199,8 +208,19 @@ export class JigRefusal extends Error {
 /**
  * Jig's text for a person with every absolute path in it cut out: no path reaches the page. Jig 0.35.0 names only
  * paths under the project, relative to it, since it runs in the project's root; this keeps a later one from leaking.
+ * A slash starts a path wherever it does not continue a word or a relative path — a letter, a digit, `.`, `~`, `*`, `-`
+ * or a slash before it — so `[/x`, `>/x`, `=/x` and `PATH=/x:/y` are cut too; a web address's `//` is kept. An option
+ * starts a path by the same rule, whatever follows it: `-I/x`, `-isystem/x`, `-xzf/x`, `${X:-/x}`, so `-Isrc/x` loses
+ * its `/x` too. A path glued to a word (`abc/Users/x`) reads as a relative one: a pattern cannot tell them apart.
+ * Not a path: a backslash after anything but a blank, a quote, `(`, `=` or `:` (`[A-Z]+\.`; `C:\x` still is one), a
+ * slash after a word's `)` or a `<placeholder>` (`$(pwd)/.env`, `<spec-id>/<n>`), an option pair (`-f/--force`).
+ * The lookahead first keeps it linear: the look back over an option runs only where a slash follows.
  */
-export const withoutPaths = (text: string): string => text.replace(/(?<=^|[\s(`'"])(?:[A-Za-z]:)?[\\/][^\s)`'"]*/g, '…');
+export const withoutPaths = (text: string): string =>
+  text.replace(
+    /(?=(?:[A-Za-z]:)?[\\/])(?:(?=\\)(?<=^|[\s(`'"=:])|(?!\\))(?:(?<![\w.~*/\\-]|\w\)|<[\w-]+>|:(?=\/\/[^/]))|(?<=(?<![\w.~*/\\-])-(?:[A-Za-z][\w-]*)?)(?!\/-))(?:[A-Za-z]:)?[\\/][^\s)`'"]*/g,
+    '…',
+  );
 
 const CODES = new Set([
   'usage',
@@ -214,6 +234,21 @@ const CODES = new Set([
   'stash-conflict',
   'upgrade-blocked',
   'not-merged',
+  'not-closable',
+  'unknown-key',
+  'not-local',
+  'invalid-value',
+  'secret-key',
+  'git-not-allowed',
+  'not-linkable',
+  'epic-missing',
+  'write-busy',
+  'branch-checked-out',
+  'branch-diverged',
+  'branch-has-other-commits',
+  'base-not-on-origin',
+  'tree-in-the-way',
+  'commit-refused',
   'failed',
 ]);
 
@@ -230,13 +265,15 @@ const isObject = (v: unknown): v is Json => typeof v === 'object' && v !== null 
 /**
  * Why Jig refused, as it said it: each line of its message with `jig: error:` and the command's own `<command>:` cut off,
  * and every absolute path cut out — `upgrade: cannot determine the framework source root; pass --from <dir>` becomes
- * `cannot determine the framework source root; pass --from <dir>`. None without a message.
+ * `cannot determine the framework source root; pass --from <dir>`. A command of two or three words says them all
+ * (`task set: `, `spec item add: `). None without a message.
  */
-function said(message: unknown, command: string | undefined): string[] {
+function said(message: unknown, args: string[]): string[] {
   if (typeof message !== 'string') return [];
   return message.split('\n').flatMap((line) => {
     let text = line.trim().replace(/^jig: error: /, '');
-    if (command && text.startsWith(`${command}: `)) text = text.slice(command.length + 2);
+    const command = [args.slice(0, 3).join(' '), args.slice(0, 2).join(' '), args[0]].find((c) => c && text.startsWith(`${c}: `));
+    if (command) text = text.slice(command.length + 2);
     return text ? [withoutPaths(text)] : [];
   });
 }
@@ -277,7 +314,7 @@ async function readJson(
       const reasons = message.split('\n').flatMap((line) => (line.startsWith('  - ') ? [withoutPaths(line.slice(4))] : []));
       throw new JigRefusal(code, reasons);
     }
-    throw new JigRefusal(typeof code === 'string' && CODES.has(code) ? code : 'failed', said(message, args[0]));
+    throw new JigRefusal(typeof code === 'string' && CODES.has(code) ? code : 'failed', said(message, args));
   }
   if (!isObject(envelope.data)) throw new JigShapeError();
   return { revision: envelope.revision, data: envelope.data };
@@ -484,8 +521,14 @@ export async function readFinishedTasks(root: string, platform: NodeJS.Platform 
 const SpecProgress = z.object({ done: count, total: count, filed: count, fog: count });
 export type SpecProgress = z.output<typeof SpecProgress>;
 
-/** A roadmap item: its words as the roadmap has them, and the task it names, if any. */
-const SpecItem = z.object({ text, checked: z.boolean(), task: maybe, fog: z.boolean() });
+/** A roadmap item: its handle (Jig 0.40.0, `null` from an older Jig), its words as the roadmap has them, and the task it names, if any. */
+const SpecItem = z.object({
+  id: text.nullish().transform((id) => id ?? null),
+  text,
+  checked: z.boolean(),
+  task: maybe,
+  fog: z.boolean(),
+});
 export type SpecItem = z.output<typeof SpecItem>;
 
 /** A roadmap phase; `phase` and `title` are `null` for items before any phase heading. */
@@ -507,6 +550,19 @@ const SpecRow = z
     /** `null` when the roadmap could not be read. */
     progress: SpecProgress.nullable(),
     phases: z.array(SpecPhase),
+    // Jig 0.40.0: edits committed on the roadmap's write branch that have not landed, and the roadmap as it is there.
+    waiting: z
+      .object({
+        branch: text,
+        base: text,
+        commits: count,
+        pushed: z.boolean(),
+        pr: maybe,
+        progress: SpecProgress.nullable(),
+        phases: z.array(SpecPhase),
+      })
+      .nullish()
+      .transform((w) => w ?? null),
   })
   .transform(({ missing_files, epic, ...s }) => ({
     id: s.id,
@@ -523,6 +579,7 @@ const SpecRow = z
     },
     progress: s.progress,
     phases: s.phases,
+    waiting: s.waiting,
   }));
 export type Spec = z.output<typeof SpecRow>;
 
@@ -643,6 +700,80 @@ export async function readArtifact(
   return parsed(ArtifactText, data);
 }
 
+/** The kinds of value Jig names for a setting; one it adds later is read as text. */
+const SETTING_KINDS = ['boolean', 'choice', 'duration', 'number', 'text', 'list'] as const;
+
+/**
+ * Every setting Jig reads, as `jig config keys --json` lists them (Jig 0.40.0), in Jig's order. `scope` says where it may
+ * be answered: `project` only in `.ai/config.yaml`, `local` in the person's `.ai/config.local.yaml` first, `local only`
+ * only there. A secret's value is never printed, and one printed anyway is dropped: `set` says whether it is there.
+ * Values and texts come without a path.
+ */
+const SettingList = z.object({
+  keys: z.array(
+    z
+      .object({
+        key: text,
+        value: maybe,
+        set: z.boolean(),
+        source: z.enum(['local', 'project', 'default']),
+        scope: z.enum(['project', 'local', 'local only']),
+        kind: text,
+        allowed: z.array(text).nullable(),
+        default: maybe,
+        description: text,
+        secret: z.boolean(),
+      })
+      .transform(({ value, default: fallback, description, kind, secret, ...setting }) => ({
+        ...setting,
+        secret,
+        kind: (SETTING_KINDS as readonly string[]).includes(kind) ? (kind as (typeof SETTING_KINDS)[number]) : 'text',
+        value: secret ? null : value && withoutPaths(value),
+        default: secret ? null : fallback && withoutPaths(fallback),
+        description: withoutPaths(description),
+      })),
+  ),
+});
+export type Setting = z.output<typeof SettingList>['keys'][number];
+
+/** The project's settings and the person's own in this clone (`jig config keys --json`, Jig 0.40.0), with the revision they were read at. */
+export async function readSettings(
+  root: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<{
+  revision: number;
+  keys: Setting[];
+}> {
+  const { revision, data } = await readJson(root, ['config', 'keys'], platform);
+  return { revision, keys: parsed(SettingList, data).keys };
+}
+
+/**
+ * Sets one of the person's own settings in this clone (`jig config set <key> <value> --local`, Jig 0.40.0), never the
+ * project's file; Jig checks the value. Refused as `unknown-key`, `not-local` (a key only the project's file answers),
+ * `invalid-value`, `secret-key` (the Telegram token: Jig takes it only in a terminal), `usage` and `stale-revision`,
+ * Jig's reason as `reasons`. Its answer, the key as it now reads, is not read: the caller reads again.
+ */
+export async function setSetting(
+  root: string,
+  key: string,
+  value: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  await readJson(root, ['config', 'set', key, value, '--local', '--revision', String(revision)], platform);
+}
+
+/** Takes one of the person's own settings out of this clone's file (`jig config unset <key> --local`), so the project's or Jig's default answers; refused as `setSetting` is. */
+export async function unsetSetting(
+  root: string,
+  key: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  await readJson(root, ['config', 'unset', key, '--local', '--revision', String(revision)], platform);
+}
+
 /** A task or an epic as Jig's queue names it, never a bare id, which could read as a flag. */
 export type Ref = `task:${string}` | `epic:${string}`;
 
@@ -748,18 +879,92 @@ export async function fileTask(root: string, id: string, goal: string, platform:
   await readJson(root, ['task', 'new', id, '--goal', goal], platform);
 }
 
+/** Where a moved roadmap item goes: after another item, to the top of its own phase, or to the bottom of another phase. */
+export type ItemPlace =
+  | {
+      after: string;
+    }
+  | {
+      phase: number;
+    }
+  | 'top';
+
+/** What a roadmap write answers that Jig UI reads: Jig's note for a person — whose step is next, or what failed after the commit. */
+const RoadmapWrite = z.object({ write: z.object({ note: maybe }) });
+
+/**
+ * Runs `jig spec item <args> --revision <n> --json`: Jig commits the edit on the spec's branch in a tree of its own and
+ * goes as far as `agent.git` allows. Answers Jig's note without a path, `null` without one; the item it answers is not
+ * read, the caller reads again. Refused as `stale-revision`, `not-found`, `already-exists`, `not-linkable`,
+ * `git-not-allowed` (`agent.git: none`), `branch-checked-out` and the other refusals of Jig's writes in its own tree.
+ */
+async function roadmapWrite(root: string, args: string[], revision: number, platform: NodeJS.Platform): Promise<string | null> {
+  const { data } = await readJson(root, ['spec', 'item', ...args, '--revision', String(revision)], platform, ROADMAP_TIMEOUT_MS);
+  const { note } = parsed(RoadmapWrite, data).write;
+  return note && withoutPaths(note);
+}
+
+/** Adds an item with `text` at the bottom of phase `phase` of a spec's roadmap (`jig spec item add`); as `roadmapWrite`. */
+export function addItem(
+  root: string,
+  spec: string,
+  phase: number,
+  text: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
+  return roadmapWrite(root, ['add', spec, '--phase', String(phase), '--text', text], revision, platform);
+}
+
+/** Moves a roadmap item, named by its handle (`jig spec item move`); as `roadmapWrite`. */
+export function moveItem(
+  root: string,
+  spec: string,
+  item: string,
+  place: ItemPlace,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
+  const where = place === 'top' ? ['--top'] : 'after' in place ? ['--after', place.after] : ['--phase', String(place.phase)];
+  return roadmapWrite(root, ['move', spec, item, ...where], revision, platform);
+}
+
+/** Names a task filed earlier on a roadmap item and links it to the spec (`jig spec item file`); as `roadmapWrite`. */
+export function fileItem(
+  root: string,
+  spec: string,
+  item: string,
+  task: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
+  return roadmapWrite(root, ['file', spec, item, '--task', task], revision, platform);
+}
+
 /** Closing asks the forge whether the task's pull request merged: a network round trip. */
 const CLOSE_TIMEOUT_MS = 60_000;
 
 /**
  * Closes a task as done (`jig task set <id> status consolidated`, the command of Jig's `close` action). Jig lets it
  * through only when the knowledge decision is recorded and the pull request, asked of the forge now, has merged — a
- * forge cache that has not heard of the merge yet withholds the action, never the command. The command takes no
- * `--revision` and prints no JSON (Jig 0.38.1): the clone's revision is read first, and a write since `revision` is
- * refused as `stale-revision` with nothing run — a read, not a claim: a write between it and the close is not seen; Jig's own refusal throws JigRefusal `failed` with its error lines,
- * without a path.
+ * forge cache that has not heard of the merge yet withholds the action, never the command. From `CLOSE_JIG_VERSION` on,
+ * Jig claims the write against `revision` itself: refused as `stale-revision`, `not-found`, or `not-closable` with Jig's
+ * reason as `reasons`; the closed task it answers is not read, the caller reads again. An older Jig takes no `--revision`
+ * and prints no JSON: the clone's revision is read first, and a write since `revision` is refused as `stale-revision`
+ * with nothing run — a read, not a claim: a write between it and the close is not seen; Jig's own refusal throws
+ * JigRefusal `failed` with its error lines, without a path.
  */
-export async function closeTask(root: string, task: string, revision: number, platform: NodeJS.Platform = process.platform): Promise<void> {
+export async function closeTask(
+  root: string,
+  task: string,
+  revision: number,
+  jigVersion: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  if (supports(jigVersion, CLOSE_JIG_VERSION)) {
+    await readJson(root, ['task', 'set', task, 'status', 'consolidated', '--revision', String(revision)], platform, CLOSE_TIMEOUT_MS);
+    return;
+  }
   if ((await readJson(root, ['queue', 'list'], platform)).revision !== revision) throw new JigRefusal('stale-revision');
   try {
     await jig(root, ['task', 'set', task, 'status', 'consolidated'], platform, CLOSE_TIMEOUT_MS);

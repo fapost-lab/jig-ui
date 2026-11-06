@@ -1,6 +1,18 @@
-import type { Artifact, ArtifactKind, Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade } from '../jig/client.js';
+import type {
+  Artifact,
+  ArtifactKind,
+  Attention,
+  ItemPlace,
+  Place,
+  Setting,
+  Spec,
+  SpecItem,
+  SpecPhase,
+  SpecProgress,
+  Upgrade,
+} from '../jig/client.js';
 
-export type { Artifact, ArtifactKind, Attention, Place, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade };
+export type { Artifact, ArtifactKind, Attention, ItemPlace, Place, Setting, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade };
 export { ARTIFACT_KINDS } from '../jig/client.js';
 export { RegistryUnreadable } from '../registry/projects.js';
 
@@ -304,6 +316,18 @@ export type TaskArtifacts =
     }
   | Exclude<ProjectView, { state: 'ready' }>;
 
+/**
+ * The project's settings and the person's own in this clone, every key Jig reads, with the revision they were read at; or
+ * why they cannot be read — a project whose Jig is older than 0.40.0 is `unsupported`, with 0.40.0 as its minimum.
+ */
+export type ProjectSettings =
+  | {
+      state: 'ready';
+      keys: Setting[];
+      revision: number;
+    }
+  | Exclude<ProjectView, { state: 'ready' }>;
+
 /** One of a task's documents as it is written, `null` when the task or the document is not there; or why it cannot be read. */
 export type TaskArtifact =
   | {
@@ -327,13 +351,15 @@ export type ShownSpec = Spec & {
 
 /**
  * A project's specs — the queued epics first, in the queue's order, then the other open epics, then the specs with
- * none, each in Jig's order — and the revision a write based on them carries; or why the project cannot be read.
+ * none, each in Jig's order — and the revision a write based on them carries; `editable` when the project's Jig adds,
+ * moves and files roadmap items; or why the project cannot be read.
  */
 export type ProjectSpecs =
   | {
       state: 'ready';
       specs: ShownSpec[];
       revision: number;
+      editable: boolean;
     }
   | Exclude<ProjectView, { state: 'ready' }>;
 
@@ -357,12 +383,18 @@ export type FoundProjects = {
 
 /** What a write came to: done, refused by Jig's failure code (`stale-revision`: the project changed since), or why the project cannot be read. */
 export type Written =
-  | { state: 'written' }
+  | {
+      state: 'written';
+      /** Jig's note for the person, without a path, where a write carries one: whose step is next, or what failed after the commit (a roadmap edit). */
+      note?: string;
+    }
   | {
       state: 'refused';
       code: string;
       /** Jig's own reasons, without a path, where a command's refusal carries them (closing a task). */
       reasons?: string[];
+      /** Filing an item's task: the task was filed, and Jig refused to name it on the item. */
+      filed?: true;
     }
   | Exclude<ProjectView, { state: 'ready' }>;
 
@@ -426,6 +458,21 @@ export interface ProjectSource {
   moveEpic(id: string, specId: string, place: Place, revision: number): Promise<Written | undefined>;
   /** Sets the priority of a spec's open epic, `null` for none, as `move` writes. */
   prioritiseEpic(id: string, specId: string, priority: number | null, revision: number): Promise<Written | undefined>;
+  /**
+   * Adds an item with `text` at the bottom of a numbered phase of a spec's roadmap, as `move` writes: the spec and the
+   * phase must be in the last read — the roadmap waiting on the spec's branch when there is one. Jig commits it on the
+   * spec's branch and goes as far as `agent.git` allows; its note comes back. Below Jig 0.40.0 refused `unsupported`.
+   */
+  addItem(id: string, specId: string, phase: number, text: string, revision: number): Promise<Written | undefined>;
+  /** Moves a roadmap item, and `place.after` names another, both in the last read; as `addItem` writes. */
+  moveItem(id: string, specId: string, item: string, place: ItemPlace, revision: number): Promise<Written | undefined>;
+  /**
+   * Names a task on an unchecked roadmap item that names none, as `addItem` writes. A live task is named as it is, with
+   * `revision`; any other id is filed first with `goal` (`null`: refused `usage`), then named with the revision read after
+   * it — refused at once as `git-not-allowed` when the clone's `agent.git` is `none`, so nothing is filed that Jig could
+   * not name. A refusal after the filing comes back `filed`.
+   */
+  fileItem(id: string, specId: string, item: string, taskId: string, goal: string | null, revision: number): Promise<Written | undefined>;
   /** Sets a live task's priority, `null` for none, as `move` writes. */
   prioritise(id: string, taskId: string, priority: number | null, revision: number): Promise<Written | undefined>;
   /** Asks a live task to pause at its next stage boundary, as `move` writes. */
@@ -444,6 +491,16 @@ export interface ProjectSource {
    * a taken id is Jig's `already-exists`. `undefined` when no project has that id.
    */
   fileTask(id: string, taskId: string, goal: string): Promise<Written | undefined>;
+  /** A connected project's settings, read through its Jig at each call; `undefined` when no project has that id. */
+  settings(id: string): Promise<ProjectSettings | undefined>;
+  /**
+   * Sets one of the person's own settings in the project's clone, never the project's file, against the revision of the
+   * settings read, then reads the project again. A project whose Jig is older than 0.40.0 is refused `unsupported`, Jig
+   * not run. `undefined` when no project has that id.
+   */
+  setSetting(id: string, key: string, value: string, revision: number): Promise<Written | undefined>;
+  /** Takes one of the person's own settings out of the clone's file, so the project's value or Jig's default answers, as `setSetting` writes. */
+  unsetSetting(id: string, key: string, revision: number): Promise<Written | undefined>;
   /**
    * What upgrading the project's Jig would do, changing nothing, for a project that shows Jig's `upgrade-available`
    * item; refused `not-found` without one, `running` while its upgrade runs. `undefined` when no project has that id.

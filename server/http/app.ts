@@ -12,6 +12,7 @@ import { columns, placeOf } from '../board/columns.js';
 import {
   ARTIFACT_KINDS,
   type ArtifactKind,
+  type ItemPlace,
   type Place,
   type ProjectSource,
   RegistryUnreadable,
@@ -86,6 +87,29 @@ const isNewId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0
 /** A goal as `jig task new --goal` takes one: a line of text, at most 500 characters; Jig refuses the rest as `usage`. */
 const isGoal = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '' && v.length <= 500 && !/[\r\n]/.test(v);
 
+/** A setting's name as Jig spells one (`agent.git`): words joined by dots, never a flag. */
+const isKey = (v: unknown): v is string => typeof v === 'string' && /^[a-z][a-z0-9_]*(\.[a-z0-9_]+)+$/.test(v);
+
+/** A setting's value as the page sends one: a line of at most 500 characters; Jig checks the rest, an empty one included. */
+const isValue = (v: unknown): v is string => typeof v === 'string' && v.length <= 500 && !/[\r\n]/.test(v);
+
+/** A roadmap phase's number, `## Phase <n>`. */
+const isPhase = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
+
+/**
+ * A new item's words: a line of at most 500 characters, not blank. Not led by a backticked id and a dash either: Jig would
+ * read the item as filed to that task, which may not exist; a task is filed through File task.
+ */
+const isItemText = (v: unknown): v is string =>
+  typeof v === 'string' && v.trim() !== '' && v.length <= 500 && !/[\r\n]/.test(v) && !/^\s*`[^`\s]+`\s+(?:—|--?)\s/.test(v);
+
+/** Where a moved item goes: after another item, to the top of its phase, or to the bottom of another phase. */
+function itemPlace(v: unknown): ItemPlace | undefined {
+  if (v === 'top') return v;
+  const [after, phase] = [field(v, 'after'), field(v, 'phase')];
+  return isId(after) ? { after } : isPhase(phase) ? { phase } : undefined;
+}
+
 /** The body of a write that names only a task: the task and the revision it was read at, `undefined` where invalid. */
 function taskAt(body: unknown) {
   const [task, revision] = [field(body, 'task'), field(body, 'revision')];
@@ -94,14 +118,32 @@ function taskAt(body: unknown) {
 
 /** What a write came to, in the API's form. A refusal names no path: Jig's code goes on, and its reasons with the paths cut out. */
 function written(c: Context, w: Written | undefined) {
+  if (w?.state === 'written') return c.json({ written: true as const }, 200);
+  return unwritten(c, w);
+}
+
+/** A write that wrote nothing, in the API's form: no such project, one not ready, or Jig's refusal. */
+function unwritten(c: Context, w: Exclude<Written, { state: 'written' }> | undefined) {
   if (w === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
-  if (w.state === 'written') return c.json({ written: true as const }, 200);
   if (w.state !== 'refused') return c.json({ project: w }, 200);
   if (w.code === 'stale-revision') return refuse(c, 409, w.code, 'The project changed since the board was read.');
   if (w.code === 'not-found') return refuse(c, 404, w.code, 'This project has no live task with this id.');
   // Jig's own reasons, where the command gave them (a close): the person sees why, not only a code.
   if (w.reasons) return c.json({ error: { code: w.code, message: 'Jig refused the change.', reasons: w.reasons } }, 422);
   return refuse(c, 422, w.code, 'Jig refused the change.');
+}
+
+/**
+ * What a roadmap edit came to, as `written` says, with Jig's note — whose step is next, or what failed after the commit,
+ * `null` for none; a task filed that Jig did not name on its item is said so (`filed`), with Jig's reasons.
+ */
+function edited(c: Context, w: Written | undefined) {
+  if (w?.state === 'written') return c.json({ written: true as const, note: w.note ?? null }, 200);
+  if (w?.state === 'refused' && w.filed) {
+    const message = 'The task was filed, and Jig did not name it on the item.';
+    return c.json({ error: { code: w.code, message, reasons: w.reasons ?? [], filed: true as const } }, 422);
+  }
+  return unwritten(c, w);
 }
 
 /** An upgrade refused before it ran, in the API's form: under way already, none to make, or Jig's code and its reasons. */
@@ -209,6 +251,13 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
         return c.json({ artifact: { state: read.state, ...read.artifact } }, 200);
       })
 
+      // The settings, read through the project's Jig at each call: the project's, and the person's own in this clone.
+      .get('/api/projects/:id/settings', async (c) => {
+        const read = await source.settings(c.req.param('id'));
+        if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        return c.json({ settings: read }, 200);
+      })
+
       .get('/api/projects/:id/specs', async (c) => {
         const read = await source.specs(c.req.param('id'));
         if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
@@ -301,6 +350,85 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
         },
       )
 
+      // A roadmap edit: Jig commits it on the spec's branch in a tree of its own, never in the person's checkout.
+      .post(
+        '/api/projects/:id/specs/items/add',
+        validator('json', (body: unknown) => {
+          const [spec, phase, text, revision] = [field(body, 'spec'), field(body, 'phase'), field(body, 'text'), field(body, 'revision')];
+          return {
+            spec: isId(spec) ? spec : undefined,
+            phase: isPhase(phase) ? phase : undefined,
+            text: isItemText(text) ? text : undefined,
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { spec, phase, text, revision } = c.req.valid('json');
+          if (spec === undefined || phase === undefined || text === undefined || revision === undefined) {
+            return refuse(
+              c,
+              422,
+              'usage',
+              'Give a spec, a phase, the item on one line not led by a task id, and the revision it was read at.',
+            );
+          }
+          return edited(c, await source.addItem(c.req.param('id'), spec, phase, text, revision));
+        },
+      )
+
+      .post(
+        '/api/projects/:id/specs/items/move',
+        validator('json', (body: unknown) => {
+          const [spec, item, revision] = [field(body, 'spec'), field(body, 'item'), field(body, 'revision')];
+          return {
+            spec: isId(spec) ? spec : undefined,
+            item: isId(item) ? item : undefined,
+            place: itemPlace(field(body, 'place')),
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { spec, item, place, revision } = c.req.valid('json');
+          if (spec === undefined || item === undefined || place === undefined || revision === undefined) {
+            return refuse(c, 422, 'usage', 'Give a spec, an item, where it goes and the revision it was read at.');
+          }
+          return edited(c, await source.moveItem(c.req.param('id'), spec, item, place, revision));
+        },
+      )
+
+      // A new task is filed with its goal first, as from the board; a live task is named as it is.
+      .post(
+        '/api/projects/:id/specs/items/file',
+        validator('json', (body: unknown) => {
+          const [spec, item, task, goal, revision] = [
+            field(body, 'spec'),
+            field(body, 'item'),
+            field(body, 'task'),
+            field(body, 'goal'),
+            field(body, 'revision'),
+          ];
+          return {
+            spec: isId(spec) ? spec : undefined,
+            item: isId(item) ? item : undefined,
+            task: isNewId(task) ? task : undefined,
+            goal: goal === undefined || goal === null ? null : isGoal(goal) ? goal : undefined,
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { spec, item, task, goal, revision } = c.req.valid('json');
+          if (spec === undefined || item === undefined || task === undefined || goal === undefined || revision === undefined) {
+            return refuse(
+              c,
+              422,
+              'usage',
+              'Give a spec, an item, a task id Jig takes, its goal on one line, and the revision it was read at.',
+            );
+          }
+          return edited(c, await source.fileItem(c.req.param('id'), spec, item, task, goal, revision));
+        },
+      )
+
       // A pause is asked of the task, not made: Jig honours it at the task's next stage boundary.
       .post('/api/projects/:id/queue/pause', validator('json', taskAt), async (c) => {
         const { task, revision } = c.req.valid('json');
@@ -326,6 +454,41 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
         if (task === undefined || revision === undefined) return refuse(c, 422, 'usage', 'Give a task and the revision it was read at.');
         return written(c, await source.close(c.req.param('id'), task, revision));
       })
+
+      // A setting is the person's own, in this clone's file only; the write carries the revision of the settings read.
+      .post(
+        '/api/projects/:id/settings',
+        validator('json', (body: unknown) => {
+          const [key, value, revision] = [field(body, 'key'), field(body, 'value'), field(body, 'revision')];
+          return {
+            key: isKey(key) ? key : undefined,
+            value: isValue(value) ? value : undefined,
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { key, value, revision } = c.req.valid('json');
+          if (key === undefined || value === undefined || revision === undefined) {
+            return refuse(c, 422, 'usage', 'Give a setting, its value on one line and the revision the settings were read at.');
+          }
+          return written(c, await source.setSetting(c.req.param('id'), key, value, revision));
+        },
+      )
+
+      .post(
+        '/api/projects/:id/settings/unset',
+        validator('json', (body: unknown) => {
+          const [key, revision] = [field(body, 'key'), field(body, 'revision')];
+          return { key: isKey(key) ? key : undefined, revision: isRevision(revision) ? revision : undefined };
+        }),
+        async (c) => {
+          const { key, revision } = c.req.valid('json');
+          if (key === undefined || revision === undefined) {
+            return refuse(c, 422, 'usage', 'Give a setting and the revision the settings were read at.');
+          }
+          return written(c, await source.unsetSetting(c.req.param('id'), key, revision));
+        },
+      )
 
       // A new task carries no revision: it writes nothing that exists (adr-20261022-filing-a-task-carries-no-revision).
       .post(

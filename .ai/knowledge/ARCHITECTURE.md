@@ -41,14 +41,17 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   (feature-specs), a task's documents `jig task artifacts` and `jig task artifact read` (from Jig 0.39.0,
   adr-20261030-a-task-document-is-shown-as-written), and the writes `jig queue move`, `jig queue set --priority`, `jig queue request`
   and `cancel` (a pause), `jig task new` and `jig task resume` (from Jig 0.35.0), `jig task set <id>
-  status consolidated` (a close, text, checked against a revision read first), and
+  status consolidated` (a close: from Jig 0.40.0 with `--revision --json`, Jig checking it; before
+  that text, checked against a revision read first), a project's settings
+  `jig config keys` and the person's own `jig config set|unset --local` (from Jig 0.40.0, feature-settings), a roadmap's
+  edits `jig spec item add|move|file` (from Jig 0.40.0, adr-20261106-editing-a-roadmap-from-the-page), and
   `jig upgrade`, its dry run and its run (from Jig 0.34.0), and `jig self-update` (its text line), each JSON answer checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
   fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue,
-  0.39.0 for a task's documents (convention-jig-client).
+  0.39.0 for a task's documents, 0.40.0 for the settings (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, the connected ids
   (`connected`), one project as the workspace shows it (`project`), the Jig projects under a folder (`scan`, walked
-  by `scan.ts`), a project's live tasks, its finished tasks on demand (`finished`), one task in full, a live task's documents (`artifacts`, `artifact`), connect, disconnect, subscribe to changes, and the writes `move`,
-  `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `planUpgrade`, `upgrade` and
+  by `scan.ts`), a project's live tasks, its finished tasks on demand (`finished`), one task in full, a live task's documents (`artifacts`, `artifact`), the settings (`settings`), connect, disconnect, subscribe to changes, and the writes `move`,
+  `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `setSetting` and `unsetSetting`, `planUpgrade`, `upgrade` and
   `dismissUpgrade`, `land` and `landAll`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
@@ -68,6 +71,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `/queue/pause/cancel`, `/tasks/resume` (adr-20261022-writes-carry-the-revision-of-their-read) and
   `/tasks/close` (adr-20261029-close-a-ready-task-from-the-board),
   `POST /api/projects/:id/tasks` (adr-20261022-filing-a-task-carries-no-revision),
+  `POST /api/projects/:id/specs/items/add`, `/move` and `/file` (adr-20261106-editing-a-roadmap-from-the-page),
+  `GET` and `POST /api/projects/:id/settings` and `POST /api/projects/:id/settings/unset` (feature-settings),
   `POST /api/projects/:id/upgrade/plan`, `POST` and `DELETE /api/projects/:id/upgrade`
   (adr-20261027-upgrading-a-project-runs-in-the-background), `POST /api/self-update`, `POST` and
   `DELETE /api/upgrade-all` (adr-20261029-upgrade-all-and-self-update-from-the-page), `POST /api/projects/:id/upgrade/land` and `POST /api/upgrade/land-all` (adr-20261029-check-merge-lands-an-upgrade-through-jig), connect /
@@ -119,7 +124,10 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   (adr-20261026-a-drop-out-of-paused-resumes-at-once); and for closing a ready task as done, after the
   person confirms, its refusal shown in Jig's words (adr-20261029-close-a-ready-task-from-the-board). Filing a task is the one write with no revision: it
   names a new id, which Jig claims or refuses `already-exists`
-  (adr-20261022-filing-a-task-carries-no-revision). Upgrading a project's Jig is the one write that
+  (adr-20261022-filing-a-task-carries-no-revision). A roadmap's edits are writes like the queue's,
+  with the specs' revision, committed by Jig on the spec's branch; filing an item's new task is that
+  filing and then naming it on the item, with a revision the adapter reads between the two
+  (adr-20261106-editing-a-roadmap-from-the-page). Upgrading a project's Jig is the one write that
   outlives its request: after a dry run, `jig upgrade` runs in the server's background, its state in
   the adapter's memory and on the workspace read, and no other Jig runs in the project meanwhile
   (adr-20261027-upgrading-a-project-runs-in-the-background). Upgrade all runs those upgrades one at
@@ -170,5 +178,7 @@ The start flow, read-and-follow and change, with its conflict display, are built
   resumes the task at once (adr-20261026-a-drop-out-of-paused-resumes-at-once).
 - A hosted or self-hosted Jig UI stays possible: projects by id, access behind a replaceable
   guard, writes carrying a revision (adr-20261014-project-source-port-keeps-hosting-open) — all but
-  the upgrade (adr-20261027-upgrading-a-project-runs-in-the-background).
+  the upgrade (adr-20261027-upgrading-a-project-runs-in-the-background) and the naming of an item's
+  new task, which carries the revision read after its filing
+  (adr-20261106-editing-a-roadmap-from-the-page).
 - Stack: adr-20261014-stack-vue-hono-sse-on-node.

@@ -8,6 +8,15 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+- A project's [settings](/projects#settings): **Settings…** in its card's **⋯** menu shows Jig's
+  settings for the project and for this clone, and changes your own through
+  `jig config set --local`. Needs Jig 0.40.0 in the project.
+- [Closing a task](/projects#closing-a-task) in a project on Jig 0.40.0 or later is checked by Jig
+  itself against the board you saw, so a change made between the check and the close is caught too.
+- [Editing a roadmap](/projects#editing-a-roadmap) on the Specs view: add an item to a phase, move
+  an item up, down or to another phase, and file an item's task. Jig commits each edit on the spec's
+  branch, never in your checkout, and the card shows the edits waiting there. Needs Jig 0.40.0 in the
+  project.
 - The board no longer reads the finished tasks of a project. **N finished tasks** still shows their
   number, from the board's own read, and the list is read when you open it. A failure to read it
   stays in the list, with **Read again**, and leaves the project and its board as they are.

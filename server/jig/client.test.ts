@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
+  addItem,
+  fileItem,
+  moveItem,
   cancelPause,
   closeTask,
   fileTask,
@@ -17,6 +20,7 @@ import {
   readArtifact,
   readArtifacts,
   readQueue,
+  readSettings,
   readSpecs,
   readStatus,
   readFinishedTasks,
@@ -27,7 +31,9 @@ import {
   runUpgrade,
   selfUpdate,
   setPriority,
+  setSetting,
   supports,
+  unsetSetting,
   withoutPaths,
   writtenByReads,
 } from './client.js';
@@ -350,12 +356,15 @@ describe('readSpecs', () => {
       [1, 'Read-only UI', 1, 3],
       [null, null, 0, 1],
     ]);
+    // Jig 0.29.0 names no item and shows no edit waiting.
     expect(ui?.phases[1]?.items[2]).toEqual({
+      id: null,
       text: "fog: registration by `jig init` — needs a hook on Jig's side",
       checked: false,
       task: null,
       fog: true,
     });
+    expect(ui?.waiting).toBeNull();
     expect(billing?.release).toBe('minor');
     expect(billing?.epic).toEqual({ branch: 'epic/billing', state: 'open', checkedOut: false, missing: false, fetched: true });
     expect(half).toMatchObject({ title: null, missingFiles: ['spec.md', 'roadmap.md'], progress: null, phases: [] });
@@ -380,6 +389,147 @@ describe('readSpecs', () => {
     ['with missing files that are not names', (d: Record<string, any>) => (d.specs[2].missing_files = [1])],
   ])('refuses a spec %s', async (_, change) => {
     await expect(readSpecs(answering(`case-${cases++}`, changed('spec-list.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+// spec-list-items.json and spec-list-waiting.json are what Jig 0.40.0 printed in a scratch project before and after
+// two edits from `jig spec item` (an item added to phase 2, phase 2's item moved to phase 1), committed on spec/shop.
+describe('readSpecs from Jig 0.40.0', () => {
+  it("reads each item's handle, and no edit waiting", async () => {
+    const [shop] = (await readSpecs(answering('specs-items', 'spec-list-items.json'))).specs;
+    expect(shop?.phases.map((p) => p.items.map((i) => i.id))).toEqual([
+      ['i-62da8b35c084', 'i-5d729342e61f', 'i-d515b2062980'],
+      ['i-230488071aa6'],
+    ]);
+    expect(shop?.waiting).toBeNull();
+  });
+
+  it('reads the edits waiting on the write branch, with the roadmap as it is there', async () => {
+    const [shop] = (await readSpecs(answering('specs-waiting', 'spec-list-waiting.json'))).specs;
+    expect(shop?.progress).toEqual({ done: 1, total: 4, filed: 0, fog: 1 });
+    expect(shop?.waiting).toMatchObject({
+      branch: 'spec/shop',
+      base: 'main',
+      commits: 2,
+      pushed: false,
+      pr: null,
+      progress: { done: 1, total: 5, filed: 0, fog: 1 },
+    });
+    expect(shop?.waiting?.phases.map((p) => p.items.map((i) => i.id))).toEqual([
+      ['i-62da8b35c084', 'i-5d729342e61f', 'i-d515b2062980', 'i-230488071aa6'],
+      ['i-9ab540b709b6'],
+    ]);
+    // The commit is Jig's to know.
+    expect(shop?.waiting).not.toHaveProperty('commit');
+  });
+
+  it.each([
+    ['an item handle that is not text', (d: Record<string, any>) => (d.specs[0].phases[0].items[0].id = 7)],
+    ['a waiting edit without its branch', (d: Record<string, any>) => delete d.specs[0].waiting.branch],
+    ['a waiting edit without its phases', (d: Record<string, any>) => delete d.specs[0].waiting.phases],
+  ])('refuses %s', async (_, change) => {
+    await expect(readSpecs(answering(`case-${cases++}`, changed('spec-list-waiting.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+// spec-item-*.json are what Jig 0.40.0 answered in that scratch project; the checkout's path is replaced by one of no one's.
+describe('writing a roadmap', () => {
+  it("adds an item at the bottom of a phase and answers Jig's note", async () => {
+    const dir = logging(`case-${cases++}`, 'spec-item-add.json');
+    expect(await addItem(dir, 'shop', 2, 'Pay by invoice — for companies', 1793950057)).toBe(
+      'agent.git is commit: pushing spec/shop is yours',
+    );
+    expect(args(dir)).toEqual([
+      'spec',
+      'item',
+      'add',
+      'shop',
+      '--phase',
+      '2',
+      '--text',
+      'Pay by invoice — for companies',
+      '--revision',
+      '1793950057',
+      '--json',
+    ]);
+  });
+
+  it.each([
+    [{ after: 'i-5d729342e61f' } as const, ['--after', 'i-5d729342e61f']],
+    ['top' as const, ['--top']],
+    [{ phase: 1 } as const, ['--phase', '1']],
+  ])('moves an item %o', async (place, where) => {
+    const dir = logging(`case-${cases++}`, 'spec-item-move.json');
+    await moveItem(dir, 'shop', 'i-230488071aa6', place, 1793950060);
+    expect(args(dir)).toEqual(['spec', 'item', 'move', 'shop', 'i-230488071aa6', ...where, '--revision', '1793950060', '--json']);
+  });
+
+  it('names a task filed earlier on an item', async () => {
+    const dir = logging(`case-${cases++}`, 'spec-item-file.json');
+    await fileItem(dir, 'shop', 'i-5d729342e61f', 'search-products', 1793950066);
+    expect(args(dir)).toEqual([
+      'spec',
+      'item',
+      'file',
+      'shop',
+      'i-5d729342e61f',
+      '--task',
+      'search-products',
+      '--revision',
+      '1793950066',
+      '--json',
+    ]);
+  });
+
+  it('answers no note where Jig gives none', async () => {
+    const json = changed('spec-item-add.json', (data) => {
+      data.write.note = null;
+    });
+    expect(await addItem(answering(`case-${cases++}`, json), 'shop', 2, 'x', 1)).toBeNull();
+  });
+
+  const add = (dir: string) => addItem(dir, 'shop', 2, 'x', 1);
+  it.each([
+    [
+      'spec-item-stale.json',
+      'stale-revision',
+      (dir: string) => moveItem(dir, 'shop', 'i-230488071aa6', 'top', 1),
+      ['the clone changed since revision 1793950060; read again and retry'],
+    ],
+    [
+      'spec-item-git-not-allowed.json',
+      'git-not-allowed',
+      add,
+      [
+        'agent.git is none in this clone, so Jig commits nothing; set it with `jig config set --local agent.git commit` (or higher), or make the change in an agent session',
+      ],
+    ],
+    // Jig names the command it ran inside, which is not the one Jig UI ran: it stays.
+    [
+      'spec-item-not-linkable.json',
+      'not-linkable',
+      (dir: string) => fileItem(dir, 'shop', 'i-230488071aa6', 'started', 1),
+      [
+        'spec link: started is started on task/started; a started task is not moved — ship it where it was cut from, and an epic gets it when the default branch is merged into it',
+      ],
+    ],
+    [
+      'spec-item-checked-out.json',
+      'branch-checked-out',
+      add,
+      [
+        'spec/shop is checked out in … and Jig never moves a checkout; finish the work there, or switch that checkout to another branch, then try again',
+      ],
+    ],
+  ])("carries the refusal in %s as %s, Jig's reason without its command's name or a path", async (json, code, write, reasons) => {
+    await expect(write(answering(`case-${cases++}`, json, 1))).rejects.toMatchObject({ code, reasons });
+  });
+
+  it('refuses an answer without its write', async () => {
+    const json = changed('spec-item-add.json', (data) => {
+      delete data.write;
+    });
+    await expect(addItem(answering(`case-${cases++}`, json), 'shop', 2, 'x', 1)).rejects.toBeInstanceOf(JigShapeError);
   });
 });
 
@@ -664,16 +814,39 @@ esac
 }
 const closeCalls = (dir: string) => readFileSync(join(dir, 'calls.log'), 'utf8').trim().split('\n');
 
+// task-set-close*.json are what Jig 0.40.0 printed in a scratch repository.
 describe('closeTask', () => {
-  it("reads the clone's revision, then runs the command of Jig's close action", async () => {
+  it('has Jig 0.40.0 check the close against the revision it was read at', async () => {
+    const dir = logging(`case-${cases++}`, 'task-set-close.json');
+    await closeTask(dir, 'beta', 1793894295, '0.40.0');
+    expect(args(dir)).toEqual(['task', 'set', 'beta', 'status', 'consolidated', '--revision', '1793894295', '--json']);
+  });
+
+  it.each([
+    ['task-set-close-stale.json', 'stale-revision'],
+    ['task-set-close-not-found.json', 'not-found'],
+  ])('carries the refusal in %s as %s', async (json, code) => {
+    await expect(closeTask(answering(`case-${cases++}`, json, 1), 'beta', 1, '0.40.0')).rejects.toEqual(refusal(code));
+  });
+
+  it("carries Jig's reason a task is not closable, as its own command says it", async () => {
+    await expect(closeTask(answering(`case-${cases++}`, 'task-set-close-not-closable.json', 1), 'e1', 1, '0.40.0')).rejects.toMatchObject({
+      code: 'not-closable',
+      reasons: [
+        'status consolidated requires knowledge_consolidated true; record the knowledge decision first: jig task set e1 knowledge_consolidated true',
+      ],
+    });
+  });
+
+  it("reads an older Jig's revision first, then runs the command of Jig's close action", async () => {
     const dir = closing(`case-${cases++}`, 41);
-    await closeTask(dir, 'beta', 41);
+    await closeTask(dir, 'beta', 41, '0.39.0');
     expect(closeCalls(dir)).toEqual(['queue list --json', 'task set beta status consolidated']);
   });
 
   it('refuses a revision the clone has moved past, running nothing', async () => {
     const dir = closing(`case-${cases++}`, 42);
-    await expect(closeTask(dir, 'beta', 41)).rejects.toEqual(refusal('stale-revision'));
+    await expect(closeTask(dir, 'beta', 41, '0.39.0')).rejects.toEqual(refusal('stale-revision'));
     expect(closeCalls(dir)).toEqual(['queue list --json']);
   });
 
@@ -684,12 +857,96 @@ describe('closeTask', () => {
       'a line that is not an error',
     ].join('\n');
     const dir = closing(`case-${cases++}`, 41, err, 1);
-    await expect(closeTask(dir, 'beta', 41)).rejects.toMatchObject({
+    await expect(closeTask(dir, 'beta', 41, '0.39.0')).rejects.toMatchObject({
       code: 'failed',
       reasons: [
         'status consolidated requires knowledge_consolidated true; record the knowledge decision first: jig task set beta knowledge_consolidated true',
         'cannot write …',
       ],
+    });
+  });
+});
+
+// config-*.json are what Jig 0.40.0 printed in a scratch repository, with a Telegram token in its local file.
+describe('settings', () => {
+  it("reads every key with its value, where it comes from, who answers it and Jig's description", async () => {
+    const { revision, keys } = await readSettings(answering(`case-${cases++}`, 'config-keys.json'));
+    expect(revision).toBe(1793894345);
+    expect(keys).toHaveLength(43);
+    expect(keys.find((k) => k.key === 'agent.git')).toEqual({
+      key: 'agent.git',
+      value: 'pr',
+      set: true,
+      source: 'local',
+      scope: 'local only',
+      kind: 'choice',
+      allowed: ['none', 'commit', 'push', 'pr', 'merge'],
+      default: 'none',
+      description: expect.any(String),
+      secret: false,
+    });
+    expect(keys.find((k) => k.key === 'forge')).toMatchObject({ source: 'project', scope: 'project', value: 'auto' });
+    expect(keys.find((k) => k.key === 'notify.telegram.token')).toMatchObject({ value: null, set: true, secret: true });
+  });
+
+  it('reads a kind it does not know as text, and cuts every absolute path out of a value, its default and its description', async () => {
+    const json = changed('config-keys.json', (data) => {
+      Object.assign(data.keys[0], {
+        kind: 'colour',
+        value: '/Users/me/trees',
+        default: '/Users/me/x',
+        description: 'Kept in /Users/me/y.',
+      });
+    });
+    const [first] = (await readSettings(answering(`case-${cases++}`, json))).keys;
+    expect(first).toMatchObject({ kind: 'text', value: '…', default: '…', description: 'Kept in …' });
+  });
+
+  it("never passes a secret's value on, should Jig print one", async () => {
+    const json = changed('config-keys.json', (data) => {
+      Object.assign(
+        data.keys.find((k: { secret: boolean }) => k.secret),
+        { value: '123:abc', default: '456:def' },
+      );
+    });
+    const { keys } = await readSettings(answering(`case-${cases++}`, json));
+    expect(keys.find((k) => k.secret)).toMatchObject({ value: null, default: null, set: true });
+  });
+
+  it('refuses a scope it does not know', async () => {
+    const json = changed('config-keys.json', (data) => {
+      data.keys[0].scope = 'machine';
+    });
+    await expect(readSettings(answering(`case-${cases++}`, json))).rejects.toBeInstanceOf(JigShapeError);
+  });
+
+  it("sets one of the person's own keys in this clone against the revision it was read at", async () => {
+    const dir = logging(`case-${cases++}`, 'config-set.json');
+    await setSetting(dir, 'agent.git', 'pr', 1793894327);
+    expect(args(dir)).toEqual(['config', 'set', 'agent.git', 'pr', '--local', '--revision', '1793894327', '--json']);
+  });
+
+  it('takes one out of the local file', async () => {
+    const dir = logging(`case-${cases++}`, 'config-unset.json');
+    await unsetSetting(dir, 'notify.telegram.token', 1793894337);
+    expect(args(dir)).toEqual(['config', 'unset', 'notify.telegram.token', '--local', '--revision', '1793894337', '--json']);
+  });
+
+  it.each([
+    ['config-set-unknown-key.json', 'unknown-key'],
+    ['config-set-not-local.json', 'not-local'],
+    ['config-set-secret-key.json', 'secret-key'],
+    ['config-stale.json', 'stale-revision'],
+  ])('carries the refusal in %s as %s', async (json, code) => {
+    await expect(setSetting(answering(`case-${cases++}`, json, 1), 'k.k', 'v', 1)).rejects.toEqual(refusal(code));
+  });
+
+  it("carries Jig's reason a value is refused, without its command's name", async () => {
+    await expect(
+      setSetting(answering(`case-${cases++}`, 'config-set-invalid-value.json', 1), 'agent.git', 'sometimes', 1),
+    ).rejects.toMatchObject({
+      code: 'invalid-value',
+      reasons: ["agent.git: invalid value 'sometimes': not a level: none, commit, push, pr or merge"],
     });
   });
 });
@@ -741,12 +998,40 @@ describe('withoutPaths', () => {
     ['(record /Users/me/shop/.ai/runtime/working/x); then', '(record …); then'],
     ['in /c/Users/me/shop and', 'in … and'],
     ['at C:\\Users\\me\\shop.', 'at …'],
+    ['npm ci --cache=/Users/me/.npm', 'npm ci --cache=…'],
+    ['PATH=/opt/bin:$PATH make', 'PATH=… make'],
+    ['dirs: /a/b:/c/d', 'dirs: …'],
+    ['file:///Users/me/x', 'file:…'],
+    ['[/Users/me/cache, /Users/me/x]', '[… …'],
+    ['npm ci >/Users/me/ci.log', 'npm ci >…'],
+    ['a;/x b,/y c|/z d&/w', 'a;… b,… c|… d&…'],
+    ['src/**/*.ts, ./a/b, ../c, ~/d, 1/2', 'src/**/*.ts, ./a/b, ../c, ~/d, 1/2'],
+    ['make CPPFLAGS=-I/Users/me/include', 'make CPPFLAGS=-I…'],
+    ['docker run -v/Users/me/p:/app img', 'docker run -v… img'],
+    ['task-x/a-b/c', 'task-x/a-b/c'],
+    ['make CFLAGS="-I/Users/me/include" \'-L/Users/me/lib\'', 'make CFLAGS="-I…" \'-L…\''],
+    ['[-I/Users/me/a, -L/Users/me/b]', '[-I… -L…'],
+    ['cc -Wl,-L/Users/me/lib -Isrc/x pre-x/y', 'cc -Wl,-L… -Isrc… pre-x/y'],
+    ['cc -isystem/Users/me/inc; tar -xzf/Users/me/a.tgz', 'cc -isystem… tar -xzf…'],
+    ['npm ci --cache=${NPM_CACHE:-/Users/me/.npm}; cmd -/Users/me/x', 'npm ci --cache=${NPM_CACHE:-… cmd -…'],
+    ['https://gitlab.com/group/-/merge_requests', 'https://gitlab.com/group/-/merge_requests'],
+    ['[A-Z]+\\.[0-9]+', '[A-Z]+\\.[0-9]+'],
+    ['cp $(git rev-parse --show-toplevel)/.env .', 'cp $(git rev-parse --show-toplevel)/.env .'],
+    ['the roadmap names <spec-id>/<n>', 'the roadmap names <spec-id>/<n>'],
+    ['pass -f/--force, use -h/--help', 'pass -f/--force, use -h/--help'],
+    ['npm ci 2>/Users/me/err.log; cc -IC:\\x', 'npm ci 2>… cc -I…'],
     [
       'branch task/up-x, `git stash`, .gitattributes, https://example.com/a',
       'branch task/up-x, `git stash`, .gitattributes, https://example.com/a',
     ],
   ])('%s', (text, expected) => {
     expect(withoutPaths(text)).toBe(expected);
+  });
+
+  it('stays linear on a long run of word characters', () => {
+    const start = performance.now();
+    withoutPaths('a-'.repeat(50_000));
+    expect(performance.now() - start).toBeLessThan(1000);
   });
 });
 

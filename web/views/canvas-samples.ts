@@ -1,5 +1,18 @@
 // Sample data for the canvas: every state a component shows, in the shapes of api.ts.
-import type { Attention, Column, Project, ReadyDetails, Spec, SpecItem, Task, TaskArtifact, TaskArtifacts, UpgradePlan } from '@/api';
+import type {
+  Attention,
+  Column,
+  Project,
+  ReadyDetails,
+  Setting,
+  Settings,
+  Spec,
+  SpecItem,
+  Task,
+  TaskArtifact,
+  TaskArtifacts,
+  UpgradePlan,
+} from '@/api';
 import type { FinishedTask } from '@/lib/finished';
 import type { PlanState, UpgradeRun } from '@/lib/upgrade';
 
@@ -338,16 +351,17 @@ export const runs: UpgradeRun[] = [
 ];
 
 export const specItems: SpecItem[] = [
-  { text: '`design-system` — design system and canvas', checked: true, task: 'design-system', fog: false },
+  { id: 'i-0a1b2c3d4e5f', text: '`design-system` — design system and canvas', checked: true, task: 'design-system', fog: false },
   {
+    id: 'i-1b2c3d4e5f60',
     text: '`specs-and-epics` — specs and epics (after: project board — `jig spec list`)',
     checked: false,
     task: 'specs-and-epics',
     fog: false,
   },
-  { text: '`old-task` — a task no longer live', checked: false, task: 'old-task', fog: false },
-  { text: 'invoices from orders, no task filed yet', checked: false, task: null, fog: false },
-  { text: 'fog: registration by `jig init`', checked: false, task: null, fog: true },
+  { id: 'i-2c3d4e5f6071', text: '`old-task` — a task no longer live', checked: false, task: 'old-task', fog: false },
+  { id: 'i-3d4e5f607182', text: 'invoices from orders, no task filed yet', checked: false, task: null, fog: false },
+  { id: 'i-4e5f60718293', text: 'fog: registration by `jig init`', checked: false, task: null, fog: true },
 ];
 
 export const specs: Spec[] = [
@@ -366,10 +380,11 @@ export const specs: Spec[] = [
         total: 1,
         filed: 0,
         fog: 0,
-        items: [{ ...specItems[0]!, text: 'package and release', task: null }],
+        items: [{ ...specItems[0]!, id: 'i-5f6071829304', text: 'package and release', task: null }],
       },
       { phase: 1, title: 'Read-only UI', done: 1, total: 5, filed: 2, fog: 1, items: specItems },
     ],
+    waiting: null,
     queue: null,
   },
   {
@@ -380,6 +395,7 @@ export const specs: Spec[] = [
     epic: { branch: 'epic/billing', state: 'open', checkedOut: false, missing: false, fetched: true },
     progress: { done: 0, total: 1, filed: 0, fog: 0 },
     phases: [{ phase: null, title: null, done: 0, total: 1, filed: 0, fog: 0, items: [specItems[3]!] }],
+    waiting: null,
     queue: { position: 100, priority: 1 },
   },
   {
@@ -390,6 +406,7 @@ export const specs: Spec[] = [
     epic: { branch: 'epic/lost', state: 'open', checkedOut: true, missing: true, fetched: false },
     progress: null,
     phases: [],
+    waiting: null,
     queue: null,
   },
   {
@@ -400,8 +417,29 @@ export const specs: Spec[] = [
     epic: null,
     progress: null,
     phases: [],
+    waiting: null,
     queue: null,
   },
+];
+
+/**
+ * A spec with edits waiting on its branch, in each state they reach: committed only, pushed, in a pull request. On the
+ * branch the fog item moved to Phase 2, an item was added and one was filed.
+ */
+const shop = specs[0]!;
+const onBranch: Spec['phases'] = [
+  { ...shop.phases[0]!, items: [...shop.phases[0]!.items, { ...specItems[3]!, id: 'i-60718293a4b5', text: 'refunds by card' }] },
+  {
+    ...shop.phases[1]!,
+    items: [specItems[0]!, specItems[1]!, specItems[2]!, { ...specItems[3]!, text: '`invoices` — invoices from orders', task: 'invoices' }],
+  },
+  { phase: 2, title: 'Writes', done: 0, total: 0, filed: 0, fog: 1, items: [specItems[4]!] },
+];
+const waiting = { branch: 'spec/jig-ui', base: 'main', commits: 3, progress: shop.progress, phases: onBranch };
+export const waitingSpecs: Spec[] = [
+  { ...shop, id: 'committed', waiting: { ...waiting, pushed: false, pr: null } },
+  { ...shop, id: 'pushed', waiting: { ...waiting, pushed: true, pr: null } },
+  { ...shop, id: 'in-review', waiting: { ...waiting, pushed: true, pr: 'https://github.com/fapost-lab/jig-ui/pull/116' } },
 ];
 
 /** Open epics in the order the Specs view shows them: three queued, one not yet. */
@@ -454,3 +492,64 @@ export const openDocument: TaskArtifact = {
     '> A document shows the paths its authors wrote.',
   ].join('\n'),
 };
+
+const setting = (key: string, more: Partial<Setting>): Setting => ({
+  key,
+  value: null,
+  set: false,
+  source: 'default',
+  scope: 'local only',
+  kind: 'text',
+  allowed: null,
+  default: null,
+  description: `What ${key} sets.`,
+  secret: false,
+  ...more,
+});
+
+/** One key of each kind and source, the token set, and the project's keys, as Jig 0.40.0 lists them. */
+const settingKeys: Setting[] = [
+  setting('profiles', { scope: 'project', source: 'project', kind: 'list', value: '[node]', set: true, default: '[generic]' }),
+  setting('forge', {
+    scope: 'project',
+    source: 'project',
+    kind: 'choice',
+    value: 'github',
+    set: true,
+    allowed: ['auto', 'github', 'gitlab', 'none'],
+    default: 'auto',
+  }),
+  setting('housekeeping.cadence', { scope: 'local', source: 'project', kind: 'duration', value: '1d', set: true, default: '1d' }),
+  setting('agent.git', {
+    source: 'local',
+    kind: 'choice',
+    value: 'pr',
+    set: true,
+    allowed: ['none', 'commit', 'push', 'pr', 'merge'],
+    default: 'none',
+  }),
+  setting('autopilot.unattended', { kind: 'boolean', value: 'false', allowed: ['true', 'false'], default: 'false' }),
+  setting('agent.ci_timeout', { kind: 'number', value: '30', default: '30' }),
+  setting('claude.review_model', {}),
+  setting('notify.telegram.token', { source: 'local', set: true, secret: true }),
+];
+const readSettings: Settings = { state: 'ready', keys: settingKeys, revision: 1 };
+
+/** The settings dialog in each of its states. */
+export const settingStates: {
+  label: string;
+  settings?: Settings;
+  pending?: string;
+  notice?: string;
+}[] = [
+  { label: 'ready', settings: readSettings },
+  { label: 'saving', settings: readSettings, pending: 'agent.git' },
+  {
+    label: 'refused',
+    settings: readSettings,
+    notice: "Jig did not change housekeeping.cadence: invalid value 'soon': not a whole number of days (e.g. 1d, 3d)",
+  },
+  { label: 'reading' },
+  { label: 'old Jig', settings: { id: 'jig-ui', state: 'unsupported', jigVersion: '0.39.0', minimum: '0.40.0' } },
+  { label: 'unreadable', settings: { id: 'jig-ui', state: 'unreadable', code: 'timeout' } },
+];

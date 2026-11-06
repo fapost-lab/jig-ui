@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import { computed } from 'vue';
-  import { Ellipsis, ExternalLink, Unplug } from '@lucide/vue';
+  import { Ellipsis, ExternalLink, Settings, Unplug } from '@lucide/vue';
   import { link, type Project } from '@/api';
   import { Button } from '@/components/ui/button';
   import { Card } from '@/components/ui/card';
@@ -34,6 +34,8 @@
   );
 
   defineEmits<{
+    /** Settings… in the ⋯ menu: the view opens the dialog and reads them. */
+    settings: [];
     disconnect: [];
     readAgain: [];
     /** Upgrade on the card: the view asks Jig for the plan, or first to update this machine's Jig. */
@@ -64,6 +66,7 @@
             <Button variant="ghost" size="icon-xs" :aria-label="`More for ${project.id}`"><Ellipsis /></Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" class="w-36">
+            <DropdownMenuItem v-if="project.state === 'ready'" @select="$emit('settings')"><Settings />Settings…</DropdownMenuItem>
             <DropdownMenuItem @select="$emit('disconnect')"><Unplug />Disconnect</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

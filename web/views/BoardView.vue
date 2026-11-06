@@ -6,12 +6,15 @@
     type Board,
     call,
     client,
+    type Edited,
     type Finished,
+    type ItemPlace,
     onChange,
     type Place,
     readAgain,
     readTask,
     type ReadyDetails,
+    type SpecItem,
     type Specs,
     type Written,
   } from '@/api';
@@ -19,6 +22,7 @@
   import BoardFilter from '@/components/BoardFilter.vue';
   import BoardList from '@/components/BoardList.vue';
   import EpicMenu from '@/components/EpicMenu.vue';
+  import FileItemDialog from '@/components/FileItemDialog.vue';
   import FinishedList from '@/components/FinishedList.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
   import SpecCard from '@/components/SpecCard.vue';
@@ -30,7 +34,7 @@
   import { conflict } from '@/lib/conflict';
   import { movable } from '@/lib/epics';
   import { lastWins } from '@/lib/last-wins';
-  import { closeRefusal, refusal } from '@/lib/refusal';
+  import { closeRefusal, refusal, roadmapRefusal, unnamedRefusal } from '@/lib/refusal';
   import { filtered, fromQuery, reorders, sift, type Sift, toQuery } from '@/lib/sift';
   import { toneText } from '@/lib/tones';
 
@@ -231,14 +235,14 @@
       (code, reasons) => closeRefusal(code, reasons, task),
     );
 
-  /** The spec whose epic's change is on its way to Jig; the notice says what Jig refused, as for a task. */
-  const pendingEpic = ref<string>();
+  /** The spec whose epic's or roadmap's change is on its way to Jig; the notice says what Jig refused, as for a task. */
+  const pendingSpec = ref<string>();
 
   /** Sends one change of an epic with the revision of the specs it was made on, then reads them again. */
   async function writeEpic(epic: string, doing: string, send: (revision: number) => Promise<Written>): Promise<void> {
     const shown = specs.value;
-    if (typeof shown !== 'object' || shown.state !== 'ready' || pendingEpic.value !== undefined) return;
-    pendingEpic.value = epic;
+    if (typeof shown !== 'object' || shown.state !== 'ready' || pendingSpec.value !== undefined) return;
+    pendingSpec.value = epic;
     notice.value = undefined;
     const res = await call(() => send(shown.revision));
     const code = res && res.status !== 200 ? (await res.json()).error.code : undefined;
@@ -249,7 +253,7 @@
         changed: [],
       };
     } else if (code !== undefined) notice.value = { text: refusal(code, doing, `epic ${epic}`), changed: [] };
-    pendingEpic.value = undefined;
+    pendingSpec.value = undefined;
   }
 
   const moveEpic = (epic: string, place: Place) =>
@@ -259,6 +263,113 @@
     writeEpic(epic, 'setting the priority of', (revision) =>
       client.api.projects[':id'].queue.epic.priority.$post({ param, json: { epic, priority, revision } }),
     );
+
+  /**
+   * Sends one edit of a spec's roadmap with the revision of the specs it was made on, then reads them again whatever came
+   * of it — and the board, where a task filed from an item shows: an item moves when Jig's roadmap does, never before.
+   * What came of it, for a person — Jig's note, or why it was refused — with the code of a refusal; `undefined` when it
+   * was not sent or the server did not answer.
+   */
+  async function editRoadmap(
+    spec: string,
+    doing: string,
+    send: (revision: number) => Promise<Edited>,
+    explain?: (refused: Refused) => string | undefined,
+  ): Promise<
+    | {
+        code?: string;
+        text: string | null;
+      }
+    | undefined
+  > {
+    const shown = specs.value;
+    if (typeof shown !== 'object' || shown.state !== 'ready' || pendingSpec.value !== undefined) return undefined;
+    pendingSpec.value = spec;
+    notice.value = undefined;
+    const res = await call(() => send(shown.revision));
+    const body = res && (await res.json());
+    await Promise.all([loadSpecs(), load()]);
+    pendingSpec.value = undefined;
+    if (!body) return undefined;
+    // A project no longer ready is not written: the specs read again show its state.
+    if (!('error' in body)) return { text: 'note' in body ? body.note : null };
+    const { code } = body.error;
+    const reasons = 'reasons' in body.error && Array.isArray(body.error.reasons) ? body.error.reasons.map(String) : [];
+    if (code === 'stale-revision')
+      return { code, text: `The project changed while you were ${doing}. Try again on the specs as they are now.` };
+    const filed = 'filed' in body.error && body.error.filed === true;
+    return { code, text: explain?.({ code, reasons, filed }) ?? roadmapRefusal(code, reasons, doing, spec) };
+  }
+
+  /** A roadmap edit Jig refused: its code, its reasons, and for filing an item's task whether the task was filed. */
+  type Refused = {
+    code: string;
+    reasons: string[];
+    filed: boolean;
+  };
+
+  /** An edit made on the card: what came of it goes to the notice. */
+  async function edit(
+    spec: string,
+    doing: string,
+    send: (revision: number) => Promise<Edited>,
+    explain?: (refused: Refused) => string | undefined,
+  ) {
+    const outcome = await editRoadmap(spec, doing, send, explain);
+    if (outcome?.text) notice.value = { text: outcome.text, changed: [] };
+  }
+
+  const addItem = (spec: string, phase: number, text: string) =>
+    edit(
+      spec,
+      `adding an item to Phase ${phase} of ${spec}`,
+      (revision) => client.api.projects[':id'].specs.items.add.$post({ param, json: { spec, phase, text, revision } }),
+      ({ code }) =>
+        code === 'usage'
+          ? 'Jig does not take this item: one line of at most 500 characters, not led by a task id — File task… names one.'
+          : undefined,
+    );
+
+  const moveItem = (spec: string, item: string, place: ItemPlace) =>
+    edit(spec, `moving an item of ${spec}`, (revision) =>
+      client.api.projects[':id'].specs.items.move.$post({ param, json: { spec, item, place, revision } }),
+    );
+
+  /** The item whose task the File task… dialog files, and why its last try was refused — in the dialog, which stays open. */
+  const filingItem = ref<{
+    spec: string;
+    item: SpecItem;
+    refusal?: {
+      code: string;
+      text: string;
+    };
+  }>();
+
+  async function fileItem(task: string, goal: string | null): Promise<void> {
+    const shown = filingItem.value;
+    if (!shown?.item.id) return;
+    const { spec, item } = shown;
+    const id = item.id!;
+    const outcome = await editRoadmap(
+      spec,
+      `filing the task of an item of ${spec}`,
+      (revision) => client.api.projects[':id'].specs.items.file.$post({ param, json: { spec, item: id, task, goal, revision } }),
+      ({ code, reasons, filed }) =>
+        filed
+          ? unnamedRefusal(code, reasons, task)
+          : code === 'already-exists'
+            ? `The project has a task called ${task} already, maybe a finished one. Choose another id.`
+            : code === 'usage'
+              ? 'Jig does not take this id or goal: one line of goal, not starting with #.'
+              : undefined,
+    );
+
+    if (!outcome || filingItem.value !== shown) return;
+    if (outcome.code === undefined) {
+      filingItem.value = undefined;
+      if (outcome.text) notice.value = { text: outcome.text, changed: [] };
+    } else shown.refusal = { code: outcome.code, text: outcome.text ?? '' };
+  }
 
   /** The new-task form: open, its request on its way, and why the last one was refused. */
   const filing = ref(false);
@@ -387,18 +498,43 @@
         No specs in this project. A spec is written with the <code>jig-idea</code> skill and kept in <code>.ai/specs/</code>.
       </p>
       <div v-else class="flex flex-col gap-3 p-3">
-        <SpecCard v-for="spec in specs.specs" :key="spec.id" :spec="spec" :project="id" :live="liveIds" :busy="pendingEpic === spec.id">
+        <SpecCard
+          v-for="spec in specs.specs"
+          :key="spec.id"
+          :spec="spec"
+          :project="id"
+          :live="liveIds"
+          :busy="pendingSpec === spec.id"
+          :editable="specs.editable"
+          :disabled="pendingSpec !== undefined"
+          @add="(phase, text) => addItem(spec.id, phase, text)"
+          @move="(item, place) => moveItem(spec.id, item, place)"
+          @file="(item) => (filingItem = { spec: spec.id, item })"
+        >
           <template v-if="movable(spec)" #menu>
             <EpicMenu
               :spec="spec"
               :specs="specs.specs"
-              :disabled="pendingEpic !== undefined"
+              :disabled="pendingSpec !== undefined"
               @move="(place) => moveEpic(spec.id, place)"
               @prioritise="(priority) => prioritiseEpic(spec.id, priority)"
             />
           </template>
         </SpecCard>
       </div>
+      <FileItemDialog
+        v-if="filingItem"
+        :key="filingItem.item.id ?? ''"
+        :open="true"
+        :spec="filingItem.spec"
+        :item="filingItem.item"
+        :live="liveIds"
+        :busy="pendingSpec !== undefined"
+        :refusal="filingItem.refusal?.text"
+        :taken="filingItem.refusal?.code === 'already-exists'"
+        @update:open="(open) => !open && (filingItem = undefined)"
+        @file="fileItem"
+      />
     </div>
 
     <BoardList

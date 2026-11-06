@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "revision": 0,
+  "generated_at": "2026-11-06T07:27:34Z",
+  "data": {
+    "specs": [
+      {
+        "id": "shop",
+        "title": "Shop",
+        "missing_files": [],
+        "release": null,
+        "epic": null,
+        "progress": { "done": 1, "total": 4, "filed": 0, "fog": 1 },
+        "phases": [
+          {
+            "phase": 1,
+            "title": "Catalogue",
+            "done": 1,
+            "total": 3,
+            "filed": 0,
+            "fog": 1,
+            "items": [
+              {
+                "id": "i-62da8b35c084",
+                "text": "`list-products` — list products",
+                "checked": true,
+                "done": true,
+                "task": "list-products",
+                "fog": false
+              },
+              {
+                "id": "i-5d729342e61f",
+                "text": "Search products — by name (after: list products — it searches them)",
+                "checked": false,
+                "done": false,
+                "task": null,
+                "fog": false
+              },
+              {
+                "id": "i-d515b2062980",
+                "text": "fog: recommendations — not stated yet",
+                "checked": false,
+                "done": false,
+                "task": null,
+                "fog": true
+              }
+            ]
+          },
+          {
+            "phase": 2,
+            "title": "Checkout",
+            "done": 0,
+            "total": 1,
+            "filed": 0,
+            "fog": 0,
+            "items": [
+              {
+                "id": "i-230488071aa6",
+                "text": "Pay by card — through the provider",
+                "checked": false,
+                "done": false,
+                "task": null,
+                "fog": false
+              }
+            ]
+          }
+        ],
+        "waiting": null
+      }
+    ]
+  }
+}

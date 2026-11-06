@@ -835,6 +835,11 @@ describe('withoutPaths', () => {
     ['cc -isystem/Users/me/inc; tar -xzf/Users/me/a.tgz', 'cc -isystem… tar -xzf…'],
     ['npm ci --cache=${NPM_CACHE:-/Users/me/.npm}; cmd -/Users/me/x', 'npm ci --cache=${NPM_CACHE:-… cmd -…'],
     ['https://gitlab.com/group/-/merge_requests', 'https://gitlab.com/group/-/merge_requests'],
+    ['[A-Z]+\\.[0-9]+', '[A-Z]+\\.[0-9]+'],
+    ['cp $(git rev-parse --show-toplevel)/.env .', 'cp $(git rev-parse --show-toplevel)/.env .'],
+    ['the roadmap names <spec-id>/<n>', 'the roadmap names <spec-id>/<n>'],
+    ['pass -f/--force, use -h/--help', 'pass -f/--force, use -h/--help'],
+    ['npm ci 2>/Users/me/err.log; cc -IC:\\x', 'npm ci 2>… cc -I…'],
     [
       'branch task/up-x, `git stash`, .gitattributes, https://example.com/a',
       'branch task/up-x, `git stash`, .gitattributes, https://example.com/a',

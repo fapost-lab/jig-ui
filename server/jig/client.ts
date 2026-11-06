@@ -208,11 +208,13 @@ export class JigRefusal extends Error {
  * or a slash before it — so `[/x`, `>/x`, `=/x` and `PATH=/x:/y` are cut too; a web address's `//` is kept. An option
  * starts a path by the same rule, whatever follows it: `-I/x`, `-isystem/x`, `-xzf/x`, `${X:-/x}`, so `-Isrc/x` loses
  * its `/x` too. A path glued to a word (`abc/Users/x`) reads as a relative one: a pattern cannot tell them apart.
+ * Not a path: a backslash after anything but a blank, a quote, `(`, `=` or `:` (`[A-Z]+\.`; `C:\x` still is one), a
+ * slash after a word's `)` or a `<placeholder>` (`$(pwd)/.env`, `<spec-id>/<n>`), an option pair (`-f/--force`).
  * The lookahead first keeps it linear: the look back over an option runs only where a slash follows.
  */
 export const withoutPaths = (text: string): string =>
   text.replace(
-    /(?=(?:[A-Za-z]:)?[\\/])(?:(?<![\w.~*/\\-]|:(?=\/\/[^/]))|(?<=(?<![\w.~*/\\-])-(?:[A-Za-z][\w-]*)?))(?:[A-Za-z]:)?[\\/][^\s)`'"]*/g,
+    /(?=(?:[A-Za-z]:)?[\\/])(?:(?=\\)(?<=^|[\s(`'"=:])|(?!\\))(?:(?<![\w.~*/\\-]|\w\)|<[\w-]+>|:(?=\/\/[^/]))|(?<=(?<![\w.~*/\\-])-(?:[A-Za-z][\w-]*)?)(?!\/-))(?:[A-Za-z]:)?[\\/][^\s)`'"]*/g,
     '…',
   );
 

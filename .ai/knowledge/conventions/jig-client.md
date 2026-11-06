@@ -97,7 +97,10 @@ does not continue a word or a relative path (a letter, a digit, `.`, `~`, `*`, `
 it), so `=/x`, `[/x`, `>/x` and `PATH=/x:/y` are cut; an option at a word's start starts one
 too, whatever follows it (`-I/x`, `-isystem/x`, `${X:-/x}`), so `-Isrc/x` loses its `/x`; a web
 address's `//` is kept. **Accepted limit** (the maintainer, task `settings-dialog`): a path glued to a word,
-`abc/Users/x`, reads as a relative one and is not cut — no pattern tells the two apart. A lookahead
+`abc/Users/x`, reads as a relative one and is not cut — no pattern tells the two apart. Kept as not
+a path (task `settings-dialog-nits`): a backslash after anything but a blank, a quote, `(`, `=` or `:`
+(`[A-Z]+\.` in a pattern; a drive form `C:\x` is still a path), a slash after a word's `)` or a
+`<placeholder>` (`$(pwd)/.env`, `<spec-id>/<n>`), and an option pair (`-f/--force`). A lookahead
 for the slash comes first so that the look back over an option runs only where a path can start:
 without it a long run of word characters took seconds (a test pins under a second for 100 000).
 

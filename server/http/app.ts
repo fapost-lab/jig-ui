@@ -12,6 +12,7 @@ import { columns, placeOf } from '../board/columns.js';
 import {
   ARTIFACT_KINDS,
   type ArtifactKind,
+  type ItemPlace,
   type Place,
   type ProjectSource,
   RegistryUnreadable,
@@ -92,6 +93,26 @@ const isKey = (v: unknown): v is string => typeof v === 'string' && /^[a-z][a-z0
 /** A setting's value as the page sends one: a line of at most 500 characters; Jig checks the rest, an empty one included. */
 const isValue = (v: unknown): v is string => typeof v === 'string' && v.length <= 500 && !/[\r\n]/.test(v);
 
+/** A roadmap phase's number, `## Phase <n>`. */
+const isPhase = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
+
+/** A roadmap item's handle as Jig names one (`i-` and 12 hex digits, `-2` for a repeat): never a flag. */
+const isItem = (v: unknown): v is string => typeof v === 'string' && /^i-[0-9a-f]{12}(-[0-9]+)?$/.test(v);
+
+/**
+ * A new item's words: a line of at most 500 characters, not blank. Not led by a backticked id and a dash either: Jig would
+ * read the item as filed to that task, which may not exist; a task is filed through File task.
+ */
+const isItemText = (v: unknown): v is string =>
+  typeof v === 'string' && v.trim() !== '' && v.length <= 500 && !/[\r\n]/.test(v) && !/^\s*`[^`\s]+`\s+(?:—|--?)\s/.test(v);
+
+/** Where a moved item goes: after another item, to the top of its phase, or to the bottom of another phase. */
+function itemPlace(v: unknown): ItemPlace | undefined {
+  if (v === 'top') return v;
+  const [after, phase] = [field(v, 'after'), field(v, 'phase')];
+  return isItem(after) ? { after } : isPhase(phase) ? { phase } : undefined;
+}
+
 /** The body of a write that names only a task: the task and the revision it was read at, `undefined` where invalid. */
 function taskAt(body: unknown) {
   const [task, revision] = [field(body, 'task'), field(body, 'revision')];
@@ -100,14 +121,32 @@ function taskAt(body: unknown) {
 
 /** What a write came to, in the API's form. A refusal names no path: Jig's code goes on, and its reasons with the paths cut out. */
 function written(c: Context, w: Written | undefined) {
+  if (w?.state === 'written') return c.json({ written: true as const }, 200);
+  return unwritten(c, w);
+}
+
+/** A write that wrote nothing, in the API's form: no such project, one not ready, or Jig's refusal. */
+function unwritten(c: Context, w: Exclude<Written, { state: 'written' }> | undefined) {
   if (w === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
-  if (w.state === 'written') return c.json({ written: true as const }, 200);
   if (w.state !== 'refused') return c.json({ project: w }, 200);
   if (w.code === 'stale-revision') return refuse(c, 409, w.code, 'The project changed since the board was read.');
   if (w.code === 'not-found') return refuse(c, 404, w.code, 'This project has no live task with this id.');
   // Jig's own reasons, where the command gave them (a close): the person sees why, not only a code.
   if (w.reasons) return c.json({ error: { code: w.code, message: 'Jig refused the change.', reasons: w.reasons } }, 422);
   return refuse(c, 422, w.code, 'Jig refused the change.');
+}
+
+/**
+ * What a roadmap edit came to, as `written` says, with Jig's note — whose step is next, or what failed after the commit,
+ * `null` for none; a task filed that Jig did not name on its item is said so (`filed`), with Jig's reasons.
+ */
+function edited(c: Context, w: Written | undefined) {
+  if (w?.state === 'written') return c.json({ written: true as const, note: w.note ?? null }, 200);
+  if (w?.state === 'refused' && w.filed) {
+    const message = 'The task was filed, and Jig did not name it on the item.';
+    return c.json({ error: { code: w.code, message, reasons: w.reasons ?? [], filed: true as const } }, 422);
+  }
+  return unwritten(c, w);
 }
 
 /** An upgrade refused before it ran, in the API's form: under way already, none to make, or Jig's code and its reasons. */
@@ -304,6 +343,85 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
             return refuse(c, 422, 'usage', 'Give an epic, a priority from 0 to 5 or null, and the revision it was read at.');
           }
           return written(c, await source.prioritiseEpic(c.req.param('id'), epic, priority, revision));
+        },
+      )
+
+      // A roadmap edit: Jig commits it on the spec's branch in a tree of its own, never in the person's checkout.
+      .post(
+        '/api/projects/:id/specs/items/add',
+        validator('json', (body: unknown) => {
+          const [spec, phase, text, revision] = [field(body, 'spec'), field(body, 'phase'), field(body, 'text'), field(body, 'revision')];
+          return {
+            spec: isId(spec) ? spec : undefined,
+            phase: isPhase(phase) ? phase : undefined,
+            text: isItemText(text) ? text : undefined,
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { spec, phase, text, revision } = c.req.valid('json');
+          if (spec === undefined || phase === undefined || text === undefined || revision === undefined) {
+            return refuse(
+              c,
+              422,
+              'usage',
+              'Give a spec, a phase, the item on one line not led by a task id, and the revision it was read at.',
+            );
+          }
+          return edited(c, await source.addItem(c.req.param('id'), spec, phase, text, revision));
+        },
+      )
+
+      .post(
+        '/api/projects/:id/specs/items/move',
+        validator('json', (body: unknown) => {
+          const [spec, item, revision] = [field(body, 'spec'), field(body, 'item'), field(body, 'revision')];
+          return {
+            spec: isId(spec) ? spec : undefined,
+            item: isItem(item) ? item : undefined,
+            place: itemPlace(field(body, 'place')),
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { spec, item, place, revision } = c.req.valid('json');
+          if (spec === undefined || item === undefined || place === undefined || revision === undefined) {
+            return refuse(c, 422, 'usage', 'Give a spec, an item, where it goes and the revision it was read at.');
+          }
+          return edited(c, await source.moveItem(c.req.param('id'), spec, item, place, revision));
+        },
+      )
+
+      // A new task is filed with its goal first, as from the board; a live task is named as it is.
+      .post(
+        '/api/projects/:id/specs/items/file',
+        validator('json', (body: unknown) => {
+          const [spec, item, task, goal, revision] = [
+            field(body, 'spec'),
+            field(body, 'item'),
+            field(body, 'task'),
+            field(body, 'goal'),
+            field(body, 'revision'),
+          ];
+          return {
+            spec: isId(spec) ? spec : undefined,
+            item: isItem(item) ? item : undefined,
+            task: isNewId(task) ? task : undefined,
+            goal: goal === undefined || goal === null ? null : isGoal(goal) ? goal : undefined,
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { spec, item, task, goal, revision } = c.req.valid('json');
+          if (spec === undefined || item === undefined || task === undefined || goal === undefined || revision === undefined) {
+            return refuse(
+              c,
+              422,
+              'usage',
+              'Give a spec, an item, a task id Jig takes, its goal on one line, and the revision it was read at.',
+            );
+          }
+          return edited(c, await source.fileItem(c.req.param('id'), spec, item, task, goal, revision));
         },
       )
 

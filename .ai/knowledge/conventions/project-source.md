@@ -57,7 +57,9 @@ disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revi
 queue — `requestPause(id, taskId, revision)`,
 `cancelPause(id, taskId, revision)`, `resume(id, taskId, revision)`, `fileTask(id, taskId, goal)`, and
 `setSetting(id, key, value, revision)` and `unsetSetting(id, key, revision)` — the person's own keys, always
-`--local` —, which answer `written`, `refused` with Jig's code,
+`--local` —, and a spec's roadmap edits `addItem(id, specId, phase, text, revision)`,
+`moveItem(id, specId, item, place, revision)` and `fileItem(id, specId, item, taskId, goal, revision)`,
+which answer `written` — with Jig's `note`, paths cut, where a roadmap edit carries one —, `refused` with Jig's code,
 or the project's state when it is not `ready`; and the upgrade of a project's Jig — `planUpgrade(id)`,
 `upgrade(id)`, which answers `started` before Jig has run, and `dismissUpgrade(id)`; its local adapter
 `localSource(configDir)` in `local.ts` holds the registry, so `http/` never sees a stored path —
@@ -85,6 +87,15 @@ read again (adr-20261022-writes-carry-the-revision-of-their-read). A board's `re
 lowest of its reads' revisions (status, task list, queue). `fileTask` is the exception: its id is
 new, so it names no live task and carries no revision; `http/` checks the id and the goal against
 Jig's grammar before the port sees them (adr-20261022-filing-a-task-carries-no-revision).
+
+A roadmap edit runs Jig only for the spec, the phase and the item handles of the roadmap the last
+read shows — the one on the spec's write branch while edits wait there — and below
+`ROADMAP_JIG_VERSION` answers `refused: unsupported`; the specs read says which (`editable`).
+`fileItem` with a live task id runs only `spec item file` with the person's revision. With a new id
+it is the one write of two Jig writes: `agent.git` read first (`none` is `refused: git-not-allowed`
+without Jig writing anything), `task new`, the revision read again, `spec item file` with it; a
+refusal after the task was filed answers `refused` with `filed: true`, and the same request again
+with the same id — now live — names it (adr-20261106-editing-a-roadmap-from-the-page).
 
 An upgrade is offered only for a project whose last read carries Jig's `upgrade-available` item
 (else `refused: not-found`), one at a time (`refused: running`). Its run — `running`, then `done`

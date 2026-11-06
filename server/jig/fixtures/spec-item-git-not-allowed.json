@@ -1,0 +1,1 @@
+{"schema":1,"revision":0,"generated_at":"2026-11-06T07:27:34Z","error":{"code":"git-not-allowed","message":"spec item add: agent.git is none in this clone, so Jig commits nothing; set it with `jig config set --local agent.git commit` (or higher), or make the change in an agent session"}}

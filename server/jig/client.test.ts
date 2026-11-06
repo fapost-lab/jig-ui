@@ -4,6 +4,9 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
+  addItem,
+  fileItem,
+  moveItem,
   cancelPause,
   closeTask,
   fileTask,
@@ -320,12 +323,15 @@ describe('readSpecs', () => {
       [1, 'Read-only UI', 1, 3],
       [null, null, 0, 1],
     ]);
+    // Jig 0.29.0 names no item and shows no edit waiting.
     expect(ui?.phases[1]?.items[2]).toEqual({
+      id: null,
       text: "fog: registration by `jig init` — needs a hook on Jig's side",
       checked: false,
       task: null,
       fog: true,
     });
+    expect(ui?.waiting).toBeNull();
     expect(billing?.release).toBe('minor');
     expect(billing?.epic).toEqual({ branch: 'epic/billing', state: 'open', checkedOut: false, missing: false, fetched: true });
     expect(half).toMatchObject({ title: null, missingFiles: ['spec.md', 'roadmap.md'], progress: null, phases: [] });
@@ -350,6 +356,147 @@ describe('readSpecs', () => {
     ['with missing files that are not names', (d: Record<string, any>) => (d.specs[2].missing_files = [1])],
   ])('refuses a spec %s', async (_, change) => {
     await expect(readSpecs(answering(`case-${cases++}`, changed('spec-list.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+// spec-list-items.json and spec-list-waiting.json are what Jig 0.40.0 printed in a scratch project before and after
+// two edits from `jig spec item` (an item added to phase 2, phase 2's item moved to phase 1), committed on spec/shop.
+describe('readSpecs from Jig 0.40.0', () => {
+  it("reads each item's handle, and no edit waiting", async () => {
+    const [shop] = (await readSpecs(answering('specs-items', 'spec-list-items.json'))).specs;
+    expect(shop?.phases.map((p) => p.items.map((i) => i.id))).toEqual([
+      ['i-62da8b35c084', 'i-5d729342e61f', 'i-d515b2062980'],
+      ['i-230488071aa6'],
+    ]);
+    expect(shop?.waiting).toBeNull();
+  });
+
+  it('reads the edits waiting on the write branch, with the roadmap as it is there', async () => {
+    const [shop] = (await readSpecs(answering('specs-waiting', 'spec-list-waiting.json'))).specs;
+    expect(shop?.progress).toEqual({ done: 1, total: 4, filed: 0, fog: 1 });
+    expect(shop?.waiting).toMatchObject({
+      branch: 'spec/shop',
+      base: 'main',
+      commits: 2,
+      pushed: false,
+      pr: null,
+      progress: { done: 1, total: 5, filed: 0, fog: 1 },
+    });
+    expect(shop?.waiting?.phases.map((p) => p.items.map((i) => i.id))).toEqual([
+      ['i-62da8b35c084', 'i-5d729342e61f', 'i-d515b2062980', 'i-230488071aa6'],
+      ['i-9ab540b709b6'],
+    ]);
+    // The commit is Jig's to know.
+    expect(shop?.waiting).not.toHaveProperty('commit');
+  });
+
+  it.each([
+    ['an item handle that is not text', (d: Record<string, any>) => (d.specs[0].phases[0].items[0].id = 7)],
+    ['a waiting edit without its branch', (d: Record<string, any>) => delete d.specs[0].waiting.branch],
+    ['a waiting edit without its phases', (d: Record<string, any>) => delete d.specs[0].waiting.phases],
+  ])('refuses %s', async (_, change) => {
+    await expect(readSpecs(answering(`case-${cases++}`, changed('spec-list-waiting.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+// spec-item-*.json are what Jig 0.40.0 answered in that scratch project; the checkout's path is replaced by one of no one's.
+describe('writing a roadmap', () => {
+  it("adds an item at the bottom of a phase and answers Jig's note", async () => {
+    const dir = logging(`case-${cases++}`, 'spec-item-add.json');
+    expect(await addItem(dir, 'shop', 2, 'Pay by invoice — for companies', 1793950057)).toBe(
+      'agent.git is commit: pushing spec/shop is yours',
+    );
+    expect(args(dir)).toEqual([
+      'spec',
+      'item',
+      'add',
+      'shop',
+      '--phase',
+      '2',
+      '--text',
+      'Pay by invoice — for companies',
+      '--revision',
+      '1793950057',
+      '--json',
+    ]);
+  });
+
+  it.each([
+    [{ after: 'i-5d729342e61f' } as const, ['--after', 'i-5d729342e61f']],
+    ['top' as const, ['--top']],
+    [{ phase: 1 } as const, ['--phase', '1']],
+  ])('moves an item %o', async (place, where) => {
+    const dir = logging(`case-${cases++}`, 'spec-item-move.json');
+    await moveItem(dir, 'shop', 'i-230488071aa6', place, 1793950060);
+    expect(args(dir)).toEqual(['spec', 'item', 'move', 'shop', 'i-230488071aa6', ...where, '--revision', '1793950060', '--json']);
+  });
+
+  it('names a task filed earlier on an item', async () => {
+    const dir = logging(`case-${cases++}`, 'spec-item-file.json');
+    await fileItem(dir, 'shop', 'i-5d729342e61f', 'search-products', 1793950066);
+    expect(args(dir)).toEqual([
+      'spec',
+      'item',
+      'file',
+      'shop',
+      'i-5d729342e61f',
+      '--task',
+      'search-products',
+      '--revision',
+      '1793950066',
+      '--json',
+    ]);
+  });
+
+  it('answers no note where Jig gives none', async () => {
+    const json = changed('spec-item-add.json', (data) => {
+      data.write.note = null;
+    });
+    expect(await addItem(answering(`case-${cases++}`, json), 'shop', 2, 'x', 1)).toBeNull();
+  });
+
+  const add = (dir: string) => addItem(dir, 'shop', 2, 'x', 1);
+  it.each([
+    [
+      'spec-item-stale.json',
+      'stale-revision',
+      (dir: string) => moveItem(dir, 'shop', 'i-230488071aa6', 'top', 1),
+      ['the clone changed since revision 1793950060; read again and retry'],
+    ],
+    [
+      'spec-item-git-not-allowed.json',
+      'git-not-allowed',
+      add,
+      [
+        'agent.git is none in this clone, so Jig commits nothing; set it with `jig config set --local agent.git commit` (or higher), or make the change in an agent session',
+      ],
+    ],
+    // Jig names the command it ran inside, which is not the one Jig UI ran: it stays.
+    [
+      'spec-item-not-linkable.json',
+      'not-linkable',
+      (dir: string) => fileItem(dir, 'shop', 'i-230488071aa6', 'started', 1),
+      [
+        'spec link: started is started on task/started; a started task is not moved — ship it where it was cut from, and an epic gets it when the default branch is merged into it',
+      ],
+    ],
+    [
+      'spec-item-checked-out.json',
+      'branch-checked-out',
+      add,
+      [
+        'spec/shop is checked out in … and Jig never moves a checkout; finish the work there, or switch that checkout to another branch, then try again',
+      ],
+    ],
+  ])("carries the refusal in %s as %s, Jig's reason without its command's name or a path", async (json, code, write, reasons) => {
+    await expect(write(answering(`case-${cases++}`, json, 1))).rejects.toMatchObject({ code, reasons });
+  });
+
+  it('refuses an answer without its write', async () => {
+    const json = changed('spec-item-add.json', (data) => {
+      delete data.write;
+    });
+    await expect(addItem(answering(`case-${cases++}`, json), 'shop', 2, 'x', 1)).rejects.toBeInstanceOf(JigShapeError);
   });
 });
 

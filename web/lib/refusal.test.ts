@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closeRefusal, refusal } from './refusal';
+import { closeRefusal, refusal, roadmapRefusal, unnamedRefusal } from './refusal';
 
 describe('refusal', () => {
   it.each([
@@ -24,5 +24,25 @@ describe('closeRefusal', () => {
     ['upgrading', [], 'Jig is being upgraded in this project: try closing a again once it has finished.'],
   ])('says %s with %j in its own words', (code, reasons, line) => {
     expect(closeRefusal(code, reasons, 'a')).toBe(line);
+  });
+});
+
+describe('roadmapRefusal', () => {
+  it.each([
+    ['git-not-allowed', [], "Jig commits nothing in this clone (agent.git is none): choose a level in the project's Settings."],
+    ['not-found', [], 'The roadmap of shop no longer has what you were moving: try again on the specs as they are now.'],
+    ['branch-checked-out', ['spec/shop is checked out in …'], 'Jig did not change the roadmap of shop: spec/shop is checked out in …'],
+    ['write-busy', [], 'Jig refused moving the roadmap of shop (write-busy).'],
+  ])('says %s', (code, reasons, line) => {
+    expect(roadmapRefusal(code, reasons, 'moving', 'shop')).toBe(line);
+  });
+});
+
+describe('unnamedRefusal', () => {
+  it('says the task was filed, why it was not named, and how to name it', () => {
+    expect(unnamedRefusal('branch-checked-out', ['spec/shop is checked out in …'], 'search')).toBe(
+      'Filed search, but Jig did not name it on the item (spec/shop is checked out in …). Once that is resolved, File task… again with search.',
+    );
+    expect(unnamedRefusal('write-busy', [], 'search')).toContain('the item (write-busy).');
   });
 });

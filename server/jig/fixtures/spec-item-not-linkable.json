@@ -1,0 +1,1 @@
+{"schema":1,"revision":1793950086,"generated_at":"2026-11-06T07:27:38Z","error":{"code":"not-linkable","message":"spec link: started is started on task/started; a started task is not moved — ship it where it was cut from, and an epic gets it when the default branch is merged into it"}}

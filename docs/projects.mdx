@@ -335,8 +335,50 @@ after the tasks that belong to no epic too; it also sets the epic's priority, fr
 beside its progress. Jig UI runs `jig queue move` and `jig queue set` with the revision of the specs
 you saw, so a change made in the project meanwhile is refused and the specs are read again. An epic
 not moved or prioritised yet is not in the queue; it follows the ones that are, in Jig's order.
-Setting its priority puts it in the queue too, at the bottom. Editing a roadmap
-from the page is not here: ask your agent.
+Setting its priority puts it in the queue too, at the bottom.
+
+### Editing a roadmap
+
+With Jig 0.40.0 or later in the project, a spec's roadmap is edited on its card:
+
+- **Add item**, at the end of every numbered phase, adds a line to that phase. Items before the
+  first phase heading have none.
+- An item's ⋯ menu moves it **Up** or **Down** within its phase, or **To Phase N** — to the end of
+  another phase.
+- **File task…**, on an item not done that names no task, fog included, files the item's task and
+  names it on the item: give the task's id, and its goal, which starts as the item's own words.
+  A fog item's goal starts without its `fog:`. The task goes to
+  Backlog. The id of a task the board shows names that task instead, with no goal.
+
+Jig UI runs Jig's `jig spec item add`, `move` or `file` with the revision of the specs you saw, as
+for the epics. Jig commits each edit on the
+spec's branch, `spec/<spec-id>` — or the open epic — in a tree of its own, never in your checkout,
+and takes it as far as `agent.git` lets it: committed, pushed, a pull request. The line above the
+specs after an edit is Jig's note on the next step, such as *agent.git is commit: pushing
+spec/shop is yours*.
+
+While edits wait on that branch, the card says so — with a link to the pull request, or *pushed,
+no pull request yet*, or *committed in this clone, not pushed* — and shows the roadmap as it is on
+the branch, the one the next edit changes. Each item an edit added, moved to another phase or
+filed there is marked **waiting**. Once the pull request is merged and the project fetched, the
+roadmap is the default branch's again.
+
+Jig refuses edits when:
+
+- `agent.git` is `none` (Jig's default) in your clone: Jig commits nothing. Choose a level in the
+  project's **Settings**. Filing a new task is not even started then.
+- the spec's branch is checked out in a checkout of yours, as `jig spec new` and `jig spec resume`
+  leave it: switch that checkout to another branch first.
+- the project changed since you saw the specs: they are read again; try again on them.
+
+Filing a new task is two Jig commands: `jig task new`, which carries no revision, then
+`jig spec item file` with the revision Jig has right after it. So a change made in the project
+since you saw the specs does not refuse it: the item is found by Jig's own handle for it, and Jig
+refuses an item that names a task already. If Jig files the task but then refuses to name it on
+the item, the dialog says so and why; once that is resolved, **File task…** again with the same
+id names it, without filing a second task.
+
+Rewording, checking off or removing an item is not here: ask your agent.
 
 ## Task details
 

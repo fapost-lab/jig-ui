@@ -11,8 +11,12 @@ paths:
   - server/jig/fixtures/spec-list.json
   - web/components/EpicMenu.vue
   - web/lib/epics.ts
-summary: A project's specs from jig spec list, shown as the Specs view with open epics in Jig's queue order and a menu to move and prioritise them; read with the board, no ref or path on the page
-reviewed_at: 2026-10-29
+  - web/components/SpecItemMenu.vue
+  - web/components/FileItemDialog.vue
+  - server/jig/fixtures/spec-list-items.json
+  - server/jig/fixtures/spec-list-waiting.json
+summary: "A project's specs from jig spec list as the Specs view: open epics in Jig's queue order with a menu to move and prioritise them, and from Jig 0.40.0 the roadmap edited on the card (add, move, file) on the spec's write branch; read with the board, no ref or path on the page"
+reviewed_at: 2026-11-06
 ---
 # Specs and epics
 
@@ -30,6 +34,14 @@ A spec with work for the person's agent offers the request to copy (`agentReques
 `web/lib/specs.ts`): to file the tasks of the first phase with an item that has none, and to continue
 the spec while it has fog.
 
+From Jig 0.40.0 (`editable`) a roadmap is edited on its card: **Add item** at the end of each
+numbered phase, an item's ⋯ menu (`SpecItemMenu.vue`) moving it Up, Down or To Phase N, and
+**File task…** (`FileItemDialog.vue`) filing an item's task and naming it on the item — `POST
+/api/projects/:id/specs/items/add`, `/move`, `/file`, Jig's `jig spec item add|move|file`
+(adr-20261106-editing-a-roadmap-from-the-page). While edits wait on the spec's write branch, the
+card shows the roadmap there (`shownRoadmap`), a line saying where they wait, and a "waiting" mark
+on each item they added, moved to another phase or filed (`waitingItems`).
+
 ## Why
 
 A spec is the plan above the tasks: the board says where each task stands, the specs say how far
@@ -46,7 +58,9 @@ the epic branch, so the page shows Jig's numbers and computes none.
   roadmap comes from the ref Jig chose. Jig UI never reads a roadmap file
   (adr-20261014-jig-ui-is-an-optional-layer-over-jig).
 - **No ref and no path reach the page.** Only whether the epic's roadmap was read from a remote
-  branch (`fetched`) goes on, not the ref name.
+  branch (`fetched`) goes on, not the ref name. Waiting edits carry branch names only (`branch`,
+  `base`), as the epic does, and their pull request's address, linked only when it is `https://`;
+  not the commit.
 - **The queue orders the epics, not Jig UI.** Jig's queue holds an epic (`epic:<spec-id>`) on its
   top level beside the tasks of no epic, on one scale of positions. The adapter puts the queued
   epics first by position, then the open epics not queued, then the specs with none, each in Jig's
@@ -58,11 +72,15 @@ the epic branch, so the page shows Jig's numbers and computes none.
   gives its tasks.
 - **Only an open epic.** A write naming a spec without one is `not-found` before Jig runs; Jig
   refuses a spec that declares no epic as `not-found` too.
-- **Editing a roadmap is not here.** Adding, moving or filing its items needs a Jig command with a
-  revision; it is a fog item in spec `jig-ui`. Filing a phase's tasks and continuing a spec go to the
-  person's agent as a request to copy, in the words of Jig's `jig-idea` skill; the page runs no agent.
-- **"Phase N" names the phase.** Items before the first phase heading get no request to file: the
-  request could not name them.
+- **Edits go through Jig's handles, on the roadmap the next edit changes.** An item is named by
+  Jig's `id`, which holds through a move or a filing, and only an id of the roadmap the page shows —
+  the waiting one when there is one — reaches Jig. Up is `--after` the item two above, or `--top`
+  for the second, since Jig has no `--before`; another phase is `--phase <n>`, its bottom.
+- **Rewording, checking or removing an item is not here** — Jig has no command for them. Filing a
+  phase's tasks and continuing a spec go to the person's agent as a request to copy, in the words of
+  Jig's `jig-idea` skill; the page runs no agent.
+- **"Phase N" names the phase.** Items before the first phase heading get no request to file and no
+  Add item: neither could name them (Jig adds only to `--phase <n>`).
 - **Not shown — not in Jig's contract:** which spec a task on the board belongs to (Jig's task
   list carries no spec link).
 
@@ -87,3 +105,7 @@ Task `spec-agent-request` (2026-10-29), decided by the maintainer:
 
 - The requests stand in the card's head, one line each to copy, as an upgrade's request does.
   Rejected: an "Ask agent…" button that opens them — one click more for a line or two.
+
+Task `roadmap-from-page` (2026-11-06), decided by the maintainer at the design gate: the branch's
+roadmap shown with waiting marks, the ⋯ menu only, the two-step filing and no `jig writes ship`
+(adr-20261106-editing-a-roadmap-from-the-page).

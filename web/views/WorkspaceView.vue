@@ -214,6 +214,7 @@
   function openSettings(id: string): void {
     settingsFor.value = id;
     settings.value = undefined;
+    settingKey.value = undefined;
     settingNotice.value = undefined;
     void loadSettings();
   }
@@ -238,6 +239,8 @@
     const res = await call(() => send(id, shown.revision));
     const error = res && res.status !== 200 ? (await res.json()).error : undefined;
     await loadSettings();
+    // The dialog closed, or shows another project, since: what came of this write is not its to show.
+    if (settingsFor.value !== id) return;
     settingKey.value = undefined;
     if (error?.code === 'stale-revision')
       settingNotice.value = 'The settings changed since they were shown: here they are as they are now.';

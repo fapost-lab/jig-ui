@@ -912,15 +912,15 @@ describe('/api/projects/:id/specs/items', () => {
     ['add', { spec: 'shop', phase: 1, text: '`search` — looks filed', revision: 3 }],
     ['add', { spec: 'shop', phase: 1, text: ' `search` - looks filed', revision: 3 }],
     ['add', { spec: 'shop', phase: 1, text: 'x' }],
-    ['move', { spec: 'shop', item: '--top', place: 'top', revision: 3 }],
-    ['move', { spec: 'shop', item: 'i-5D729342E61F', place: 'top', revision: 3 }],
+    ['move', { spec: 'shop', item: '', place: 'top', revision: 3 }],
+    ['move', { spec: 'shop', item: 7, place: 'top', revision: 3 }],
     ['move', { spec: 'shop', item, place: 'bottom', revision: 3 }],
-    ['move', { spec: 'shop', item, place: { after: 'search' }, revision: 3 }],
+    ['move', { spec: 'shop', item, place: { after: '' }, revision: 3 }],
     ['move', { spec: 'shop', item, place: { phase: 1.5 }, revision: 3 }],
     ['file', { spec: 'shop', item, task: '-x', goal: 'g', revision: 3 }],
     ['file', { spec: 'shop', item, task: 'a', goal: 'two\nlines', revision: 3 }],
     ['file', { spec: 'shop', item, task: 'a', goal: '', revision: 3 }],
-    ['file', { spec: 'shop', item: 'x', task: 'a', goal: 'g', revision: 3 }],
+    ['file', { spec: 'shop', task: 'a', goal: 'g', revision: 3 }],
   ])('refuses %s %o as usage, the source not asked', async (path, body) => {
     const { app, sent } = faked(noted);
     const res = await post(app, path, body);

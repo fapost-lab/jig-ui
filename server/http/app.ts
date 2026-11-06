@@ -96,9 +96,6 @@ const isValue = (v: unknown): v is string => typeof v === 'string' && v.length <
 /** A roadmap phase's number, `## Phase <n>`. */
 const isPhase = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 
-/** A roadmap item's handle as Jig names one (`i-` and 12 hex digits, `-2` for a repeat): never a flag. */
-const isItem = (v: unknown): v is string => typeof v === 'string' && /^i-[0-9a-f]{12}(-[0-9]+)?$/.test(v);
-
 /**
  * A new item's words: a line of at most 500 characters, not blank. Not led by a backticked id and a dash either: Jig would
  * read the item as filed to that task, which may not exist; a task is filed through File task.
@@ -110,7 +107,7 @@ const isItemText = (v: unknown): v is string =>
 function itemPlace(v: unknown): ItemPlace | undefined {
   if (v === 'top') return v;
   const [after, phase] = [field(v, 'after'), field(v, 'phase')];
-  return isItem(after) ? { after } : isPhase(phase) ? { phase } : undefined;
+  return isId(after) ? { after } : isPhase(phase) ? { phase } : undefined;
 }
 
 /** The body of a write that names only a task: the task and the revision it was read at, `undefined` where invalid. */
@@ -378,7 +375,7 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
           const [spec, item, revision] = [field(body, 'spec'), field(body, 'item'), field(body, 'revision')];
           return {
             spec: isId(spec) ? spec : undefined,
-            item: isItem(item) ? item : undefined,
+            item: isId(item) ? item : undefined,
             place: itemPlace(field(body, 'place')),
             revision: isRevision(revision) ? revision : undefined,
           };
@@ -405,7 +402,7 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
           ];
           return {
             spec: isId(spec) ? spec : undefined,
-            item: isItem(item) ? item : undefined,
+            item: isId(item) ? item : undefined,
             task: isNewId(task) ? task : undefined,
             goal: goal === undefined || goal === null ? null : isGoal(goal) ? goal : undefined,
             revision: isRevision(revision) ? revision : undefined,

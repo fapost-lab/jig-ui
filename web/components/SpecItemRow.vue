@@ -3,11 +3,12 @@
   import type { SpecItem } from '@/api';
   import { itemWords } from '@/lib/specs';
 
-  /** `live`: the item's task is live, so its details can be opened. */
+  /** `live`: the item's task is live, so its details can be opened; `waiting`: an edit waiting on the spec's branch changed it. */
   const props = defineProps<{
     item: SpecItem;
     project: string;
     live: boolean;
+    waiting?: boolean;
   }>();
 
   const shown = computed(() => itemWords(props.item));
@@ -38,5 +39,8 @@
         >
       </span>
     </span>
+    <span v-if="waiting" class="shrink-0 text-muted-foreground">waiting</span>
+    <!-- The item's roadmap menu, from the page that writes it. -->
+    <slot name="menu" />
   </li>
 </template>

@@ -10,6 +10,7 @@ const spec = (id: string, epic: 'open' | 'finished' | null, position: number | n
   epic: epic && { branch: `epic/${id}`, state: epic, checkedOut: false, missing: false, fetched: false },
   progress: null,
   phases: [],
+  waiting: null,
   queue: position === null ? null : { position, priority: null },
 });
 

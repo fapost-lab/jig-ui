@@ -319,7 +319,7 @@ describe('/api/projects and /api/workspace', () => {
 
   it("serves a project's specs, its state when it is not readable, and 404 for an unknown id", async () => {
     const text = await (await call('GET', '/api/projects/ready/specs')).text();
-    expect(JSON.parse(text)).toEqual({ specs: { state: 'ready', specs: [], revision: 1 } });
+    expect(JSON.parse(text)).toEqual({ specs: { state: 'ready', specs: [], revision: 1, editable: false } });
     expectNoPath(text);
     expect(await (await call('GET', '/api/projects/broken/specs')).json()).toEqual({
       specs: { id: 'broken', state: 'unreadable', code: 'failed' },
@@ -853,6 +853,109 @@ describe('/api/projects/:id/queue', () => {
     expect((await post(app, '/api/projects/queued/queue/priority', { task: 'a', priority: 1, revision: 1 }, foreign)).status).toBe(403);
     expect((await post(app, '/api/projects/queued/queue/pause', { task: 'a', revision: 1 }, {})).status).toBe(401);
     expect((await post(app, '/api/projects/queued/queue/pause/cancel', { task: 'a', revision: 1 }, foreign)).status).toBe(403);
+  });
+});
+
+describe('/api/projects/:id/specs/items', () => {
+  const post = (target: Hono, path: string, body: unknown, headers: Record<string, string> = { cookie: COOKIE }) =>
+    target.request(`/api/projects/x/specs/items/${path}`, {
+      method: 'POST',
+      headers: { host: HOST, 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+    });
+  const item = 'i-5d729342e61f';
+
+  const noted: Written = { state: 'written', note: 'agent.git is commit: pushing spec/shop is yours' };
+
+  function faked(outcome: Written | undefined) {
+    const sent: unknown[][] = [];
+    const source: ProjectSource = {
+      ...localSource(join(webRoot, 'items-config')),
+      addItem: (...a) => (sent.push(['add', ...a]), Promise.resolve(outcome)),
+      moveItem: (...a) => (sent.push(['move', ...a]), Promise.resolve(outcome)),
+      fileItem: (...a) => (sent.push(['file', ...a]), Promise.resolve(outcome)),
+    };
+    return { app: createApp({ port: PORT, token: TOKEN, source, webRoot }), sent };
+  }
+
+  it("hands each edit to the source as the page sent it, and answers Jig's note", async () => {
+    const { app, sent } = faked(noted);
+    const res = await post(app, 'add', { spec: 'shop', phase: 0, text: 'Pay — `--json` by invoice', revision: 3 });
+    expect([res.status, await res.json()]).toEqual([200, { written: true, note: 'agent.git is commit: pushing spec/shop is yours' }]);
+    for (const place of ['top', { after: 'i-230488071aa6-2' }, { phase: 2 }]) {
+      expect((await post(app, 'move', { spec: 'shop', item, place, revision: 3 })).status).toBe(200);
+    }
+    expect((await post(app, 'file', { spec: 'shop', item, task: 'search', goal: 'Search by name', revision: 3 })).status).toBe(200);
+    expect((await post(app, 'file', { spec: 'shop', item, task: 'filed', revision: 3 })).status).toBe(200);
+    expect(sent).toEqual([
+      ['add', 'x', 'shop', 0, 'Pay — `--json` by invoice', 3],
+      ['move', 'x', 'shop', item, 'top', 3],
+      ['move', 'x', 'shop', item, { after: 'i-230488071aa6-2' }, 3],
+      ['move', 'x', 'shop', item, { phase: 2 }, 3],
+      ['file', 'x', 'shop', item, 'search', 'Search by name', 3],
+      ['file', 'x', 'shop', item, 'filed', null, 3],
+    ]);
+  });
+
+  it('answers a note of null when Jig gives none', async () => {
+    const res = await post(faked({ state: 'written' }).app, 'add', { spec: 'shop', phase: 1, text: 'x', revision: 3 });
+    expect(await res.json()).toEqual({ written: true, note: null });
+  });
+
+  it.each([
+    ['add', { phase: 1, text: 'x', revision: 3 }],
+    ['add', { spec: 'shop', phase: -1, text: 'x', revision: 3 }],
+    ['add', { spec: 'shop', phase: '1', text: 'x', revision: 3 }],
+    ['add', { spec: 'shop', phase: 1, text: '   ', revision: 3 }],
+    ['add', { spec: 'shop', phase: 1, text: 'two\nlines', revision: 3 }],
+    ['add', { spec: 'shop', phase: 1, text: 'x'.repeat(501), revision: 3 }],
+    ['add', { spec: 'shop', phase: 1, text: '`search` — looks filed', revision: 3 }],
+    ['add', { spec: 'shop', phase: 1, text: ' `search` - looks filed', revision: 3 }],
+    ['add', { spec: 'shop', phase: 1, text: 'x' }],
+    ['move', { spec: 'shop', item: '--top', place: 'top', revision: 3 }],
+    ['move', { spec: 'shop', item: 'i-5D729342E61F', place: 'top', revision: 3 }],
+    ['move', { spec: 'shop', item, place: 'bottom', revision: 3 }],
+    ['move', { spec: 'shop', item, place: { after: 'search' }, revision: 3 }],
+    ['move', { spec: 'shop', item, place: { phase: 1.5 }, revision: 3 }],
+    ['file', { spec: 'shop', item, task: '-x', goal: 'g', revision: 3 }],
+    ['file', { spec: 'shop', item, task: 'a', goal: 'two\nlines', revision: 3 }],
+    ['file', { spec: 'shop', item, task: 'a', goal: '', revision: 3 }],
+    ['file', { spec: 'shop', item: 'x', task: 'a', goal: 'g', revision: 3 }],
+  ])('refuses %s %o as usage, the source not asked', async (path, body) => {
+    const { app, sent } = faked(noted);
+    const res = await post(app, path, body);
+    expect([res.status, ((await res.json()) as { error: { code: string } }).error.code]).toEqual([422, 'usage']);
+    expect(sent).toEqual([]);
+  });
+
+  it.each([
+    ['a stale read', { state: 'refused', code: 'stale-revision' }, 409, 'stale-revision'],
+    ['an item the read does not show', { state: 'refused', code: 'not-found' }, 404, 'not-found'],
+    ['agent.git none', { state: 'refused', code: 'git-not-allowed' }, 422, 'git-not-allowed'],
+    ['a project not connected', undefined, 404, 'not-connected'],
+  ] as const)('answers %s', async (_, outcome, status, code) => {
+    const res = await post(faked(outcome).app, 'move', { spec: 'shop', item, place: 'top', revision: 3 });
+    expect([res.status, ((await res.json()) as { error: { code: string } }).error.code]).toEqual([status, code]);
+  });
+
+  it("says a task was filed that Jig did not name on its item, with Jig's reasons", async () => {
+    const outcome: Written = { state: 'refused', code: 'branch-checked-out', reasons: ['spec/shop is checked out in …'], filed: true };
+    const res = await post(faked(outcome).app, 'file', { spec: 'shop', item, task: 'search', goal: 'g', revision: 3 });
+    expect([res.status, await res.json()]).toEqual([
+      422,
+      {
+        error: {
+          code: 'branch-checked-out',
+          message: 'The task was filed, and Jig did not name it on the item.',
+          reasons: ['spec/shop is checked out in …'],
+          filed: true,
+        },
+      },
+    ]);
+  });
+
+  it('is refused without the token', async () => {
+    expect((await post(faked(noted).app, 'add', { spec: 'shop', phase: 1, text: 'x', revision: 3 }, {})).status).toBe(401);
   });
 });
 

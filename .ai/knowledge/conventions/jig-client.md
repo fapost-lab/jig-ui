@@ -30,7 +30,8 @@ The minimum Jig the package reads is `MIN_JIG_VERSION` in `server/jig/client.ts`
 first Jig with a queue (0.29.0 was the first that prints JSON). A write a later Jig made possible
 does not raise it: it carries a version of its own, checked by the local adapter against the
 project's Jig before the page is offered the write — `RESUME_JIG_VERSION`, 0.35.0, for
-`resumeTask`, and `ARTIFACTS_JIG_VERSION`, 0.39.0, for a task's documents — so a project on an older Jig is still read, and only that write is missing. `CLOSE_JIG_VERSION`, 0.40.0, is the other kind: the close is offered on any Jig, and the version picks how `closeTask` checks it. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
+`resumeTask`, `ARTIFACTS_JIG_VERSION`, 0.39.0, for a task's documents, and `ROADMAP_JIG_VERSION`, 0.40.0, for a
+roadmap's edits — so a project on an older Jig is still read, and only that write is missing. `CLOSE_JIG_VERSION`, 0.40.0, is the other kind: the close is offered on any Jig, and the version picks how `closeTask` checks it. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
 found from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`), never a
 `bash` on PATH, which may be WSL's. It is asked once per process; a failed ask is not kept.
 
@@ -39,11 +40,13 @@ camelCase by its `.transform`; the exported types are its `z.output`
 (adr-20261018-jig-answers-checked-by-zod-schemas). Keys Jig adds without raising `schema` are
 dropped by `z.object`, so nothing Jig UI does not read gets past `server/jig/`.
 
-Every field a schema reads is in Jig's output, `null` where Jig has nothing — except one: an
+Every field a schema reads is in Jig's output, `null` where Jig has nothing — except three: an
 attention item's `versions` (`{from, to}`, the project's Jig as its manifest says and the
 machine's), which only `upgrade-available` carries, from Jig 0.34.0, and older Jig never printed on
 any item. It reads as `null` when absent, and an `upgrade-available` item without it fails the read,
-as a field Jig dropped does (task `projects-to-upgrade`).
+as a field Jig dropped does (task `projects-to-upgrade`). A roadmap item's `id` (Jig's handle) and a
+spec's `waiting` (the edits on its write branch, with the roadmap there) are printed from Jig 0.40.0
+only, and read as `null` when absent (task `roadmap-from-page`).
 
 A test that runs real processes — a stand-in `jig` script that starts a child, leaves its process
 group, or waits — waits for a marker file the process writes once it is where the test needs it,
@@ -77,7 +80,7 @@ the others, with `--revision <n>` and `--json`, and adds `not-closable`, Jig's r
 answers is not read. On an older Jig it is the one text write: it reads `queue list --json` first and refuses
 `stale-revision` itself when the clone's revision is not the caller's; a refusal is `failed` with Jig's `jig: error:`
 lines, through `withoutPaths`, as `reasons` (adr-20261029-close-a-ready-task-from-the-board). A refusal's `reasons` lose
-the command's own name, of one word or two (`upgrade: `, `task set: `). On Windows the arguments do not go on Git bash's
+the command's own name, of one word, two or three (`upgrade: `, `task set: `, `spec item file: `). On Windows the arguments do not go on Git bash's
 command line, which it parses itself: it globbed a one-word goal `out*` that Node left unquoted,
 and with `MSYS=noglob` it read `\"` as a backslash and a quote (both caught by the Windows CI leg).
 They go in the environment as `JIG_UI_ARG_<n>`, and the fixed script
@@ -112,8 +115,18 @@ dropped even if Jig prints them (Jig 0.40.0 prints none); a kind Jig adds later 
 checks every value itself: `invalid-value`, `unknown-key`, `not-local` (a key only the project's
 `.ai/config.yaml` answers) and `secret-key` (the Telegram token, which Jig takes only in a terminal)
 come back as codes, Jig's line as `reasons` with the command's name cut by `said` — one word
-(`upgrade: `) or two (`config set: `, `task set: `). The write's answer is not read: the caller
+(`upgrade: `), two (`config set: `, `task set: `) or three (`spec item add: `). The write's answer is not read: the caller
 reads the settings again.
+
+A roadmap's edits — `addItem`, `moveItem` and `fileItem` (`jig spec item add|move|file <spec> …
+--revision <n> --json`) — have 60 s each (`ROADMAP_TIMEOUT_MS`): Jig fetches, may push and ask the
+forge. Of the answer only `write.note` is read — whose step is next, or a push that failed after the
+commit — through `withoutPaths`. Their refusals add `git-not-allowed` (`agent.git: none`),
+`not-linkable`, `epic-missing`, `write-busy`, `branch-checked-out` (its message names the checkout's
+absolute path), `branch-diverged`, `branch-has-other-commits`, `base-not-on-origin`,
+`tree-in-the-way` and `commit-refused`, Jig's line as `reasons`, its command cut by `said` — of one
+word, two or three (`spec item move: `)
+(adr-20261106-editing-a-roadmap-from-the-page).
 
 ## Rationale
 

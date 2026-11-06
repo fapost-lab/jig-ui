@@ -25,12 +25,16 @@ export const ARTIFACTS_JIG_VERSION = '0.39.0';
 export const CLOSE_JIG_VERSION = '0.40.0';
 /** The first Jig that lists its settings as JSON and sets them with `--revision` and `--json` (fapost-lab/jig#363). */
 export const SETTINGS_JIG_VERSION = '0.40.0';
+/** The first Jig that names a roadmap's items, shows the edits waiting, and adds, moves and files them (fapost-lab/jig#362). */
+export const ROADMAP_JIG_VERSION = '0.40.0';
 
 const SCRIPT = '.ai/scripts/jig';
 /** A read's limit: 10 s ran out with several projects read at once, each four Jig runs (task `read-timeout`). */
 const TIMEOUT_MS = 30_000;
 /** A dry run compares every framework file; a real upgrade at `agent.git: merge` also waits for CI. */
 const PLAN_TIMEOUT_MS = 60_000;
+/** A roadmap write fetches before it commits, and may push and ask the forge for the pull request. */
+const ROADMAP_TIMEOUT_MS = 60_000;
 const UPGRADE_TIMEOUT_MS = 30 * 60_000;
 
 /** The directory whose changes may change what Jig reports: the main checkout's `.ai/`. */
@@ -235,6 +239,16 @@ const CODES = new Set([
   'not-local',
   'invalid-value',
   'secret-key',
+  'git-not-allowed',
+  'not-linkable',
+  'epic-missing',
+  'write-busy',
+  'branch-checked-out',
+  'branch-diverged',
+  'branch-has-other-commits',
+  'base-not-on-origin',
+  'tree-in-the-way',
+  'commit-refused',
   'failed',
 ]);
 
@@ -251,14 +265,14 @@ const isObject = (v: unknown): v is Json => typeof v === 'object' && v !== null 
 /**
  * Why Jig refused, as it said it: each line of its message with `jig: error:` and the command's own `<command>:` cut off,
  * and every absolute path cut out — `upgrade: cannot determine the framework source root; pass --from <dir>` becomes
- * `cannot determine the framework source root; pass --from <dir>`. A command of two words says both (`task set: `).
- * None without a message.
+ * `cannot determine the framework source root; pass --from <dir>`. A command of two or three words says them all
+ * (`task set: `, `spec item add: `). None without a message.
  */
 function said(message: unknown, args: string[]): string[] {
   if (typeof message !== 'string') return [];
   return message.split('\n').flatMap((line) => {
     let text = line.trim().replace(/^jig: error: /, '');
-    const command = [args.slice(0, 2).join(' '), args[0]].find((c) => c && text.startsWith(`${c}: `));
+    const command = [args.slice(0, 3).join(' '), args.slice(0, 2).join(' '), args[0]].find((c) => c && text.startsWith(`${c}: `));
     if (command) text = text.slice(command.length + 2);
     return text ? [withoutPaths(text)] : [];
   });
@@ -483,8 +497,14 @@ export async function readTasks(
 const SpecProgress = z.object({ done: count, total: count, filed: count, fog: count });
 export type SpecProgress = z.output<typeof SpecProgress>;
 
-/** A roadmap item: its words as the roadmap has them, and the task it names, if any. */
-const SpecItem = z.object({ text, checked: z.boolean(), task: maybe, fog: z.boolean() });
+/** A roadmap item: its handle (Jig 0.40.0, `null` from an older Jig), its words as the roadmap has them, and the task it names, if any. */
+const SpecItem = z.object({
+  id: text.nullish().transform((id) => id ?? null),
+  text,
+  checked: z.boolean(),
+  task: maybe,
+  fog: z.boolean(),
+});
 export type SpecItem = z.output<typeof SpecItem>;
 
 /** A roadmap phase; `phase` and `title` are `null` for items before any phase heading. */
@@ -506,6 +526,19 @@ const SpecRow = z
     /** `null` when the roadmap could not be read. */
     progress: SpecProgress.nullable(),
     phases: z.array(SpecPhase),
+    // Jig 0.40.0: edits committed on the roadmap's write branch that have not landed, and the roadmap as it is there.
+    waiting: z
+      .object({
+        branch: text,
+        base: text,
+        commits: count,
+        pushed: z.boolean(),
+        pr: maybe,
+        progress: SpecProgress.nullable(),
+        phases: z.array(SpecPhase),
+      })
+      .nullish()
+      .transform((w) => w ?? null),
   })
   .transform(({ missing_files, epic, ...s }) => ({
     id: s.id,
@@ -522,6 +555,7 @@ const SpecRow = z
     },
     progress: s.progress,
     phases: s.phases,
+    waiting: s.waiting,
   }));
 export type Spec = z.output<typeof SpecRow>;
 
@@ -819,6 +853,68 @@ export async function resumeTask(
  */
 export async function fileTask(root: string, id: string, goal: string, platform: NodeJS.Platform = process.platform): Promise<void> {
   await readJson(root, ['task', 'new', id, '--goal', goal], platform);
+}
+
+/** Where a moved roadmap item goes: after another item, to the top of its own phase, or to the bottom of another phase. */
+export type ItemPlace =
+  | {
+      after: string;
+    }
+  | {
+      phase: number;
+    }
+  | 'top';
+
+/** What a roadmap write answers that Jig UI reads: Jig's note for a person — whose step is next, or what failed after the commit. */
+const RoadmapWrite = z.object({ write: z.object({ note: maybe }) });
+
+/**
+ * Runs `jig spec item <args> --revision <n> --json`: Jig commits the edit on the spec's branch in a tree of its own and
+ * goes as far as `agent.git` allows. Answers Jig's note without a path, `null` without one; the item it answers is not
+ * read, the caller reads again. Refused as `stale-revision`, `not-found`, `already-exists`, `not-linkable`,
+ * `git-not-allowed` (`agent.git: none`), `branch-checked-out` and the other refusals of Jig's writes in its own tree.
+ */
+async function roadmapWrite(root: string, args: string[], revision: number, platform: NodeJS.Platform): Promise<string | null> {
+  const { data } = await readJson(root, ['spec', 'item', ...args, '--revision', String(revision)], platform, ROADMAP_TIMEOUT_MS);
+  const { note } = parsed(RoadmapWrite, data).write;
+  return note && withoutPaths(note);
+}
+
+/** Adds an item with `text` at the bottom of phase `phase` of a spec's roadmap (`jig spec item add`); as `roadmapWrite`. */
+export function addItem(
+  root: string,
+  spec: string,
+  phase: number,
+  text: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
+  return roadmapWrite(root, ['add', spec, '--phase', String(phase), '--text', text], revision, platform);
+}
+
+/** Moves a roadmap item, named by its handle (`jig spec item move`); as `roadmapWrite`. */
+export function moveItem(
+  root: string,
+  spec: string,
+  item: string,
+  place: ItemPlace,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
+  const where = place === 'top' ? ['--top'] : 'after' in place ? ['--after', place.after] : ['--phase', String(place.phase)];
+  return roadmapWrite(root, ['move', spec, item, ...where], revision, platform);
+}
+
+/** Names a task filed earlier on a roadmap item and links it to the spec (`jig spec item file`); as `roadmapWrite`. */
+export function fileItem(
+  root: string,
+  spec: string,
+  item: string,
+  task: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
+  return roadmapWrite(root, ['file', spec, item, '--task', task], revision, platform);
 }
 
 /** Closing asks the forge whether the task's pull request merged: a network round trip. */

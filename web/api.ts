@@ -32,6 +32,11 @@ export type Failure = InferResponseType<Api['projects']['$post'], 422>;
 type Queue = Api['projects'][':id']['queue'];
 /** Where a move puts a task, as the move route takes it. */
 export type Place = NonNullable<InferRequestType<Queue['move']['$post']>['json']['place']>;
+type Items = Api['projects'][':id']['specs']['items'];
+/** Where a move puts a roadmap item, as the move route takes it. */
+export type ItemPlace = NonNullable<InferRequestType<Items['move']['$post']>['json']['place']>;
+/** The answer to an edit of a roadmap. */
+export type Edited = Awaited<ReturnType<Items['add']['$post'] | Items['move']['$post'] | Items['file']['$post']>>;
 /** The answer to a write of the queue. */
 export type Written = Awaited<
   ReturnType<Queue['move']['$post'] | Queue['priority']['$post'] | Queue['pause']['$post'] | Queue['pause']['cancel']['$post']>

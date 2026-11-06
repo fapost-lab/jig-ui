@@ -26,6 +26,7 @@ import {
   readSourceDiff,
   readSpecs,
   readStatus,
+  readFinishedTasks,
   readTasks,
   releaseNamed,
   requestPause,
@@ -64,6 +65,39 @@ describe('jigVersion', () => {
 
   it('throws when Jig names no version', async () => {
     await expect(jigVersion(checkout('odd', 'usage: jig'))).rejects.toThrow();
+  });
+});
+
+describe('readFinishedTasks', () => {
+  // task-list-status-abandoned.json is what Jig 0.40.0 printed in a scratch repository; the rows of the closed ones are 0.31.0's.
+  const finishedJig = (name: string, consolidated: string, abandoned: string): string => {
+    const dir = answering(name, '{}');
+    writeFileSync(join(dir, 'consolidated.json'), consolidated);
+    writeFileSync(join(dir, 'abandoned.json'), abandoned);
+    writeFileSync(
+      join(dir, '.ai', 'scripts', 'jig'),
+      `#!/usr/bin/env bash\necho "$*" >> calls.log\ncase "$*" in\n  *consolidated*) cat consolidated.json ;;\n  *abandoned*) cat abandoned.json; grep -q '"error"' abandoned.json && exit 1 ;;\nesac\nexit 0\n`,
+    );
+    return dir;
+  };
+  const closed = changed('task-list-all.json', (d) => (d.tasks = d.tasks.filter((t: { status: string }) => t.status === 'consolidated')));
+  const dropped = readFileSync(fixture('task-list-status-abandoned.json'), 'utf8');
+
+  it('asks for one status at a time, and reads both by id', async () => {
+    const dir = finishedJig('finished', closed, dropped);
+    expect((await readFinishedTasks(dir)).map((t) => [t.id, t.status])).toEqual([
+      ['fix-typo', 'consolidated'],
+      ['old-idea', 'abandoned'],
+    ]);
+    expect(readFileSync(join(dir, 'calls.log'), 'utf8').trim().split('\n').sort()).toEqual([
+      'task list --status abandoned --json',
+      'task list --status consolidated --json',
+    ]);
+  });
+
+  it('refuses as a whole when either status is refused', async () => {
+    const refused = readFileSync(fixture('refusal.json'), 'utf8');
+    await expect(readFinishedTasks(finishedJig('finished-refused', closed, refused))).rejects.toEqual(refusal('usage'));
   });
 });
 
@@ -230,16 +264,15 @@ describe('readTasks', () => {
     });
   });
 
-  it('asks for the finished tasks too, and reads them as Jig keeps them', async () => {
-    const dir = logging('tasks-all', 'task-list-all.json');
-    const read = await readTasks(dir);
-    expect(args(dir)).toEqual(['task', 'list', '--all', '--json']);
-    expect(read.tasks.map((t) => [t.id, t.status])).toEqual([
-      ['fix-typo', 'consolidated'],
-      ['live-one', 'active'],
-      ['old-idea', 'abandoned'],
-      ['put-away', 'archived'],
-    ]);
+  it('asks only for the live tasks, and counts the finished ones it left out', async () => {
+    const dir = logging('tasks-live', 'task-list.json');
+    expect(await readTasks(dir)).toMatchObject({ finished: 0 });
+    expect(args(dir)).toEqual(['task', 'list', '--json']);
+    const before = changed('task-list.json', (d) => (d.hidden = 4));
+    expect(await readTasks(answering(`case-${cases++}`, before))).toMatchObject({ finished: 4 });
+    // Jig 0.37.0 hides the archived ones too, and says how many of the hidden they are.
+    const since = changed('task-list.json', (d) => ((d.hidden = 4), (d.archived = 1)));
+    expect(await readTasks(answering(`case-${cases++}`, since))).toMatchObject({ finished: 3 });
   });
 
   it('reads a pause asked of a task and the actions to ask and take it back', async () => {

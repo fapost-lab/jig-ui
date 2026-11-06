@@ -56,8 +56,10 @@ after #80). The `stopJig` tests write `waiter.pid` and `left` for this.
 
 ## Example
 
-A task-list read runs Jig's JSON task listing with `--all`, finished tasks included, checks the envelope, then `data` through the
-`TaskList` schema — the status among Jig's own words — and returns typed tasks. Jig's refusal throws `JigRefusal` with its code
+A task-list read runs Jig's JSON task listing, the live tasks only, checks the envelope, then `data` through the
+`TaskList` schema — the status among Jig's own words — and returns typed tasks and the count of finished ones left out
+(`hidden`, less `archived` from Jig 0.37.0, which counts those among the hidden). The finished tasks themselves are
+`readFinishedTasks`: `--status` takes one status, so two runs, and either's failure fails the read. Jig's refusal throws `JigRefusal` with its code
 (an unknown code is `failed`); an envelope of another shape throws `JigShapeError`, which the
 project shows as `incompatible` ("update Jig UI"), never half-parsed. Each read has a contract
 test over a fixture in `server/jig/fixtures/`. Each Jig run of a read, `--version` included, has

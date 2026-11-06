@@ -29,6 +29,7 @@ import {
   readSourceDiff,
   readSpecs,
   readStatus,
+  readFinishedTasks,
   readTasks,
   releaseNamed,
   requestPause,
@@ -127,7 +128,7 @@ class Unnamed extends JigRefusal {}
 const itemIn = (phases: SpecPhase[], item: string) => phases.flatMap((p) => p.items).find((i) => i.id === item);
 type Finished = TaskSummary & { status: FinishedTask['status'] };
 
-/** A finished task as the board's list of them shows it. */
+/** A finished task as the list of them shows it. */
 const gone = (t: Finished): FinishedTask => ({
   id: t.id,
   status: t.status,
@@ -253,9 +254,8 @@ async function readProject(project: Project): Promise<Read> {
   });
   if (!('list' in read)) return { view: read, tasks: read, details: [], specs: read, revision: null };
   const { status, list, queue, specs, jigVersion } = read;
-  // Live: active and ready; finished: closed and abandoned. An archived one (Jig 0.37.0) is neither: Jig keeps it out of its lists.
+  // Jig's own list holds the live ones; `finished` counts the closed and abandoned ones it left out, read on demand.
   const live = list.tasks.filter((t): t is Live => t.status === 'active' || t.status === 'ready');
-  const finished = list.tasks.filter((t): t is Finished => t.status === 'consolidated' || t.status === 'abandoned');
   const queued = new Map(queue.items.map((q) => [q.id, q]));
   const open = new Set(specs.specs.filter((s) => s.epic?.state === 'open').map((s) => s.id));
   const shownQueue = {
@@ -274,7 +274,7 @@ async function readProject(project: Project): Promise<Read> {
       attention: status.attention,
       housekeepingStale: status.housekeepingStale,
     },
-    tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id), resumes)), finished: finished.map(gone), revision },
+    tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id), resumes)), finishedCount: list.finished, revision },
     details: live.map((t) => details(t, queued.get(t.id), shownQueue, status.attention, resumes)),
     // The specs are read beside the queue: a write of an epic carries the older of the two reads, or of the board's.
     specs: {
@@ -325,7 +325,7 @@ interface Entry {
   news: boolean;
   /** The upgrade started from the page, kept until dismissed or the next one starts. */
   upgrade?: UpgradeRun;
-  /** The writes, and the reads of a task's documents, under way: an upgrade starts once they have ended. */
+  /** The writes, and the on-demand reads (a task's documents, the settings, the finished tasks), under way: an upgrade starts once they have ended. */
   writes: Set<Promise<unknown>>;
   /**
    * The pull request the page's last upgrade left open, kept until a landing brings it here: before housekeeping hears
@@ -804,7 +804,8 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
 
   /**
    * Reads through the project's Jig in its main checkout on demand, as the board's read holds none: a task's documents —
-   * Jig finds a worktree task's workspace itself — or the settings. With `taskId`, `null` for a task not live in the last
+   * Jig finds a worktree task's workspace itself —, the settings or the finished tasks; kept nowhere, so a failure is its
+   * answer and leaves what the project shows alone. With `taskId`, `null` for a task not live in the last
    * read, Jig not run, or a document Jig does not have. A Jig older than `minimum` answers `unsupported`, with that
    * version as its minimum. While the project upgrades it runs no Jig there (`unreadable`, `upgrading`), and an upgrade
    * waits for a read under way.
@@ -902,6 +903,15 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       const read = await shown(project);
       if (read.tasks.state !== 'ready') return read.tasks;
       return { state: 'ready', task: read.details.find((t) => t.id === taskId) ?? null };
+    },
+    async finished(id) {
+      // Every Jig the board reads has `--status`: 0.31.0, its minimum.
+      const answer = await onDemand(id, MIN_JIG_VERSION, readFinishedTasks);
+      if (answer?.state !== 'ready') return answer;
+      return {
+        state: 'ready',
+        tasks: (answer.read ?? []).filter((t): t is Finished => t.status === 'consolidated' || t.status === 'abandoned').map(gone),
+      };
     },
     async artifacts(id, taskId) {
       const answer = await onDemand(id, ARTIFACTS_JIG_VERSION, (root) => readArtifacts(root, taskId), taskId);

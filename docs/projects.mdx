@@ -185,7 +185,8 @@ has one, and what it waits for.
 Finished tasks are not on the board. When the project has any, **N finished tasks** above the
 board shows them in a list under it, the latest first: each one's id, *closed* or *abandoned*,
 its goal, its pull request and the day it finished. Click it again to hide the list; it starts
-hidden. The list holds what Jig still keeps: `jig housekeeping` moves a closed task's workspace to
+hidden. Jig UI reads the list when you open it, and again on each change while it stays open. If
+that read fails, the list says so and offers **Read again**; the board goes on as it was. The list holds what Jig still keeps: `jig housekeeping` moves a closed task's workspace to
 trash once it sees the task's branch merged — for a task of an epic, once the epic reached the
 default branch — and an abandoned one's after 14 days (`housekeeping.abandoned_ttl`); the task
 leaves the list with it. From Jig 0.37.0 on, housekeeping archives the abandoned task instead and

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { finished, type FinishedTask, latestFirst } from './finished';
+import { finished, type FinishedTask, latestFirst, noFinished } from './finished';
 
 const task = (more: Partial<FinishedTask> = {}): FinishedTask => ({
   id: 'fix-typo',
@@ -40,5 +40,17 @@ describe('latestFirst', () => {
       task({ id: 'd', updatedAt: '2026-10-25' }),
     ];
     expect(latestFirst(tasks).map((t) => t.id)).toEqual(['b', 'd', 'a', 'c']);
+  });
+});
+
+describe('noFinished', () => {
+  it('says why there is no list, and nothing when there is one', () => {
+    expect(noFinished({ state: 'ready', tasks: [task()] })).toBeUndefined();
+    expect(noFinished({ state: 'ready', tasks: [] })).toContain('no finished tasks');
+    expect(noFinished({ id: 'x', state: 'unreadable', code: 'failed' })).toBe('Jig could not list the finished tasks.');
+    expect(noFinished({ id: 'x', state: 'unreadable', code: 'timeout' })).toContain('in time');
+    expect(noFinished({ id: 'x', state: 'unreadable', code: 'upgrading' })).toContain('being upgraded');
+    expect(noFinished({ id: 'x', state: 'incompatible', jigVersion: '0.50.0' })).toContain('0.50.0');
+    expect(noFinished({ id: 'x', state: 'unavailable', reason: 'missing' })).toBe('The project cannot be read.');
   });
 });

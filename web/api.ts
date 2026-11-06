@@ -23,6 +23,8 @@ type Documents = Api['projects'][':id']['tasks'][':task']['artifacts'];
 export type TaskArtifacts = Ok<Documents['$get']>['artifacts'];
 export type TaskArtifact = Ok<Documents[':kind']['$get']>['artifact'];
 export type ArtifactKind = Extract<TaskArtifact, { state: 'ready' }>['kind'];
+/** The finished tasks Jig still keeps, or why they cannot be read. */
+export type Finished = Ok<Api['projects'][':id']['finished']['$get']>['finished'];
 export type Settings = Ok<Api['projects'][':id']['settings']['$get']>['settings'];
 export type Setting = Extract<Settings, { state: 'ready' }>['keys'][number];
 export type Specs = Ok<Api['projects'][':id']['specs']['$get']>['specs'];

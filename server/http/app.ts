@@ -216,8 +216,15 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
         const read = await source.tasks(id);
         if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
         if (read.state !== 'ready') return c.json({ board: read }, 200);
-        const { state, finished, revision } = read;
-        return c.json({ board: { id, state, columns: columns(read.tasks), finished, revision } }, 200);
+        const { state, finishedCount, revision } = read;
+        return c.json({ board: { id, state, columns: columns(read.tasks), finishedCount, revision } }, 200);
+      })
+
+      // Read through the project's Jig at each call, for the list the person opened; not under /tasks/, where a task may be called `finished`.
+      .get('/api/projects/:id/finished', async (c) => {
+        const read = await source.finished(c.req.param('id'));
+        if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        return c.json({ finished: read }, 200);
       })
 
       .get('/api/projects/:id/tasks/:task', async (c) => {

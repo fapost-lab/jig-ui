@@ -295,15 +295,23 @@ export interface FinishedTask {
   } | null;
 }
 
-/** A project's live tasks, the finished ones Jig still keeps and the revision a write based on them carries, or why it cannot be read. */
+/** A project's live tasks, how many finished ones Jig still keeps and the revision a write based on them carries, or why it cannot be read. */
 export type ProjectTasks =
   | {
       state: 'ready';
       tasks: Task[];
-      finished: FinishedTask[];
+      finishedCount: number;
       revision: number;
     }
   | NotReady;
+
+/** The finished tasks Jig still keeps, read on demand; or why they cannot be read, which says nothing of the project's own read. */
+export type ProjectFinished =
+  | {
+      state: 'ready';
+      tasks: FinishedTask[];
+    }
+  | Exclude<ProjectView, { state: 'ready' }>;
 
 /** One live task of a project, `null` when the project has no live task of that id; or why the project cannot be read. */
 export type ProjectTask =
@@ -471,6 +479,8 @@ export interface ProjectSource {
   artifact(id: string, taskId: string, kind: ArtifactKind): Promise<TaskArtifact | undefined>;
   /** A connected project's specs with their roadmaps; `undefined` when no project has that id. */
   specs(id: string): Promise<ProjectSpecs | undefined>;
+  /** A project's finished tasks, read through Jig at each call and kept nowhere; a failure stays this read's. */
+  finished(id: string): Promise<ProjectFinished | undefined>;
   /** Reads a connected project through Jig now, as a person's Read again asks; `undefined` when no project has that id. */
   readAgain(id: string): Promise<ProjectView | undefined>;
   /**

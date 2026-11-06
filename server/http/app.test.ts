@@ -305,7 +305,7 @@ describe('/api/projects and /api/workspace', () => {
       board: {
         id: 'ready',
         state: 'ready',
-        finished: [],
+        finishedCount: 0,
         revision: 1,
         columns: ['needs-you', 'in-progress', 'ready', 'backlog', 'paused'].map((id) => expect.objectContaining({ id, cards: [] })),
       },
@@ -315,6 +315,14 @@ describe('/api/projects and /api/workspace', () => {
     expect(JSON.parse(unreadable)).toEqual({ board: { id: 'broken', state: 'unreadable', code: 'failed' } });
     expectNoPath(unreadable);
     expect((await call('GET', '/api/projects/nobody/board')).status).toBe(404);
+  });
+
+  it("serves a project's finished tasks, its state when it is not readable, and 404 for an unknown id", async () => {
+    expect(await (await call('GET', '/api/projects/ready/finished')).json()).toEqual({ finished: { state: 'ready', tasks: [] } });
+    const unreadable = await (await call('GET', '/api/projects/broken/finished')).text();
+    expect(JSON.parse(unreadable)).toEqual({ finished: { id: 'broken', state: 'unreadable', code: 'failed' } });
+    expectNoPath(unreadable);
+    expect((await call('GET', '/api/projects/nobody/finished')).status).toBe(404);
   });
 
   it("serves a project's specs, its state when it is not readable, and 404 for an unknown id", async () => {

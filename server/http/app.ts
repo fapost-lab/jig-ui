@@ -13,6 +13,7 @@ import {
   ARTIFACT_KINDS,
   type ArtifactKind,
   type ItemPlace,
+  type KnowledgeDecision,
   type Place,
   type ProjectSource,
   RegistryUnreadable,
@@ -92,6 +93,9 @@ const isKey = (v: unknown): v is string => typeof v === 'string' && /^[a-z][a-z0
 
 /** A setting's value as the page sends one: a line of at most 500 characters; Jig checks the rest, an empty one included. */
 const isValue = (v: unknown): v is string => typeof v === 'string' && v.length <= 500 && !/[\r\n]/.test(v);
+
+/** A decision on a knowledge document, as Jig's command is named: `reviewed` keeps a changed linked file. */
+const isDecision = (v: unknown): v is KnowledgeDecision => v === 'accept' || v === 'reject' || v === 'reviewed';
 
 /** A roadmap phase's number, `## Phase <n>`. */
 const isPhase = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
@@ -256,6 +260,22 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
         const read = await source.settings(c.req.param('id'));
         if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
         return c.json({ settings: read }, 200);
+      })
+
+      // What waits for a person's decision in the project's knowledge, read through its Jig at each call; paths in it are
+      // the project's own, relative to it (adr-20261106-knowledge-decisions-from-the-page).
+      .get('/api/projects/:id/knowledge', async (c) => {
+        const read = await source.knowledge(c.req.param('id'));
+        if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        return c.json({ knowledge: read }, 200);
+      })
+
+      .get('/api/projects/:id/knowledge/:doc/diff', async (c) => {
+        const read = await source.knowledgeDiff(c.req.param('id'), c.req.param('doc'));
+        if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        if (read.state !== 'ready') return c.json({ diff: read }, 200);
+        if (read.diff === null) return refuse(c, 404, 'not-found', 'This project has no stub with this id whose linked file changed.');
+        return c.json({ diff: { state: read.state, ...read.diff } }, 200);
       })
 
       .get('/api/projects/:id/specs', async (c) => {
@@ -487,6 +507,26 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
             return refuse(c, 422, 'usage', 'Give a setting and the revision the settings were read at.');
           }
           return written(c, await source.unsetSetting(c.req.param('id'), key, revision));
+        },
+      )
+
+      // A knowledge decision: Jig commits it on `knowledge/decisions` in a tree of its own, never in the person's checkout.
+      .post(
+        '/api/projects/:id/knowledge/decide',
+        validator('json', (body: unknown) => {
+          const [doc, decision, revision] = [field(body, 'doc'), field(body, 'decision'), field(body, 'revision')];
+          return {
+            doc: isId(doc) ? doc : undefined,
+            decision: isDecision(decision) ? decision : undefined,
+            revision: isRevision(revision) ? revision : undefined,
+          };
+        }),
+        async (c) => {
+          const { doc, decision, revision } = c.req.valid('json');
+          if (doc === undefined || decision === undefined || revision === undefined) {
+            return refuse(c, 422, 'usage', 'Give a document, accept, reject or reviewed, and the revision the knowledge was read at.');
+          }
+          return edited(c, await source.decideKnowledge(c.req.param('id'), doc, decision, revision));
         },
       )
 

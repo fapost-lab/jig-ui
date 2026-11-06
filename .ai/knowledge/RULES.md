@@ -36,9 +36,12 @@ are added as sections of this file.
   no other `fetch` or outbound request in `server/`.)
 - The API and the page name connected projects by id; no path reaches `web/` but Find projects'
   answer — the folder it looked through and what it found there, under the folder the person named,
-  with `~` for the home folder — and a task's documents, whose content is shown as its authors wrote it.
+  with `~` for the home folder —, a task's documents, whose content is shown as its authors wrote it,
+  and the knowledge waiting for a decision: its documents' paths relative to the project, and a linked
+  file's diff as Jig gives it.
   (adr-20261014-project-source-port-keeps-hosting-open, adr-20261029-finding-projects-shows-their-paths,
-  adr-20261030-a-task-document-is-shown-as-written. Checked by tests on the API responses.)
+  adr-20261030-a-task-document-is-shown-as-written, adr-20261106-knowledge-decisions-from-the-page.
+  Checked by tests on the API responses.)
 - `v-html` takes only what `rendered()` in `web/lib/markdown.ts` gives: Markdown cleaned by DOMPurify.
   (adr-20261030-a-task-document-is-shown-as-written. Checked in review; `web/lib/markdown.test.ts`
   pins that every rendering goes through DOMPurify.)

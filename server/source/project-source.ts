@@ -3,6 +3,8 @@ import type {
   ArtifactKind,
   Attention,
   ItemPlace,
+  Knowledge,
+  KnowledgeDecision,
   Place,
   Setting,
   Spec,
@@ -12,7 +14,21 @@ import type {
   Upgrade,
 } from '../jig/client.js';
 
-export type { Artifact, ArtifactKind, Attention, ItemPlace, Place, Setting, Spec, SpecItem, SpecPhase, SpecProgress, Upgrade };
+export type {
+  Artifact,
+  ArtifactKind,
+  Attention,
+  ItemPlace,
+  Knowledge,
+  KnowledgeDecision,
+  Place,
+  Setting,
+  Spec,
+  SpecItem,
+  SpecPhase,
+  SpecProgress,
+  Upgrade,
+};
 export { ARTIFACT_KINDS } from '../jig/client.js';
 export { RegistryUnreadable } from '../registry/projects.js';
 
@@ -328,6 +344,24 @@ export type ProjectSettings =
     }
   | Exclude<ProjectView, { state: 'ready' }>;
 
+/**
+ * What waits for a person's decision in a project's knowledge — proposals, approved stubs whose linked file changed, is
+ * gone or has no approved text — with the revision a decision carries; or why it cannot be read. Paths in it are the
+ * project's own, relative to it (adr-20261106-knowledge-decisions-from-the-page).
+ */
+export type ProjectKnowledge = ({ state: 'ready' } & Knowledge) | Exclude<ProjectView, { state: 'ready' }>;
+
+/** How the file a stub links changed since it was approved, `null` when it links none that changed; or why it cannot be read. */
+export type SourceChange =
+  | {
+      state: 'ready';
+      diff: {
+        diff: string | null;
+        lossy: boolean;
+      } | null;
+    }
+  | Exclude<ProjectView, { state: 'ready' }>;
+
 /** One of a task's documents as it is written, `null` when the task or the document is not there; or why it cannot be read. */
 export type TaskArtifact =
   | {
@@ -501,6 +535,21 @@ export interface ProjectSource {
   setSetting(id: string, key: string, value: string, revision: number): Promise<Written | undefined>;
   /** Takes one of the person's own settings out of the clone's file, so the project's value or Jig's default answers, as `setSetting` writes. */
   unsetSetting(id: string, key: string, revision: number): Promise<Written | undefined>;
+  /** What waits for a person's decision in a connected project's knowledge, read through its Jig at each call; `undefined` when no project has that id. */
+  knowledge(id: string): Promise<ProjectKnowledge | undefined>;
+  /**
+   * How the file a stub links changed since it was approved, read through the project's Jig for a stub a knowledge read
+   * just before lists as `changed` — anything else is `null`, Jig not run. `undefined` when no project has that id.
+   */
+  knowledgeDiff(id: string, docId: string): Promise<SourceChange | undefined>;
+  /**
+   * Decides one document against the revision of the knowledge read it was based on: `accept` or `reject` a proposal,
+   * `reviewed` keeps a stub's changed or unrecorded file. Jig runs only for what a knowledge read just before lists as
+   * open to that decision — else `refused: not-found` —, commits it on `knowledge/decisions` and goes as far as
+   * `agent.git` allows; its note comes back. A document Jig does not find there, as the branch starts from origin's base
+   * and the checkout's commits may not be on it, is `refused: not-on-branch`. Below Jig 0.40.0 refused `unsupported`. `undefined` when no project has that id.
+   */
+  decideKnowledge(id: string, docId: string, decision: KnowledgeDecision, revision: number): Promise<Written | undefined>;
   /**
    * What upgrading the project's Jig would do, changing nothing, for a project that shows Jig's `upgrade-available`
    * item; refused `not-found` without one, `running` while its upgrade runs. `undefined` when no project has that id.

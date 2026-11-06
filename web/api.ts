@@ -31,6 +31,18 @@ export type Specs = Ok<Api['projects'][':id']['specs']['$get']>['specs'];
 export type Spec = Extract<Specs, { state: 'ready' }>['specs'][number];
 export type SpecItem = Spec['phases'][number]['items'][number];
 export type Failure = InferResponseType<Api['projects']['$post'], 422>;
+type KnowledgeApi = Api['projects'][':id']['knowledge'];
+/** What waits for a person's decision in a project's knowledge, or why its Jig cannot list it. */
+export type Knowledge = Ok<KnowledgeApi['$get']>['knowledge'];
+export type ReadyKnowledge = Extract<Knowledge, { state: 'ready' }>;
+export type Proposal = ReadyKnowledge['proposals'][number];
+export type LinkedSource = ReadyKnowledge['sources'][number];
+/** How a stub's linked file changed since it was approved, or why the project's Jig cannot say. */
+export type SourceDiff = Ok<KnowledgeApi[':doc']['diff']['$get']>['diff'];
+/** A decision as the route takes it: Jig's command, `reviewed` keeping a changed file. */
+export type Decision = NonNullable<InferRequestType<KnowledgeApi['decide']['$post']>['json']['decision']>;
+/** The answer to a knowledge decision. */
+export type Decided = Awaited<ReturnType<KnowledgeApi['decide']['$post']>>;
 type Queue = Api['projects'][':id']['queue'];
 /** Where a move puts a task, as the move route takes it. */
 export type Place = NonNullable<InferRequestType<Queue['move']['$post']>['json']['place']>;

@@ -65,7 +65,8 @@ readable project's card shows:
 - **Its live tasks counted** — `active`, `paused` and `ready` (finished tasks are not counted).
 - **What needs you** — the same items `jig status` lists under "Needs you", most urgent first: a
   design waiting at its gate, a stopped autopilot run, a pull request waiting for review, a task to
-  close. Each says what happened and what to do; a pull request comes with a link to it.
+  close. Each says what happened and what to do; a pull request comes with a link to it, and
+  knowledge waiting for your decision with **Decide on the page** ([Deciding knowledge](#deciding-knowledge)).
 - **A note when pull request facts may be out of date.** Jig reads pull requests only during
   `jig housekeeping`; when its last run is old or the forge did not answer, a waiting pull request
   may be missing until you run it.
@@ -380,6 +381,42 @@ the item, the dialog says so and why; once that is resolved, **File task…** ag
 id names it, without filing a second task.
 
 Rewording, checking off or removing an item is not here: ask your agent.
+
+## Deciding knowledge
+
+**Knowledge** — the fourth choice beside Board, List and Specs — shows what waits for your decision
+in the project's knowledge: documents proposed and not agreed to yet, and the files linked by
+approved documents that changed since they were approved. It needs Jig 0.40.0 or later in the
+project; on an older Jig it says which Jig the project runs. On the projects page, a card's items
+about knowledge or linked files waiting for your decision link here with **Decide on the page**.
+
+A proposal shows its id, type, summary and file, the paths and domains whose tasks it would make
+agents read it for, and for a document that links a file of the project, that file and its size —
+or that it is missing. **Accept** or **Reject** decides it.
+
+Jig does not give Jig UI a document's text yet ([fapost-lab/jig#391](https://github.com/fapost-lab/jig/issues/391)):
+each proposal names the file to read before you decide.
+
+A changed file shows **Diff since approved**, Jig's diff of it since it was approved. **Keep**
+approves the file as it is now. A file with no approved text kept to compare with says so: read it
+whole before you keep it. A file that is gone has no button: move the link in the project with your
+agent (`jig-accept`). Dropping a link from the page has no Jig command yet
+([fapost-lab/jig#392](https://github.com/fapost-lab/jig/issues/392)).
+
+Jig UI runs `jig knowledge accept`, `reject` or `reviewed` with the revision of the knowledge you
+saw. Jig commits each decision on the branch `knowledge/decisions` in a tree of its own, never in
+your checkout, and takes it as far as `agent.git` lets it, as for [roadmap edits](#editing-a-roadmap).
+A decided document stays in the list, marked *Accepted, waiting*, *Rejected, waiting* or *Kept,
+waiting*, until that branch's pull request is merged; a line above the lists says where the
+decisions wait.
+
+Jig refuses a decision when:
+
+- `agent.git` is `none` (Jig's default) in your clone: choose a level in the project's **Settings**.
+- the document is proposed in a commit not on origin's default branch yet — `knowledge/decisions`
+  starts from there: push that commit, or let the decisions waiting on the branch land first.
+- `knowledge/decisions` is checked out in a checkout of yours: switch it to another branch first.
+- the project changed since you saw the knowledge: it is read again; decide again on it.
 
 ## Task details
 

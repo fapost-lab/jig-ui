@@ -44,14 +44,16 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   status consolidated` (a close: from Jig 0.40.0 with `--revision --json`, Jig checking it; before
   that text, checked against a revision read first), a project's settings
   `jig config keys` and the person's own `jig config set|unset --local` (from Jig 0.40.0, feature-settings), a roadmap's
-  edits `jig spec item add|move|file` (from Jig 0.40.0, adr-20261106-editing-a-roadmap-from-the-page), and
+  edits `jig spec item add|move|file` (from Jig 0.40.0, adr-20261106-editing-a-roadmap-from-the-page), the
+  knowledge waiting for a decision `jig knowledge proposed`, `jig knowledge sources` and its `--diff`, and the decisions
+  `jig knowledge accept|reject|reviewed` (from Jig 0.40.0, feature-knowledge), and
   `jig upgrade`, its dry run and its run (from Jig 0.34.0), and `jig self-update` (its text line), each JSON answer checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
   fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue,
-  0.39.0 for a task's documents, 0.40.0 for the settings (convention-jig-client).
+  0.39.0 for a task's documents, 0.40.0 for the settings, a roadmap's edits and the knowledge (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, the connected ids
   (`connected`), one project as the workspace shows it (`project`), the Jig projects under a folder (`scan`, walked
-  by `scan.ts`), a project's live tasks, its finished tasks on demand (`finished`), one task in full, a live task's documents (`artifacts`, `artifact`), the settings (`settings`), connect, disconnect, subscribe to changes, and the writes `move`,
-  `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `setSetting` and `unsetSetting`, `planUpgrade`, `upgrade` and
+  by `scan.ts`), a project's live tasks, its finished tasks on demand (`finished`), one task in full, a live task's documents (`artifacts`, `artifact`), the settings (`settings`), the knowledge waiting for a decision (`knowledge`, `knowledgeDiff`), connect, disconnect, subscribe to changes, and the writes `move`,
+  `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `setSetting` and `unsetSetting`, `addItem`, `moveItem` and `fileItem`, `decideKnowledge`, `planUpgrade`, `upgrade` and
   `dismissUpgrade`, `land` and `landAll`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
@@ -73,12 +75,15 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `POST /api/projects/:id/tasks` (adr-20261022-filing-a-task-carries-no-revision),
   `POST /api/projects/:id/specs/items/add`, `/move` and `/file` (adr-20261106-editing-a-roadmap-from-the-page),
   `GET` and `POST /api/projects/:id/settings` and `POST /api/projects/:id/settings/unset` (feature-settings),
+  `GET /api/projects/:id/knowledge`, `/knowledge/:doc/diff` and `POST /api/projects/:id/knowledge/decide`
+  (adr-20261106-knowledge-decisions-from-the-page),
   `POST /api/projects/:id/upgrade/plan`, `POST` and `DELETE /api/projects/:id/upgrade`
   (adr-20261027-upgrading-a-project-runs-in-the-background), `POST /api/self-update`, `POST` and
   `DELETE /api/upgrade-all` (adr-20261029-upgrade-all-and-self-update-from-the-page), `POST /api/projects/:id/upgrade/land` and `POST /api/upgrade/land-all` (adr-20261029-check-merge-lands-an-upgrade-through-jig), connect /
   disconnect under `/api/projects`, and `GET /api/events` — the SSE stream of "project X changed,
   revision R" — through the port only; responses name projects by id, and only Find projects' answer names
-  folders, by path.
+  folders, by path; a task's documents and the knowledge name the project's files relative to it
+  (adr-20261030-a-task-document-is-shown-as-written, adr-20261106-knowledge-decisions-from-the-page).
   Directions: `http/` → `board/`, `source/`; `board/` → `source/` (types); `source/` → `jig/`,
   `registry/`, `watch/`.
 - `server/release.ts` — whether a newer Jig UI is out on the build's channel, asked of npm's
@@ -90,7 +95,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   the token is never a process argument (adr-20261017-browser-opens-through-a-redirect-file).
 - `web/` — the Vue 3 page, built from shadcn-vue components on Tailwind (adr-20261018-page-built-from-shadcn-vue-with-router-and-canvas,
   convention-vue). `router.ts` — vue-router in hash mode: `#/` the workspace, `#/projects/<id>`
-  a board — its query the board's sort and filters (`sort`, `class`, `priority`, `q`), `#/projects/<id>/tasks/<task>` a task's details, `#/canvas` every component in every
+  a board — its query the board's sort and filters (`sort`, `class`, `priority`, `q`), and `view`, a view to open
+  (`knowledge`, the workspace card's link, dropped from the address once shown), `#/projects/<id>/tasks/<task>` a task's details, `#/canvas` every component in every
   state (loaded lazily, linked from nowhere), anything else `#/`. `App.vue` — the header's
   project dropdown and the theme switch over the current view. `views/` — one per address (and the canvas's
   helpers), the only callers of `call()`, `client` and `onChange()` besides `App.vue`; `components/` — Jig UI's own, props in and events out;
@@ -127,7 +133,9 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   (adr-20261022-filing-a-task-carries-no-revision). A roadmap's edits are writes like the queue's,
   with the specs' revision, committed by Jig on the spec's branch; filing an item's new task is that
   filing and then naming it on the item, with a revision the adapter reads between the two
-  (adr-20261106-editing-a-roadmap-from-the-page). Upgrading a project's Jig is the one write that
+  (adr-20261106-editing-a-roadmap-from-the-page). A knowledge decision is a write like those, with the
+knowledge's revision, committed by Jig on `knowledge/decisions` and checked against a knowledge read made
+just before it (adr-20261106-knowledge-decisions-from-the-page). Upgrading a project's Jig is the one write that
   outlives its request: after a dry run, `jig upgrade` runs in the server's background, its state in
   the adapter's memory and on the workspace read, and no other Jig runs in the project meanwhile
   (adr-20261027-upgrading-a-project-runs-in-the-background). Upgrade all runs those upgrades one at

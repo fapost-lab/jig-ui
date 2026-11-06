@@ -30,8 +30,8 @@ The minimum Jig the package reads is `MIN_JIG_VERSION` in `server/jig/client.ts`
 first Jig with a queue (0.29.0 was the first that prints JSON). A write a later Jig made possible
 does not raise it: it carries a version of its own, checked by the local adapter against the
 project's Jig before the page is offered the write — `RESUME_JIG_VERSION`, 0.35.0, for
-`resumeTask`, `ARTIFACTS_JIG_VERSION`, 0.39.0, for a task's documents, and `ROADMAP_JIG_VERSION`, 0.40.0, for a
-roadmap's edits — so a project on an older Jig is still read, and only that write is missing. `CLOSE_JIG_VERSION`, 0.40.0, is the other kind: the close is offered on any Jig, and the version picks how `closeTask` checks it. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
+`resumeTask`, `ARTIFACTS_JIG_VERSION`, 0.39.0, for a task's documents, `ROADMAP_JIG_VERSION`, 0.40.0, for a
+roadmap's edits, and `KNOWLEDGE_JIG_VERSION`, 0.40.0, for the knowledge waiting for a decision — so a project on an older Jig is still read, and only that write is missing. `CLOSE_JIG_VERSION`, 0.40.0, is the other kind: the close is offered on any Jig, and the version picks how `closeTask` checks it. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
 found from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`), never a
 `bash` on PATH, which may be WSL's. It is asked once per process; a failed ask is not kept.
 
@@ -129,6 +129,17 @@ absolute path), `branch-diverged`, `branch-has-other-commits`, `base-not-on-orig
 `tree-in-the-way` and `commit-refused`, Jig's line as `reasons`, its command cut by `said` — of one
 word, two or three (`spec item move: `)
 (adr-20261106-editing-a-roadmap-from-the-page).
+
+The knowledge waiting for a decision — `readKnowledge` (`jig knowledge proposed --json` and
+`jig knowledge sources --json`, at the lower of their revisions; of the sources only `changed`,
+`unrecorded` and `missing` kept, a stub proposal's `bytes` taken from the sources read) and
+`readSourceDiff` (`jig knowledge sources --diff <id> --json`) — keeps Jig's paths, relative to the
+project, and the diff as Jig prints it (adr-20261106-knowledge-decisions-from-the-page).
+`decideKnowledge` (`jig knowledge accept|reject|reviewed <id> --revision <n> --json`, 60 s,
+`KNOWLEDGE_TIMEOUT_MS`) always passes the revision — without it Jig decides unchecked — and reads only
+`write.note`, through `withoutPaths`, with the roadmap edits' `WriteNote` schema. Its refusals add
+`not-proposed` (decided already, or an active stub given to `reject`) and `source-missing` (a stub
+whose linked file is gone).
 
 ## Rationale
 

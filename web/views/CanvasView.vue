@@ -12,6 +12,7 @@
   import ConnectForm from '@/components/ConnectForm.vue';
   import FoundProjects from '@/components/FoundProjects.vue';
   import FinishedList from '@/components/FinishedList.vue';
+  import KnowledgeView from '@/components/KnowledgeView.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
   import CopyButton from '@/components/CopyButton.vue';
   import StateLine from '@/components/StateLine.vue';
@@ -57,6 +58,9 @@
     emptyBoard,
     epics,
     finished,
+    knowledge,
+    knowledgeAttention,
+    knowledgeDiffs,
     openDocument,
     plans,
     projects,
@@ -293,8 +297,9 @@
       <FoundProjects :result="{ folder: '~', found: [], connected: 2, skipped: ['Desktop', 'Documents', 'Downloads'], stopped: true }" />
     </CanvasSection>
 
-    <CanvasSection title="AttentionItem" note="no link; a pull request; another link">
+    <CanvasSection title="AttentionItem" note="no link; a pull request; another link; knowledge, on a project's card">
       <AttentionItem v-for="(item, i) in attention" :key="i" :item="item" />
+      <AttentionItem :item="knowledgeAttention" project="acme" />
     </CanvasSection>
 
     <CanvasSection title="ColumnHeader" note="each column, and one this page does not know">
@@ -426,6 +431,24 @@
       <TaskDocuments :documents="{ id: 'x', state: 'unreadable', code: 'timeout' }" :open="{}" />
       <TaskDocuments :open="{}" />
       <TaskDocuments :documents="documents" :open="{ task: { id: 'x', state: 'unreadable', code: 'failed' } }" />
+    </CanvasSection>
+
+    <CanvasSection
+      title="KnowledgeView"
+      note="proposals — a document, a stub, a stub whose file is gone, one accepted and waiting in a pull request; changed sources — a diff read with bytes dropped, one being read, no approved text, a file gone, one kept whose diff Jig could not read; then a decision on its way, and decisions waiting pushed with no pull request"
+    >
+      <KnowledgeView :knowledge="knowledge" :diffs="knowledgeDiffs" />
+      <KnowledgeView
+        :knowledge="{
+          ...knowledge,
+          proposals: knowledge.proposals.slice(0, 1),
+          sources: knowledge.sources.slice(0, 1),
+          waiting: { ...knowledge.waiting!, pr: null },
+        }"
+        :diffs="{}"
+        busy="feature-checkout"
+        disabled
+      />
     </CanvasSection>
 
     <CanvasSection title="ActionList" note="Jig's offers, one unknown id; none">

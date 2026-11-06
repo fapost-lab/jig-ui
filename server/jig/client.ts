@@ -27,6 +27,8 @@ export const CLOSE_JIG_VERSION = '0.40.0';
 export const SETTINGS_JIG_VERSION = '0.40.0';
 /** The first Jig that names a roadmap's items, shows the edits waiting, and adds, moves and files them (fapost-lab/jig#362). */
 export const ROADMAP_JIG_VERSION = '0.40.0';
+/** The first Jig that lists knowledge waiting for a decision as JSON and commits a decision on a branch of its own. */
+export const KNOWLEDGE_JIG_VERSION = '0.40.0';
 
 const SCRIPT = '.ai/scripts/jig';
 /** A read's limit: 10 s ran out with several projects read at once, each four Jig runs (task `read-timeout`). */
@@ -35,6 +37,8 @@ const TIMEOUT_MS = 30_000;
 const PLAN_TIMEOUT_MS = 60_000;
 /** A roadmap write fetches before it commits, and may push and ask the forge for the pull request. */
 const ROADMAP_TIMEOUT_MS = 60_000;
+/** A knowledge decision fetches, may push and ask the forge, as a roadmap edit does. */
+const KNOWLEDGE_TIMEOUT_MS = 60_000;
 const UPGRADE_TIMEOUT_MS = 30 * 60_000;
 
 /** The directory whose changes may change what Jig reports: the main checkout's `.ai/`. */
@@ -249,6 +253,8 @@ const CODES = new Set([
   'base-not-on-origin',
   'tree-in-the-way',
   'commit-refused',
+  'not-proposed',
+  'source-missing',
   'failed',
 ]);
 
@@ -889,8 +895,11 @@ export type ItemPlace =
     }
   | 'top';
 
-/** What a roadmap write answers that Jig UI reads: Jig's note for a person — whose step is next, or what failed after the commit. */
-const RoadmapWrite = z.object({ write: z.object({ note: maybe }) });
+/**
+ * What a write Jig commits in a tree of its own — a roadmap edit, a knowledge decision — answers that Jig UI reads: Jig's note
+ * for a person, whose step is next or what failed after the commit.
+ */
+const WriteNote = z.object({ write: z.object({ note: maybe }) });
 
 /**
  * Runs `jig spec item <args> --revision <n> --json`: Jig commits the edit on the spec's branch in a tree of its own and
@@ -900,7 +909,7 @@ const RoadmapWrite = z.object({ write: z.object({ note: maybe }) });
  */
 async function roadmapWrite(root: string, args: string[], revision: number, platform: NodeJS.Platform): Promise<string | null> {
   const { data } = await readJson(root, ['spec', 'item', ...args, '--revision', String(revision)], platform, ROADMAP_TIMEOUT_MS);
-  const { note } = parsed(RoadmapWrite, data).write;
+  const { note } = parsed(WriteNote, data).write;
   return note && withoutPaths(note);
 }
 
@@ -939,6 +948,108 @@ export function fileItem(
   platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
   return roadmapWrite(root, ['file', spec, item, '--task', task], revision, platform);
+}
+
+/** A decision on a document waiting on Jig's `knowledge/decisions` branch, its pull request's address once there is one. */
+const KnowledgeWaiting = z.object({ decision: z.enum(['accepted', 'rejected', 'reviewed']), pr: maybe }).nullable();
+
+const KnowledgeProposed = z.object({
+  proposals: z.array(
+    z.object({
+      id: text,
+      type: text,
+      domains: z.array(text),
+      /** The document's file and the files whose tasks it would bind, relative to the project. */
+      path: text,
+      paths: z.array(text),
+      summary: maybe,
+      /** The file a stub links, relative to the project. */
+      source: maybe,
+      waiting: KnowledgeWaiting,
+    }),
+  ),
+  waiting: z.object({ branch: text, base: text, pushed: z.boolean(), pr: maybe }).nullable(),
+});
+
+const KnowledgeSources = z.object({
+  sources: z.array(z.object({ id: text, state: text, source: text, bytes: count.nullable(), waiting: KnowledgeWaiting })),
+});
+
+/** The states of an approved stub's linked file that wait for a person: changed since approved, no approved text kept, gone. */
+const LOOK = ['changed', 'unrecorded', 'missing'] as const;
+type Look = (typeof LOOK)[number];
+const needsLook = (state: string): state is Look => (LOOK as readonly string[]).includes(state);
+
+/** What waits for a person's decision in the project's knowledge, with the revision a decision on it carries. */
+export interface Knowledge {
+  revision: number;
+  /** Each proposed document in Jig's order; `bytes` the size of a stub's linked file, `null` when it is gone or there is none. */
+  proposals: (z.output<typeof KnowledgeProposed>['proposals'][number] & { bytes: number | null })[];
+  /** Each approved stub whose linked file waits for a look, in Jig's order. */
+  sources: {
+    id: string;
+    state: Look;
+    source: string;
+    bytes: number | null;
+    waiting: z.output<typeof KnowledgeWaiting>;
+  }[];
+  /** Where the decisions taken wait, `null` when none does. */
+  waiting: z.output<typeof KnowledgeProposed>['waiting'];
+}
+
+/**
+ * The knowledge waiting for a person (`jig knowledge proposed --json` and `jig knowledge sources --json`, Jig 0.40.0), at
+ * the lower of the two reads' revisions. Paths are the project's own, relative to it, as Jig gives them.
+ */
+export async function readKnowledge(root: string, platform: NodeJS.Platform = process.platform): Promise<Knowledge> {
+  const [proposed, linked] = await Promise.all([
+    readJson(root, ['knowledge', 'proposed'], platform),
+    readJson(root, ['knowledge', 'sources'], platform),
+  ]);
+  const { proposals, waiting } = parsed(KnowledgeProposed, proposed.data);
+  const { sources } = parsed(KnowledgeSources, linked.data);
+  return {
+    revision: Math.min(proposed.revision, linked.revision),
+    proposals: proposals.map((p) => ({ ...p, bytes: p.source === null ? null : (sources.find((s) => s.id === p.id)?.bytes ?? null) })),
+    sources: sources.flatMap(({ state, ...s }) => (needsLook(state) ? [{ ...s, state }] : [])),
+    waiting,
+  };
+}
+
+const SourceDiff = z.object({ diff: maybe, lossy: z.boolean() });
+
+/**
+ * How a stub's linked file changed since it was approved (`jig knowledge sources --diff <id> --json`): the unified diff as
+ * Jig prints it, `null` when there is no approved text to compare with; `lossy` when bytes that are not UTF-8 were dropped.
+ */
+export async function readSourceDiff(
+  root: string,
+  id: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<z.output<typeof SourceDiff>> {
+  const { data } = await readJson(root, ['knowledge', 'sources', '--diff', id], platform);
+  return parsed(SourceDiff, data);
+}
+
+/** A person's decision on a knowledge document, as Jig's command is named. */
+export type KnowledgeDecision = 'accept' | 'reject' | 'reviewed';
+
+/**
+ * Decides one document (`jig knowledge accept|reject|reviewed <id> --revision <n> --json`): Jig commits it on
+ * `knowledge/decisions` in a tree of its own and goes as far as `agent.git` allows. The revision is never left out —
+ * without it Jig decides unchecked. Answers Jig's note without a path; refused as a roadmap edit is, and `not-proposed`
+ * (decided already, or not a proposal) and `source-missing`.
+ */
+export async function decideKnowledge(
+  root: string,
+  decision: KnowledgeDecision,
+  id: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
+  const { data } = await readJson(root, ['knowledge', decision, id, '--revision', String(revision)], platform, KNOWLEDGE_TIMEOUT_MS);
+  const { note } = parsed(WriteNote, data).write;
+  return note && withoutPaths(note);
 }
 
 /** Closing asks the forge whether the task's pull request merged: a network round trip. */

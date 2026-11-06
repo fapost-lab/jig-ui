@@ -17,6 +17,10 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
   an item up, down or to another phase, and file an item's task. Jig commits each edit on the spec's
   branch, never in your checkout, and the card shows the edits waiting there. Needs Jig 0.40.0 in the
   project.
+- [Deciding knowledge](/projects#deciding-knowledge) on a project's new **Knowledge** view: accept or
+  reject the knowledge proposed in the project, and keep a linked file that changed after reading its
+  diff. Jig commits each decision on `knowledge/decisions`, never in your checkout. Needs Jig 0.40.0
+  in the project.
 - The board no longer reads the finished tasks of a project. **N finished tasks** still shows their
   number, from the board's own read, and the list is read when you open it. A failure to read it
   stays in the list, with **Read again**, and leaves the project and its board as they are.

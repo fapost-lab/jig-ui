@@ -107,7 +107,10 @@ done, or moving.
   The list holds what `jig task list --status consolidated` and `--status abandoned` return, read
   through `GET /api/projects/:id/finished` when the person opens it and on each change while it is
   open; it is kept nowhere, and its failure is the list's own (a line and Read again), never the
-  project's `unreadable`. That leaves: a closed task until housekeeping sees its branch merged — a task of an epic, the epic on
+  project's `unreadable`. A refresh on a change keeps a shown list over one torn read
+  (`unreadable` or `incompatible`) and believes the next, as the server holds the project's read
+  (`settleFinished` in `web/lib/finished.ts`); opening the list and Read again are believed at once,
+  being reads the person asked for. That leaves: a closed task until housekeeping sees its branch merged — a task of an epic, the epic on
   the default branch — and moves its workspace to trash (one with no branch, or none seen merged,
   stays), an abandoned one for `housekeeping.abandoned_ttl` (14 days by default). An archived task
   (Jig 0.37.0: an abandoned one past that time, one nobody touched for `housekeeping.stale_after`,

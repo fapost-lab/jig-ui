@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { finished, type FinishedTask, latestFirst, noFinished } from './finished';
+import type { Finished } from '../api';
+import { finished, type FinishedTask, latestFirst, noFinished, settleFinished } from './finished';
 
 const task = (more: Partial<FinishedTask> = {}): FinishedTask => ({
   id: 'fix-typo',
@@ -52,5 +53,35 @@ describe('noFinished', () => {
     expect(noFinished({ id: 'x', state: 'unreadable', code: 'upgrading' })).toContain('being upgraded');
     expect(noFinished({ id: 'x', state: 'incompatible', jigVersion: '0.50.0' })).toContain('0.50.0');
     expect(noFinished({ id: 'x', state: 'unavailable', reason: 'missing' })).toBe('The project cannot be read.');
+  });
+});
+
+describe('settleFinished', () => {
+  const ready = { id: 'p', state: 'ready', tasks: [task()] } as Finished;
+  const unreadable = { id: 'p', state: 'unreadable', code: 'failed' } as Finished;
+  const incompatible = { id: 'p', state: 'incompatible', jigVersion: '9.0.0' } as Finished;
+
+  it('holds a ready list over one unreadable read', () => {
+    expect(settleFinished(ready, unreadable, false)).toEqual({ shown: ready, held: true });
+  });
+
+  it('holds a ready list over one incompatible read', () => {
+    expect(settleFinished(ready, incompatible, false)).toEqual({ shown: ready, held: true });
+  });
+
+  it('believes the second torn read in a row', () => {
+    expect(settleFinished(ready, unreadable, true)).toEqual({ shown: unreadable, held: false });
+  });
+
+  it('shows a ready read and lets a later single torn read be held again', () => {
+    const fresh = { ...ready, tasks: [] } as Finished;
+    const settled = settleFinished(ready, fresh, true);
+    expect(settled).toEqual({ shown: fresh, held: false });
+    expect(settleFinished(settled.shown, unreadable, settled.held)).toEqual({ shown: fresh, held: true });
+  });
+
+  it('believes a torn read at once when nothing good is shown', () => {
+    expect(settleFinished(undefined, unreadable, false)).toEqual({ shown: unreadable, held: false });
+    expect(settleFinished(incompatible, unreadable, false)).toEqual({ shown: unreadable, held: false });
   });
 });

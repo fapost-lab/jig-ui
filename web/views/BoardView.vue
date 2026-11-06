@@ -37,6 +37,7 @@
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { conflict } from '@/lib/conflict';
   import { movable } from '@/lib/epics';
+  import { settleFinished } from '@/lib/finished';
   import { knowledgeRefusal, noKnowledge } from '@/lib/knowledge';
   import { lastWins } from '@/lib/last-wins';
   import { closeRefusal, refusal, roadmapRefusal, unnamedRefusal } from '@/lib/refusal';
@@ -62,18 +63,26 @@
 
   /** The finished tasks as last read; none while the first read since opening the list runs. */
   const finished = ref<Finished>();
+  /** The shown list is a good one kept over a torn read; the next torn read in a row is believed. */
+  let held = false;
   // A run with the list closed lands nothing, yet still keeps an older read from landing. Any failure is this list's, not the project's.
+  // A refresh keeps a good list over one torn read (see settleFinished); a read made afresh is believed at once.
   const loadFinished = lastWins(
     async () => {
       if (!showFinished.value) return undefined;
       const res = await call(() => client.api.projects[':id'].finished.$get({ param }));
       return res?.status === 200 ? (await res.json()).finished : ({ id: props.id, state: 'unreadable', code: 'failed' } as const);
     },
-    (read) => (finished.value = read),
+    (read) => {
+      const settled = settleFinished(finished.value, read, held);
+      finished.value = settled.shown;
+      held = settled.held;
+    },
   );
 
   function readFinishedAfresh(): void {
     finished.value = undefined;
+    held = false;
     void loadFinished();
   }
   watch(showFinished, readFinishedAfresh);

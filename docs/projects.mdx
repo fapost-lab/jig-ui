@@ -115,7 +115,7 @@ which changes nothing — and shows it on the card:
 a branch, places its files, commits, and then goes as far as the project's `agent.git` lets it —
 push, a pull request, a merge after CI. The card says *Upgrading…* meanwhile, in every browser tab and
 after a reload. Until it ends Jig UI neither reads the project nor changes it: a change from the
-board is refused, and the card offers no **Disconnect**. Then the card says what came of
+board is refused, and the card offers no **⋯** menu. Then the card says what came of
 it: merged, a pull request waiting for review with its link, pushed, committed, staged, nothing
 to do, or why Jig stopped. It stays until you choose **Dismiss** or upgrade again, and until Jig
 UI stops: it is not kept anywhere.
@@ -383,6 +383,28 @@ Watching stops when the last page closes; watching writes nothing in the project
 session has ended, the browser was closed since the page was opened, the token was reset, or Jig UI
 now runs on another port: run
 `jig-ui open`, or `npx @fapost/jig-ui`, to reopen it. A restart of Jig UI does not end it.
+
+## Settings
+
+**Settings…**, in the **⋯** menu on a project's card, shows the project's Jig settings as
+`jig config keys` lists them, in two parts. Each key says where its value comes from.
+
+- **Yours, in this clone** — the keys you can set for this clone alone, in its gitignored
+  `.ai/config.local.yaml`; a value set there wins over the project's. Change one here: a box for
+  yes or no, a list for a fixed set of values, a field for the rest (**Save**, or Enter). Jig UI
+  runs `jig config set <key> <value> --local` in the project. **Unset** runs
+  `jig config unset <key> --local`, and the key falls back to the project's value or Jig's default.
+- **The project's, shared through git** — the keys only `.ai/config.yaml` holds. They are shown,
+  not changed: change that file and commit it, so everyone on the project gets the change.
+
+Jig checks each change itself, against the settings you saw. A value it refuses is not written, and
+the dialog says why in Jig's words. A setting changed since the dialog read them — in a terminal, by
+an agent — is not overwritten: the dialog reads them again and says so.
+
+The Telegram token is never shown, only whether it is set. **Clear** removes it; set it with
+`jig notify setup` in a terminal in the project — Jig never takes it on a command line.
+
+Needs Jig 0.40.0 or later in the project.
 
 ## Disconnect a project
 

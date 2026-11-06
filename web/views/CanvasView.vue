@@ -2,6 +2,7 @@
   // The maintainer's page of every component in every variant and state, light and dark side by
   // side. A component added to components/ or components/ui/ gets a section here.
   import { Copy } from '@lucide/vue';
+  import { ref } from 'vue';
   import ActionList from '@/components/ActionList.vue';
   import AttentionItem from '@/components/AttentionItem.vue';
   import BoardColumns from '@/components/BoardColumns.vue';
@@ -20,6 +21,7 @@
   import ProjectList from '@/components/ProjectList.vue';
   import ProjectMark from '@/components/ProjectMark.vue';
   import ProjectSwitcher from '@/components/ProjectSwitcher.vue';
+  import SettingsDialog from '@/components/SettingsDialog.vue';
   import EpicMenu from '@/components/EpicMenu.vue';
   import QueueMenu from '@/components/QueueMenu.vue';
   import SpecCard from '@/components/SpecCard.vue';
@@ -57,6 +59,7 @@
     plans,
     projects,
     runs,
+    settingStates,
     specItems,
     specs,
     tasks,
@@ -67,6 +70,8 @@
   const iconSizes = ['icon-xs', 'icon-sm', 'icon', 'icon-lg'] as const;
   const badgeVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
   const tones = ['attention', 'good', 'bad', 'quiet'] as const;
+  /** The settings dialog's state open on the canvas: a dialog covers the page, so one at a time. */
+  const settingsOpen = ref<(typeof settingStates)[number]>();
 </script>
 
 <template>
@@ -445,6 +450,26 @@
         :total="total!"
       />
     </CanvasSection>
+
+    <CanvasSection
+      title="SettingsDialog"
+      note="open one: the person's keys of each kind and the project's; saving; a refusal; reading; an old Jig; unreadable"
+    >
+      <div class="flex flex-wrap gap-2">
+        <Button v-for="state in settingStates" :key="state.label" variant="outline" size="xs" @click="settingsOpen = state">{{
+          state.label
+        }}</Button>
+      </div>
+    </CanvasSection>
+    <SettingsDialog
+      v-if="settingsOpen"
+      :open="true"
+      project="jig-ui"
+      :settings="settingsOpen.settings"
+      :pending="settingsOpen.pending"
+      :notice="settingsOpen.notice"
+      @update:open="settingsOpen = undefined"
+    />
 
     <CanvasSection title="SpecItemRow" note="done with a live task; open with dependencies; a task no longer live; no task; fog">
       <ul>

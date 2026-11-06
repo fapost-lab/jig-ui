@@ -19,6 +19,7 @@ import {
   readArtifact,
   readArtifacts,
   readQueue,
+  readSettings,
   readSpecs,
   readStatus,
   readTasks,
@@ -29,8 +30,11 @@ import {
   runUpgrade,
   selfUpdate as runSelfUpdate,
   setPriority,
+  setSetting,
+  SETTINGS_JIG_VERSION,
   supports,
   type TaskSummary,
+  unsetSetting,
   watchDir,
   writtenByReads,
 } from '../jig/client.js';
@@ -750,16 +754,23 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     return written;
   }
 
+  /** A settings write, refused `unsupported` with Jig not run on a project whose Jig cannot take it. */
+  function settingWrite(jigVersion: string, write: () => Promise<void>): Promise<void> {
+    return supports(jigVersion, SETTINGS_JIG_VERSION) ? write() : Promise.reject(new JigRefusal('unsupported'));
+  }
+
   /**
-   * Reads a task's documents through the project's Jig in its main checkout, which finds a worktree task's workspace
-   * itself — on demand, as the board's read holds none. `null` for a task not live in the last read, or a document Jig
-   * does not have; a Jig older than 0.39.0 answers `unsupported`, with that version as its minimum. While the project
-   * upgrades it runs no Jig there (`unreadable`, `upgrading`), and an upgrade waits for a read under way.
+   * Reads through the project's Jig in its main checkout on demand, as the board's read holds none: a task's documents —
+   * Jig finds a worktree task's workspace itself — or the settings. With `taskId`, `null` for a task not live in the last
+   * read, Jig not run, or a document Jig does not have. A Jig older than `minimum` answers `unsupported`, with that
+   * version as its minimum. While the project upgrades it runs no Jig there (`unreadable`, `upgrading`), and an upgrade
+   * waits for a read under way.
    */
-  async function documents<T>(
+  async function onDemand<T>(
     id: string,
-    taskId: string,
+    minimum: string,
     read: (root: string) => Promise<T>,
+    taskId?: string,
   ): Promise<
     | {
         state: 'ready';
@@ -773,9 +784,9 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     const { view, details } = await shown(project);
     if (view.state !== 'ready') return view;
     const { jigVersion } = view;
-    if (!supports(jigVersion, ARTIFACTS_JIG_VERSION)) return { id, state: 'unsupported', jigVersion, minimum: ARTIFACTS_JIG_VERSION };
+    if (!supports(jigVersion, minimum)) return { id, state: 'unsupported', jigVersion, minimum };
     // Only a live task's id reaches Jig, never one the address made up (`--help`).
-    if (!details.some((t) => t.id === taskId)) return { state: 'ready', read: null };
+    if (taskId !== undefined && !details.some((t) => t.id === taskId)) return { state: 'ready', read: null };
     const entry = entryOf(project);
     // Jig replaces its own scripts while it upgrades (adr-20261027-upgrading-a-project-runs-in-the-background).
     if (entry.upgrade?.state === 'running') return { id, state: 'unreadable', code: 'upgrading' };
@@ -850,11 +861,11 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       return { state: 'ready', task: read.details.find((t) => t.id === taskId) ?? null };
     },
     async artifacts(id, taskId) {
-      const answer = await documents(id, taskId, (root) => readArtifacts(root, taskId));
+      const answer = await onDemand(id, ARTIFACTS_JIG_VERSION, (root) => readArtifacts(root, taskId), taskId);
       return answer?.state === 'ready' ? { state: 'ready', artifacts: answer.read } : answer;
     },
     async artifact(id, taskId, kind) {
-      const answer = await documents(id, taskId, (root) => readArtifact(root, taskId, kind));
+      const answer = await onDemand(id, ARTIFACTS_JIG_VERSION, (root) => readArtifact(root, taskId, kind), taskId);
       return answer?.state === 'ready' ? { state: 'ready', artifact: answer.read && { ...answer.read, kind } } : answer;
     },
     async specs(id) {
@@ -903,6 +914,18 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     fileTask(id, taskId, goal) {
       // A new id names no live task: Jig itself refuses a taken one.
       return writing(id, [], (root) => fileTask(root, taskId, goal));
+    },
+    async settings(id) {
+      const answer = await onDemand(id, SETTINGS_JIG_VERSION, (root) => readSettings(root));
+      if (answer?.state !== 'ready') return answer;
+      // `config keys` names nothing that could be missing: a `not-found` from it is a Jig that failed.
+      return answer.read ? { state: 'ready', ...answer.read } : { id, state: 'unreadable', code: 'failed' };
+    },
+    setSetting(id, key, value, revision) {
+      return writing(id, [], (root, jigVersion) => settingWrite(jigVersion, () => setSetting(root, key, value, revision)));
+    },
+    unsetSetting(id, key, revision) {
+      return writing(id, [], (root, jigVersion) => settingWrite(jigVersion, () => unsetSetting(root, key, revision)));
     },
     async planUpgrade(id) {
       const found = await upgradable(id);

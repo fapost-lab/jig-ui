@@ -1,5 +1,18 @@
 // Sample data for the canvas: every state a component shows, in the shapes of api.ts.
-import type { Attention, Column, Project, ReadyDetails, Spec, SpecItem, Task, TaskArtifact, TaskArtifacts, UpgradePlan } from '@/api';
+import type {
+  Attention,
+  Column,
+  Project,
+  ReadyDetails,
+  Setting,
+  Settings,
+  Spec,
+  SpecItem,
+  Task,
+  TaskArtifact,
+  TaskArtifacts,
+  UpgradePlan,
+} from '@/api';
 import type { FinishedTask } from '@/lib/finished';
 import type { PlanState, UpgradeRun } from '@/lib/upgrade';
 
@@ -454,3 +467,64 @@ export const openDocument: TaskArtifact = {
     '> A document shows the paths its authors wrote.',
   ].join('\n'),
 };
+
+const setting = (key: string, more: Partial<Setting>): Setting => ({
+  key,
+  value: null,
+  set: false,
+  source: 'default',
+  scope: 'local only',
+  kind: 'text',
+  allowed: null,
+  default: null,
+  description: `What ${key} sets.`,
+  secret: false,
+  ...more,
+});
+
+/** One key of each kind and source, the token set, and the project's keys, as Jig 0.40.0 lists them. */
+const settingKeys: Setting[] = [
+  setting('profiles', { scope: 'project', source: 'project', kind: 'list', value: '[node]', set: true, default: '[generic]' }),
+  setting('forge', {
+    scope: 'project',
+    source: 'project',
+    kind: 'choice',
+    value: 'github',
+    set: true,
+    allowed: ['auto', 'github', 'gitlab', 'none'],
+    default: 'auto',
+  }),
+  setting('housekeeping.cadence', { scope: 'local', source: 'project', kind: 'duration', value: '1d', set: true, default: '1d' }),
+  setting('agent.git', {
+    source: 'local',
+    kind: 'choice',
+    value: 'pr',
+    set: true,
+    allowed: ['none', 'commit', 'push', 'pr', 'merge'],
+    default: 'none',
+  }),
+  setting('autopilot.unattended', { kind: 'boolean', value: 'false', allowed: ['true', 'false'], default: 'false' }),
+  setting('agent.ci_timeout', { kind: 'number', value: '30', default: '30' }),
+  setting('claude.review_model', {}),
+  setting('notify.telegram.token', { source: 'local', set: true, secret: true }),
+];
+const readSettings: Settings = { state: 'ready', keys: settingKeys, revision: 1 };
+
+/** The settings dialog in each of its states. */
+export const settingStates: {
+  label: string;
+  settings?: Settings;
+  pending?: string;
+  notice?: string;
+}[] = [
+  { label: 'ready', settings: readSettings },
+  { label: 'saving', settings: readSettings, pending: 'agent.git' },
+  {
+    label: 'refused',
+    settings: readSettings,
+    notice: "Jig did not change housekeeping.cadence: invalid value 'soon': not a whole number of days (e.g. 1d, 3d)",
+  },
+  { label: 'reading' },
+  { label: 'old Jig', settings: { id: 'jig-ui', state: 'unsupported', jigVersion: '0.39.0', minimum: '0.40.0' } },
+  { label: 'unreadable', settings: { id: 'jig-ui', state: 'unreadable', code: 'timeout' } },
+];

@@ -23,6 +23,8 @@ type Documents = Api['projects'][':id']['tasks'][':task']['artifacts'];
 export type TaskArtifacts = Ok<Documents['$get']>['artifacts'];
 export type TaskArtifact = Ok<Documents[':kind']['$get']>['artifact'];
 export type ArtifactKind = Extract<TaskArtifact, { state: 'ready' }>['kind'];
+export type Settings = Ok<Api['projects'][':id']['settings']['$get']>['settings'];
+export type Setting = Extract<Settings, { state: 'ready' }>['keys'][number];
 export type Specs = Ok<Api['projects'][':id']['specs']['$get']>['specs'];
 export type Spec = Extract<Specs, { state: 'ready' }>['specs'][number];
 export type SpecItem = Spec['phases'][number]['items'][number];
@@ -96,6 +98,13 @@ export async function readArtifacts(project: string, task: string): Promise<Task
   if (!res) return undefined;
   if (res.status === 200) return (await res.json()).artifacts;
   return (await res.json()).error.code === 'not-found' ? 'not-found' : 'not-connected';
+}
+
+/** A project's settings, or `not-connected` when no project has the id; undefined when `call` failed. */
+export async function readSettings(project: string): Promise<Settings | 'not-connected' | undefined> {
+  const res = await call(() => client.api.projects[':id'].settings.$get({ param: { id: encodeURIComponent(project) } }));
+  if (!res) return undefined;
+  return res.status === 200 ? (await res.json()).settings : 'not-connected';
 }
 
 /** One of a task's documents as it is written, or `not-found` when it is gone; undefined when `call` failed. */

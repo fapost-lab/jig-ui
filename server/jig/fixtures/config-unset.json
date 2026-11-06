@@ -1,0 +1,1 @@
+{"schema":1,"revision":1793894339,"generated_at":"2026-11-05T16:36:07Z","data":{"keys":[{"key":"notify.telegram.token","value":null,"set":false,"source":"default","scope":"local only","kind":"text","allowed":null,"default":null,"description":"The Telegram bot token messages are sent with; never shown.","secret":true}],"removed":["notify.telegram.token"]}}

@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-11-05
+reviewed_at: 2026-11-06
 ---
 # JigClient — the only module that knows Jig
 
@@ -91,6 +91,26 @@ human texts in it — `would_stop`, `manual_steps` — and the reasons of an `up
 (the `  - ` lines of its message, on `JigRefusal.reasons`) go through `withoutPaths`, which puts `…`
 for an absolute path: Jig 0.35.0 names only relative ones, so the cut is a guard, tested on a real
 reason with an absolute path put in (adr-20261027-upgrading-a-project-runs-in-the-background).
+
+`withoutPaths` is a pattern, not a parser, and errs towards cutting. A slash starts a path wherever it
+does not continue a word or a relative path (a letter, a digit, `.`, `~`, `*`, `-` or a slash before
+it), so `=/x`, `[/x`, `>/x` and `PATH=/x:/y` are cut; an option at a word's start starts one
+too, whatever follows it (`-I/x`, `-isystem/x`, `${X:-/x}`), so `-Isrc/x` loses its `/x`; a web
+address's `//` is kept. **Accepted limit** (the maintainer, task `settings-dialog`): a path glued to a word,
+`abc/Users/x`, reads as a relative one and is not cut — no pattern tells the two apart. A lookahead
+for the slash comes first so that the look back over an option runs only where a path can start:
+without it a long run of word characters took seconds (a test pins under a second for 100 000).
+
+The settings — `readSettings` (`jig config keys --json`), `setSetting` and `unsetSetting`
+(`jig config set <key> <value>` and `jig config unset <key>`, each `--local --revision <n> --json`) —
+need `SETTINGS_JIG_VERSION`, 0.40.0, which the local adapter checks before running Jig. A key's
+value, default and description go through `withoutPaths`; a secret's value and default are
+dropped even if Jig prints them (Jig 0.40.0 prints none); a kind Jig adds later reads as `text`. Jig
+checks every value itself: `invalid-value`, `unknown-key`, `not-local` (a key only the project's
+`.ai/config.yaml` answers) and `secret-key` (the Telegram token, which Jig takes only in a terminal)
+come back as codes, Jig's line as `reasons` with the command's name cut by `said` — one word
+(`upgrade: `) or two (`config set: `, `task set: `). The write's answer is not read: the caller
+reads the settings again.
 
 ## Rationale
 

@@ -23,6 +23,8 @@ export const ARTIFACTS_JIG_VERSION = '0.39.0';
 
 /** The first Jig whose close (`task set <id> status consolidated`) takes `--revision` and `--json` (fapost-lab/jig#365). */
 export const CLOSE_JIG_VERSION = '0.40.0';
+/** The first Jig that lists its settings as JSON and sets them with `--revision` and `--json` (fapost-lab/jig#363). */
+export const SETTINGS_JIG_VERSION = '0.40.0';
 
 const SCRIPT = '.ai/scripts/jig';
 /** A read's limit: 10 s ran out with several projects read at once, each four Jig runs (task `read-timeout`). */
@@ -202,8 +204,17 @@ export class JigRefusal extends Error {
 /**
  * Jig's text for a person with every absolute path in it cut out: no path reaches the page. Jig 0.35.0 names only
  * paths under the project, relative to it, since it runs in the project's root; this keeps a later one from leaking.
+ * A slash starts a path wherever it does not continue a word or a relative path — a letter, a digit, `.`, `~`, `*`, `-`
+ * or a slash before it — so `[/x`, `>/x`, `=/x` and `PATH=/x:/y` are cut too; a web address's `//` is kept. An option
+ * starts a path by the same rule, whatever follows it: `-I/x`, `-isystem/x`, `-xzf/x`, `${X:-/x}`, so `-Isrc/x` loses
+ * its `/x` too. A path glued to a word (`abc/Users/x`) reads as a relative one: a pattern cannot tell them apart.
+ * The lookahead first keeps it linear: the look back over an option runs only where a slash follows.
  */
-export const withoutPaths = (text: string): string => text.replace(/(?<=^|[\s(`'"])(?:[A-Za-z]:)?[\\/][^\s)`'"]*/g, '…');
+export const withoutPaths = (text: string): string =>
+  text.replace(
+    /(?=(?:[A-Za-z]:)?[\\/])(?:(?<![\w.~*/\\-]|:(?=\/\/[^/]))|(?<=(?<![\w.~*/\\-])-(?:[A-Za-z][\w-]*)?))(?:[A-Za-z]:)?[\\/][^\s)`'"]*/g,
+    '…',
+  );
 
 const CODES = new Set([
   'usage',
@@ -218,6 +229,10 @@ const CODES = new Set([
   'upgrade-blocked',
   'not-merged',
   'not-closable',
+  'unknown-key',
+  'not-local',
+  'invalid-value',
+  'secret-key',
   'failed',
 ]);
 
@@ -623,6 +638,80 @@ export async function readArtifact(
 ): Promise<z.output<typeof ArtifactText>> {
   const { data } = await readJson(root, ['task', 'artifact', 'read', task, kind], platform);
   return parsed(ArtifactText, data);
+}
+
+/** The kinds of value Jig names for a setting; one it adds later is read as text. */
+const SETTING_KINDS = ['boolean', 'choice', 'duration', 'number', 'text', 'list'] as const;
+
+/**
+ * Every setting Jig reads, as `jig config keys --json` lists them (Jig 0.40.0), in Jig's order. `scope` says where it may
+ * be answered: `project` only in `.ai/config.yaml`, `local` in the person's `.ai/config.local.yaml` first, `local only`
+ * only there. A secret's value is never printed, and one printed anyway is dropped: `set` says whether it is there.
+ * Values and texts come without a path.
+ */
+const SettingList = z.object({
+  keys: z.array(
+    z
+      .object({
+        key: text,
+        value: maybe,
+        set: z.boolean(),
+        source: z.enum(['local', 'project', 'default']),
+        scope: z.enum(['project', 'local', 'local only']),
+        kind: text,
+        allowed: z.array(text).nullable(),
+        default: maybe,
+        description: text,
+        secret: z.boolean(),
+      })
+      .transform(({ value, default: fallback, description, kind, secret, ...setting }) => ({
+        ...setting,
+        secret,
+        kind: (SETTING_KINDS as readonly string[]).includes(kind) ? (kind as (typeof SETTING_KINDS)[number]) : 'text',
+        value: secret ? null : value && withoutPaths(value),
+        default: secret ? null : fallback && withoutPaths(fallback),
+        description: withoutPaths(description),
+      })),
+  ),
+});
+export type Setting = z.output<typeof SettingList>['keys'][number];
+
+/** The project's settings and the person's own in this clone (`jig config keys --json`, Jig 0.40.0), with the revision they were read at. */
+export async function readSettings(
+  root: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<{
+  revision: number;
+  keys: Setting[];
+}> {
+  const { revision, data } = await readJson(root, ['config', 'keys'], platform);
+  return { revision, keys: parsed(SettingList, data).keys };
+}
+
+/**
+ * Sets one of the person's own settings in this clone (`jig config set <key> <value> --local`, Jig 0.40.0), never the
+ * project's file; Jig checks the value. Refused as `unknown-key`, `not-local` (a key only the project's file answers),
+ * `invalid-value`, `secret-key` (the Telegram token: Jig takes it only in a terminal), `usage` and `stale-revision`,
+ * Jig's reason as `reasons`. Its answer, the key as it now reads, is not read: the caller reads again.
+ */
+export async function setSetting(
+  root: string,
+  key: string,
+  value: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  await readJson(root, ['config', 'set', key, value, '--local', '--revision', String(revision)], platform);
+}
+
+/** Takes one of the person's own settings out of this clone's file (`jig config unset <key> --local`), so the project's or Jig's default answers; refused as `setSetting` is. */
+export async function unsetSetting(
+  root: string,
+  key: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<void> {
+  await readJson(root, ['config', 'unset', key, '--local', '--revision', String(revision)], platform);
 }
 
 /** A task or an epic as Jig's queue names it, never a bare id, which could read as a flag. */

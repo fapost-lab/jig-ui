@@ -1,0 +1,1 @@
+{"schema":1,"revision":1793894337,"generated_at":"2026-11-05T16:35:51Z","error":{"code":"invalid-value","message":"config set: agent.git: invalid value 'sometimes': not a level: none, commit, push, pr or merge"}}

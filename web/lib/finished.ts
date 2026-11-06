@@ -40,3 +40,15 @@ export function noFinished(read: Finished): string | undefined {
   }
   return 'The project cannot be read.';
 }
+
+/** The finished list as shown, and whether it is a good one kept over a torn read. */
+export type Settled = {
+  shown: Finished | undefined;
+  held: boolean;
+};
+
+/** What the finished list shows once a read lands: one torn read over a good list is held, the next one in a row is believed. */
+export function settleFinished(shown: Finished | undefined, read: Finished, held: boolean): Settled {
+  const torn = read.state === 'unreadable' || read.state === 'incompatible';
+  return torn && shown?.state === 'ready' && !held ? { shown, held: true } : { shown: read, held: false };
+}

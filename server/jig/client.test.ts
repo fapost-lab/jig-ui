@@ -9,6 +9,7 @@ import {
   moveItem,
   cancelPause,
   closeTask,
+  decideKnowledge,
   fileTask,
   jigVersion,
   landUpgrade,
@@ -19,8 +20,10 @@ import {
   planUpgrade,
   readArtifact,
   readArtifacts,
+  readKnowledge,
   readQueue,
   readSettings,
+  readSourceDiff,
   readSpecs,
   readStatus,
   readTasks,
@@ -497,6 +500,194 @@ describe('writing a roadmap', () => {
       delete data.write;
     });
     await expect(addItem(answering(`case-${cases++}`, json), 'shop', 2, 'x', 1)).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+/** A checkout whose Jig answers `knowledge proposed --json` with `proposed` and `knowledge sources --json` with `sources`. */
+function knowing(name: string, proposed: string, sources: string): string {
+  const dir = join(root, name);
+  mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
+  for (const [file, json] of [
+    ['proposed.json', proposed],
+    ['sources.json', sources],
+  ]) {
+    if (json!.endsWith('.json')) copyFileSync(fixture(json!), join(dir, file!));
+    else writeFileSync(join(dir, file!), json!);
+  }
+  writeFileSync(
+    join(dir, '.ai', 'scripts', 'jig'),
+    `#!/usr/bin/env bash
+case "$*" in
+  "knowledge proposed --json") cat proposed.json ;;
+  "knowledge sources --json") cat sources.json ;;
+  *) exit 1 ;;
+esac
+`,
+  );
+  return dir;
+}
+
+// knowledge-*.json are what Jig 0.40.0 answered in a scratch project with a bare origin, at `agent.git: commit`; the
+// checkout's path is replaced by one of no one's.
+describe('readKnowledge', () => {
+  it('reads the proposals and the linked files that wait for a look, decisions waiting on the branch included', async () => {
+    expect(await readKnowledge(knowing('knowledge', 'knowledge-proposed-waiting.json', 'knowledge-sources-waiting.json'))).toEqual({
+      revision: 1793950171,
+      proposals: [
+        {
+          id: 'feature-checkout',
+          type: 'feature',
+          domains: [],
+          path: '.ai/knowledge/features/checkout.md',
+          paths: ['src/checkout/**'],
+          summary: 'How checkout takes a card payment',
+          source: null,
+          bytes: null,
+          waiting: null,
+        },
+        {
+          id: 'convention-coding-style',
+          type: 'convention',
+          domains: [],
+          path: '.ai/knowledge/sources/coding-style.md',
+          paths: [],
+          summary: null,
+          source: 'docs/style.md',
+          bytes: 43,
+          waiting: null,
+        },
+        {
+          id: 'convention-ops',
+          type: 'convention',
+          domains: [],
+          path: '.ai/knowledge/sources/ops.md',
+          paths: [],
+          summary: null,
+          source: 'docs/ops.md',
+          bytes: null,
+          waiting: { decision: 'rejected', pr: null },
+        },
+      ],
+      // A proposed stub's file shows with its proposal, an approved one whose file is as approved needs nobody.
+      sources: [
+        { id: 'convention-team-rules', state: 'changed', source: 'docs/rules.md', bytes: 106, waiting: { decision: 'reviewed', pr: null } },
+      ],
+      waiting: { branch: 'knowledge/decisions', base: 'main', pushed: false, pr: null },
+    });
+  });
+
+  it("takes the lower of the two reads' revisions, and keeps each state that waits for a look", async () => {
+    const sources = changed('knowledge-sources.json', (data) => {
+      data.sources.push(
+        { ...data.sources[1], id: 'a', state: 'unrecorded' },
+        { ...data.sources[1], id: 'b', state: 'missing', bytes: null },
+        { ...data.sources[1], id: 'c', state: 'ok' },
+        { ...data.sources[1], id: 'd', state: 'rejected' },
+      );
+    }).replace('1793950123', '1793950200');
+    const read = await readKnowledge(knowing(`case-${cases++}`, 'knowledge-proposed.json', sources));
+    expect(read.revision).toBe(1793950123);
+    expect(read.sources.map((s) => [s.id, s.state])).toEqual([
+      ['convention-team-rules', 'changed'],
+      ['a', 'unrecorded'],
+      ['b', 'missing'],
+    ]);
+    expect(read.waiting).toBeNull();
+  });
+
+  it.each([
+    ['a proposal without its paths', 'proposed', (d: Record<string, any>) => delete d.proposals[0].paths],
+    [
+      'a decision Jig UI does not know',
+      'proposed',
+      (d: Record<string, any>) => (d.proposals[0].waiting = { decision: 'merged', pr: null }),
+    ],
+    ['a source without its size', 'sources', (d: Record<string, any>) => delete d.sources[0].bytes],
+  ])('refuses %s', async (_, read, change) => {
+    const proposed = read === 'proposed' ? changed('knowledge-proposed.json', change) : 'knowledge-proposed.json';
+    const sources = read === 'sources' ? changed('knowledge-sources.json', change) : 'knowledge-sources.json';
+    await expect(readKnowledge(knowing(`case-${cases++}`, proposed, sources))).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
+describe('readSourceDiff', () => {
+  it("reads a linked file's diff from its approved text as Jig prints it, quotes and tabs included", async () => {
+    const dir = logging(`case-${cases++}`, 'knowledge-diff.json');
+    expect(await readSourceDiff(dir, 'convention-team-rules')).toEqual({
+      diff: '--- docs/rules.md (approved)\n+++ docs/rules.md\n@@ -1,4 +1,5 @@\n # Team rules\n \n - Review every change.\n-- Ship on green.\n+- Ship on green, after CI on Windows too.\n+- "Quotes" and a tab\there.\n',
+      lossy: false,
+    });
+    expect(args(dir)).toEqual(['knowledge', 'sources', '--diff', 'convention-team-rules', '--json']);
+  });
+
+  it('reads no diff where no approved text is kept', async () => {
+    expect(await readSourceDiff(answering(`case-${cases++}`, 'knowledge-diff-unrecorded.json'), 'convention-coding-style')).toEqual({
+      diff: null,
+      lossy: false,
+    });
+  });
+
+  it('carries a document that links no file as not-found', async () => {
+    await expect(readSourceDiff(answering(`case-${cases++}`, 'knowledge-diff-no-source.json', 1), 'feature-checkout')).rejects.toEqual(
+      refusal('not-found'),
+    );
+  });
+});
+
+describe('decideKnowledge', () => {
+  it.each([
+    ['accept', 'knowledge-accept.json'],
+    ['reject', 'knowledge-reject.json'],
+    ['reviewed', 'knowledge-reviewed.json'],
+  ] as const)("runs %s on one document against the revision it was read at and answers Jig's note", async (decision, json) => {
+    const dir = logging(`case-${cases++}`, json);
+    expect(await decideKnowledge(dir, decision, 'feature-checkout', 1793950153)).toBe(
+      'agent.git is commit: pushing knowledge/decisions is yours',
+    );
+    expect(args(dir)).toEqual(['knowledge', decision, 'feature-checkout', '--revision', '1793950153', '--json']);
+  });
+
+  it.each([
+    ['knowledge-stale.json', 'stale-revision', 'accept', ['the clone changed since revision 1; read again and retry']],
+    ['knowledge-not-proposed.json', 'not-proposed', 'reject', ['not a proposed document: convention-team-rules (status: active)']],
+    ['knowledge-not-found.json', 'not-found', 'accept', ['no document with id: convention-ops']],
+    [
+      'knowledge-source-missing.json',
+      'source-missing',
+      'accept',
+      ['convention-ops links docs/ops.md, which is missing, invalid or not tracked by git with this exact case; fix the link or reject it'],
+    ],
+    [
+      'knowledge-git-not-allowed.json',
+      'git-not-allowed',
+      'reject',
+      [
+        'agent.git is none in this clone, so Jig commits nothing; set it with `jig config set --local agent.git commit` (or higher), or make the change in an agent session',
+      ],
+    ],
+    [
+      'knowledge-checked-out.json',
+      'branch-checked-out',
+      'reject',
+      [
+        'knowledge/decisions is checked out in … and Jig never moves a checkout; finish the work there, or switch that checkout to another branch, then try again',
+      ],
+    ],
+  ] as const)(
+    "carries the refusal in %s as %s of %s, Jig's reason without its command's name or a path",
+    async (json, code, decision, reasons) => {
+      await expect(decideKnowledge(answering(`case-${cases++}`, json, 1), decision, 'convention-ops', 1)).rejects.toMatchObject({
+        code,
+        reasons,
+      });
+    },
+  );
+
+  it('refuses an answer without its write', async () => {
+    const json = changed('knowledge-accept.json', (data) => {
+      delete data.write;
+    });
+    await expect(decideKnowledge(answering(`case-${cases++}`, json), 'accept', 'x', 1)).rejects.toBeInstanceOf(JigShapeError);
   });
 });
 

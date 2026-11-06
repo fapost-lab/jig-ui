@@ -1,0 +1,1 @@
+{"schema":1,"revision":1793950153,"generated_at":"2026-11-06T09:08:37Z","error":{"code":"branch-checked-out","message":"knowledge reject: knowledge/decisions is checked out in /Users/someone/acme, and Jig never moves a checkout; finish the work there, or switch that checkout to another branch, then try again"}}

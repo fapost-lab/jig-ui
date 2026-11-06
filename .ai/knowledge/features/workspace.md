@@ -30,7 +30,8 @@ The page at `#/` (`web/views/WorkspaceView.vue`): a list of the connected projec
 that needs the person — not readable, or with an attention item — else the first
 (`web/lib/projects.ts`); a click in the list sets `?project=`, and a project just connected is
 shown. The card has its Jig version, its live tasks counted, what needs the person there — Jig's
-attention items as `jig status --json` lists them — and the housekeeping note. A readable project's
+attention items as `jig status --json` lists them, `knowledge-proposed` and `sources-changed` with a link to the
+project's Knowledge view (`AttentionItem.vue`, feature-knowledge) — and the housekeeping note. A readable project's
 name on its card opens its board, and so does **Board** in the card's corner, beside a ⋯ menu that
 holds **Settings…** (feature-settings) and **Disconnect** (task `project-card-actions`): what a person does rarely sits a click further
 away (a colleague, 2026-10-30), and the Board button stays as the action people look for. The menu

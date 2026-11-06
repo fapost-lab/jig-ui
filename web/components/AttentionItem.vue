@@ -1,11 +1,21 @@
 <script setup lang="ts">
   import { ExternalLink } from '@lucide/vue';
+  import { computed } from 'vue';
   import { type Attention, link } from '@/api';
   import { toneRule } from '@/lib/tones';
 
-  defineProps<{
+  /** `project`: the project the item is about, given where the item can link to its page — the workspace card. */
+  const props = defineProps<{
     item: Attention;
+    project?: string;
   }>();
+
+  /** Knowledge waiting for the person is decided on the project's page, in its Knowledge view. */
+  const decide = computed(() =>
+    props.project !== undefined && (props.item.kind === 'knowledge-proposed' || props.item.kind === 'sources-changed')
+      ? { path: `/projects/${encodeURIComponent(props.project)}`, query: { view: 'knowledge' } }
+      : undefined,
+  );
 </script>
 
 <template>
@@ -25,6 +35,7 @@
       >
         {{ item.kind.startsWith('pull-request') ? 'Open pull request' : 'Open link' }}<ExternalLink class="size-3" />
       </a>
+      <RouterLink v-if="decide" :to="decide" class="underline underline-offset-2">Decide on the page</RouterLink>
     </p>
   </div>
 </template>

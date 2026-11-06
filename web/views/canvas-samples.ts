@@ -4,6 +4,8 @@ import type {
   Column,
   Project,
   ReadyDetails,
+  ReadyKnowledge,
+  SourceDiff,
   Setting,
   Settings,
   Spec,
@@ -553,3 +555,86 @@ export const settingStates: {
   { label: 'old Jig', settings: { id: 'jig-ui', state: 'unsupported', jigVersion: '0.39.0', minimum: '0.40.0' } },
   { label: 'unreadable', settings: { id: 'jig-ui', state: 'unreadable', code: 'timeout' } },
 ];
+
+/** Knowledge Jig lists as waiting for a decision: a proposal, stubs whose file is there and gone, decisions waiting, each state of a linked file. */
+export const knowledge: ReadyKnowledge = {
+  state: 'ready',
+  revision: 1,
+  proposals: [
+    {
+      id: 'feature-checkout',
+      type: 'feature',
+      domains: ['shop'],
+      path: '.ai/knowledge/features/checkout.md',
+      paths: ['src/checkout/**', 'src/cart/**'],
+      summary: 'How checkout takes a card payment',
+      source: null,
+      bytes: null,
+      waiting: null,
+    },
+    {
+      id: 'convention-coding-style',
+      type: 'convention',
+      domains: [],
+      path: '.ai/knowledge/sources/coding-style.md',
+      paths: [],
+      summary: null,
+      source: 'docs/style.md',
+      bytes: 2310,
+      waiting: null,
+    },
+    {
+      id: 'convention-ops',
+      type: 'convention',
+      domains: [],
+      path: '.ai/knowledge/sources/ops.md',
+      paths: [],
+      summary: null,
+      source: 'docs/ops.md',
+      bytes: null,
+      waiting: null,
+    },
+    {
+      id: 'adr-20261106-payments-provider',
+      type: 'adr',
+      domains: [],
+      path: '.ai/knowledge/adr/20261106-payments-provider.md',
+      paths: ['src/payments/**'],
+      summary: 'Card payments go through one provider',
+      source: null,
+      bytes: null,
+      waiting: { decision: 'accepted', pr: 'https://github.com/fapost-lab/acme/pull/12' },
+    },
+  ],
+  sources: [
+    { id: 'convention-team-rules', state: 'changed', source: 'docs/rules.md', bytes: 106, waiting: null },
+    { id: 'convention-release', state: 'changed', source: 'docs/release.md', bytes: 3400, waiting: null },
+    { id: 'convention-legacy', state: 'unrecorded', source: 'docs/legacy.md', bytes: 800, waiting: null },
+    { id: 'convention-deploy', state: 'missing', source: 'docs/deploy.md', bytes: null, waiting: null },
+    { id: 'convention-review', state: 'changed', source: 'docs/review.md', bytes: 512, waiting: { decision: 'reviewed', pr: null } },
+  ],
+  waiting: { branch: 'knowledge/decisions', base: 'main', pushed: true, pr: 'https://github.com/fapost-lab/acme/pull/12' },
+};
+
+/** Open diffs of the linked files: one read (a line not UTF-8 dropped), one being read, one Jig could not read. */
+export const knowledgeDiffs: Record<string, SourceDiff | 'reading'> = {
+  'convention-team-rules': {
+    state: 'ready',
+    diff: '--- docs/rules.md (approved)\n+++ docs/rules.md\n@@ -1,4 +1,5 @@\n # Team rules\n \n - Review every change.\n-- Ship on green.\n+- Ship on green, after CI on Windows too.\n+- Never on a Friday.\n',
+    lossy: true,
+  },
+  'convention-release': 'reading',
+  'convention-review': { id: 'acme', state: 'unreadable', code: 'failed' },
+};
+
+/** The project item that sends the person to the Knowledge view. */
+export const knowledgeAttention: Attention = {
+  kind: 'knowledge-proposed',
+  subject: { type: 'project', id: null },
+  tasks: [],
+  title: 'Knowledge is waiting for your decision',
+  detail: '4 document(s) proposed',
+  todo: "Ask the agent: what's proposed? (jig-accept)",
+  url: null,
+  versions: null,
+};

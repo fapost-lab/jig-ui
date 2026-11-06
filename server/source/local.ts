@@ -6,11 +6,13 @@ import {
   ARTIFACTS_JIG_VERSION,
   cancelPause,
   closeTask,
+  decideKnowledge,
   fileItem,
   fileTask,
   hasJig,
   JigRefusal,
   JigShapeError,
+  KNOWLEDGE_JIG_VERSION,
   LAND_JIG_VERSION,
   landUpgrade,
   jigVersion,
@@ -21,8 +23,10 @@ import {
   type QueueItem,
   readArtifact,
   readArtifacts,
+  readKnowledge,
   readQueue,
   readSettings,
+  readSourceDiff,
   readSpecs,
   readStatus,
   readTasks,
@@ -1012,6 +1016,37 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     },
     unsetSetting(id, key, revision) {
       return writing(id, [], (root, jigVersion) => settingWrite(jigVersion, () => unsetSetting(root, key, revision)));
+    },
+    async knowledge(id) {
+      const answer = await onDemand(id, KNOWLEDGE_JIG_VERSION, (root) => readKnowledge(root));
+      if (answer?.state !== 'ready') return answer;
+      // The lists name nothing that could be missing: a `not-found` from them is a Jig that failed.
+      return answer.read ? { state: 'ready', ...answer.read } : { id, state: 'unreadable', code: 'failed' };
+    },
+    async knowledgeDiff(id, docId) {
+      const answer = await onDemand(id, KNOWLEDGE_JIG_VERSION, async (root) =>
+        // Only a stub Jig itself listed with a changed file reaches Jig's arguments.
+        (await readKnowledge(root)).sources.some((s) => s.id === docId && s.state === 'changed') ? readSourceDiff(root, docId) : null,
+      );
+      return answer?.state === 'ready' ? { state: 'ready', diff: answer.read } : answer;
+    },
+    decideKnowledge(id, docId, decision, revision) {
+      return writing(id, [], async (root, jigVersion) => {
+        if (!supports(jigVersion, KNOWLEDGE_JIG_VERSION)) throw new JigRefusal('unsupported');
+        // No held read lists knowledge: Jig's own lists, read now, name what each decision may take.
+        const { proposals, sources } = await readKnowledge(root);
+        const open =
+          decision === 'reviewed'
+            ? sources.some((s) => s.id === docId && s.state !== 'missing' && s.waiting === null)
+            : proposals.some((p) => p.id === docId && p.waiting === null);
+        if (!open) throw new JigRefusal('not-found');
+        try {
+          return await decideKnowledge(root, decision, docId, revision);
+        } catch (error) {
+          // Listed in the checkout, yet not where Jig decides: `knowledge/decisions`, cut from origin's base (fapost-lab/jig#392).
+          throw error instanceof JigRefusal && error.code === 'not-found' ? new JigRefusal('not-on-branch') : error;
+        }
+      });
     },
     async planUpgrade(id) {
       const found = await upgradable(id);

@@ -23,13 +23,16 @@ export function closeRefusal(code: string, reasons: string[], task: string): str
   return refusal(code, 'closing', task);
 }
 
+/** `agent.git: none`: Jig commits nothing, so a write it makes on a branch of its own is refused; the level is a setting. */
+export const NO_COMMITS = "Jig commits nothing in this clone (agent.git is none): choose a level in the project's Settings.";
+
 /**
  * The line for a roadmap edit Jig refused: `agent.git: none`, where Jig commits nothing, sends the person to the
  * project's Settings; an item or phase the specs no longer show is said so; otherwise Jig's own reasons, paths already
  * cut out by the server — a checkout on the spec's branch, a base not on origin — or, without any, as `refusal` says it.
  */
 export function roadmapRefusal(code: string, reasons: string[], doing: string, spec: string): string {
-  if (code === 'git-not-allowed') return "Jig commits nothing in this clone (agent.git is none): choose a level in the project's Settings.";
+  if (code === 'git-not-allowed') return NO_COMMITS;
   if (code === 'not-found') return `The roadmap of ${spec} no longer has what you were ${doing}: try again on the specs as they are now.`;
   if (reasons.length > 0) return `Jig did not change the roadmap of ${spec}: ${reasons.join(' ')}`;
   return refusal(code, doing, `the roadmap of ${spec}`);

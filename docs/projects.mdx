@@ -394,21 +394,27 @@ A proposal shows its id, type, summary and file, the paths and domains whose tas
 agents read it for, and for a document that links a file of the project, that file and its size —
 or that it is missing. **Accept** or **Reject** decides it.
 
-Jig does not give Jig UI a document's text yet ([fapost-lab/jig#391](https://github.com/fapost-lab/jig/issues/391)):
-each proposal names the file to read before you decide.
+**Document** opens its text, with the fields shown above it left out, and for a document that links a
+file, that file as it is now. A Markdown file is shown formatted; any other file as it is. This needs
+Jig 0.41.0 in the project; on Jig 0.40.0 each proposal names the file to read before you decide.
 
 A changed file shows **Diff since approved**, Jig's diff of it since it was approved. **Keep**
-approves the file as it is now. A file with no approved text kept to compare with says so: read it
-whole before you keep it. A file that is gone has no button: move the link in the project with your
-agent (`jig-accept`). Dropping a link from the page has no Jig command yet
-([fapost-lab/jig#392](https://github.com/fapost-lab/jig/issues/392)).
+approves the file as it is now. **Drop** ends the link: agents are no longer sent to the file. A file
+with no approved text kept to compare with says so: read it whole before you keep it. A file that is
+gone has only **Drop**, or move the link in the project with your agent (`jig-accept`). Drop needs
+Jig 0.41.0; on Jig 0.40.0 a gone file has no button.
 
 Jig UI runs `jig knowledge accept`, `reject` or `reviewed` with the revision of the knowledge you
 saw. Jig commits each decision on the branch `knowledge/decisions` in a tree of its own, never in
 your checkout, and takes it as far as `agent.git` lets it, as for [roadmap edits](#editing-a-roadmap).
-A decided document stays in the list, marked *Accepted, waiting*, *Rejected, waiting* or *Kept,
-waiting*, until that branch's pull request is merged; a line above the lists says where the
-decisions wait.
+A decided document stays in the list, marked *Accepted, waiting*, *Rejected, waiting*, *Kept,
+waiting* or *Dropped, waiting*, until that branch's pull request is merged; a line above the lists
+says where the decisions wait.
+
+On Jig 0.41.0, a document Jig cannot decide yet says why above its buttons: it is committed only in
+your clone — push it first, then decide —, or it reached the default branch after the decisions
+waiting were started — decide it once they have landed. Jig fetches before it decides, so a decision
+sent after the push goes through; one sent too early is refused with Jig's reason.
 
 Jig refuses a decision when:
 
@@ -416,6 +422,8 @@ Jig refuses a decision when:
 - the document is proposed in a commit not on origin's default branch yet — `knowledge/decisions`
   starts from there: push that commit, or let the decisions waiting on the branch land first.
 - `knowledge/decisions` is checked out in a checkout of yours: switch it to another branch first.
+- decisions committed on `knowledge/decisions` in your clone never reached origin, above ones origin
+  no longer has: Jig says how to move them to a branch of your own.
 - the project changed since you saw the knowledge: it is read again; decide again on it.
 
 ## Task details

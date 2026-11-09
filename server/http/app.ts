@@ -278,6 +278,15 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
         return c.json({ diff: { state: read.state, ...read.diff } }, 200);
       })
 
+      // A proposed document's whole file and the file a stub links, as the project has them (Jig 0.41.0).
+      .get('/api/projects/:id/knowledge/:doc/text', async (c) => {
+        const read = await source.knowledgeText(c.req.param('id'), c.req.param('doc'));
+        if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');
+        if (read.state !== 'ready') return c.json({ text: read }, 200);
+        if (read.text === null) return refuse(c, 404, 'not-found', 'This project proposes no document with this id.');
+        return c.json({ text: { state: read.state, ...read.text } }, 200);
+      })
+
       .get('/api/projects/:id/specs', async (c) => {
         const read = await source.specs(c.req.param('id'));
         if (read === undefined) return refuse(c, 404, 'not-connected', 'No connected project has this id.');

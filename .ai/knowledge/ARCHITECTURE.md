@@ -46,13 +46,15 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `jig config keys` and the person's own `jig config set|unset --local` (from Jig 0.40.0, feature-settings), a roadmap's
   edits `jig spec item add|move|file` (from Jig 0.40.0, adr-20261106-editing-a-roadmap-from-the-page), the
   knowledge waiting for a decision `jig knowledge proposed`, `jig knowledge sources` and its `--diff`, and the decisions
-  `jig knowledge accept|reject|reviewed` (from Jig 0.40.0, feature-knowledge), and
+  `jig knowledge accept|reject|reviewed` (from Jig 0.40.0, feature-knowledge), a proposed document's text
+  `jig knowledge read` (from Jig 0.41.0, adr-20261109-knowledge-text-and-drop-from-jig-0-41), and
   `jig upgrade`, its dry run and its run (from Jig 0.34.0), and `jig self-update` (its text line), each JSON answer checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
   fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue,
-  0.39.0 for a task's documents, 0.40.0 for the settings, a roadmap's edits and the knowledge (convention-jig-client).
+  0.39.0 for a task's documents, 0.40.0 for the settings, a roadmap's edits and the knowledge, 0.41.0 for the
+  knowledge's text, Drop and judged reads (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, the connected ids
   (`connected`), one project as the workspace shows it (`project`), the Jig projects under a folder (`scan`, walked
-  by `scan.ts`), a project's live tasks, its finished tasks on demand (`finished`), one task in full, a live task's documents (`artifacts`, `artifact`), the settings (`settings`), the knowledge waiting for a decision (`knowledge`, `knowledgeDiff`), connect, disconnect, subscribe to changes, and the writes `move`,
+  by `scan.ts`), a project's live tasks, its finished tasks on demand (`finished`), one task in full, a live task's documents (`artifacts`, `artifact`), the settings (`settings`), the knowledge waiting for a decision (`knowledge`, `knowledgeDiff`, `knowledgeText`), connect, disconnect, subscribe to changes, and the writes `move`,
   `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `setSetting` and `unsetSetting`, `addItem`, `moveItem` and `fileItem`, `decideKnowledge`, `planUpgrade`, `upgrade` and
   `dismissUpgrade`, `land` and `landAll`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
@@ -75,15 +77,16 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `POST /api/projects/:id/tasks` (adr-20261022-filing-a-task-carries-no-revision),
   `POST /api/projects/:id/specs/items/add`, `/move` and `/file` (adr-20261106-editing-a-roadmap-from-the-page),
   `GET` and `POST /api/projects/:id/settings` and `POST /api/projects/:id/settings/unset` (feature-settings),
-  `GET /api/projects/:id/knowledge`, `/knowledge/:doc/diff` and `POST /api/projects/:id/knowledge/decide`
-  (adr-20261106-knowledge-decisions-from-the-page),
+  `GET /api/projects/:id/knowledge`, `/knowledge/:doc/diff`, `/knowledge/:doc/text` and
+  `POST /api/projects/:id/knowledge/decide` (adr-20261106-knowledge-decisions-from-the-page, adr-20261109-knowledge-text-and-drop-from-jig-0-41),
   `POST /api/projects/:id/upgrade/plan`, `POST` and `DELETE /api/projects/:id/upgrade`
   (adr-20261027-upgrading-a-project-runs-in-the-background), `POST /api/self-update`, `POST` and
   `DELETE /api/upgrade-all` (adr-20261029-upgrade-all-and-self-update-from-the-page), `POST /api/projects/:id/upgrade/land` and `POST /api/upgrade/land-all` (adr-20261029-check-merge-lands-an-upgrade-through-jig), connect /
   disconnect under `/api/projects`, and `GET /api/events` — the SSE stream of "project X changed,
   revision R" — through the port only; responses name projects by id, and only Find projects' answer names
   folders, by path; a task's documents and the knowledge name the project's files relative to it
-  (adr-20261030-a-task-document-is-shown-as-written, adr-20261106-knowledge-decisions-from-the-page).
+  (adr-20261030-a-task-document-is-shown-as-written, adr-20261106-knowledge-decisions-from-the-page,
+  adr-20261109-knowledge-text-and-drop-from-jig-0-41).
   Directions: `http/` → `board/`, `source/`; `board/` → `source/` (types); `source/` → `jig/`,
   `registry/`, `watch/`.
 - `server/release.ts` — whether a newer Jig UI is out on the build's channel, asked of npm's

@@ -2,6 +2,7 @@
 import type {
   Attention,
   Column,
+  DocumentText,
   Project,
   ReadyDetails,
   ReadyKnowledge,
@@ -556,10 +557,15 @@ export const settingStates: {
   { label: 'unreadable', settings: { id: 'jig-ui', state: 'unreadable', code: 'timeout' } },
 ];
 
-/** Knowledge Jig lists as waiting for a decision: a proposal, stubs whose file is there and gone, decisions waiting, each state of a linked file. */
+/** What a record of Jig 0.40.0 reads for the fields Jig 0.41.0 added. */
+const older = { decidable: null, reason: null, lossy: null };
+
+/** Knowledge Jig 0.40.0 lists as waiting for a decision: a proposal, stubs whose file is there and gone, decisions waiting, each state of a linked file. */
 export const knowledge: ReadyKnowledge = {
   state: 'ready',
   revision: 1,
+  canRead: false,
+  canDrop: false,
   proposals: [
     {
       id: 'feature-checkout',
@@ -571,6 +577,7 @@ export const knowledge: ReadyKnowledge = {
       source: null,
       bytes: null,
       waiting: null,
+      ...older,
     },
     {
       id: 'convention-coding-style',
@@ -582,6 +589,7 @@ export const knowledge: ReadyKnowledge = {
       source: 'docs/style.md',
       bytes: 2310,
       waiting: null,
+      ...older,
     },
     {
       id: 'convention-ops',
@@ -593,6 +601,7 @@ export const knowledge: ReadyKnowledge = {
       source: 'docs/ops.md',
       bytes: null,
       waiting: null,
+      ...older,
     },
     {
       id: 'adr-20261106-payments-provider',
@@ -604,14 +613,22 @@ export const knowledge: ReadyKnowledge = {
       source: null,
       bytes: null,
       waiting: { decision: 'accepted', pr: 'https://github.com/fapost-lab/acme/pull/12' },
+      ...older,
     },
   ],
   sources: [
-    { id: 'convention-team-rules', state: 'changed', source: 'docs/rules.md', bytes: 106, waiting: null },
-    { id: 'convention-release', state: 'changed', source: 'docs/release.md', bytes: 3400, waiting: null },
-    { id: 'convention-legacy', state: 'unrecorded', source: 'docs/legacy.md', bytes: 800, waiting: null },
-    { id: 'convention-deploy', state: 'missing', source: 'docs/deploy.md', bytes: null, waiting: null },
-    { id: 'convention-review', state: 'changed', source: 'docs/review.md', bytes: 512, waiting: { decision: 'reviewed', pr: null } },
+    { id: 'convention-team-rules', state: 'changed', source: 'docs/rules.md', bytes: 106, waiting: null, ...older },
+    { id: 'convention-release', state: 'changed', source: 'docs/release.md', bytes: 3400, waiting: null, ...older },
+    { id: 'convention-legacy', state: 'unrecorded', source: 'docs/legacy.md', bytes: 800, waiting: null, ...older },
+    { id: 'convention-deploy', state: 'missing', source: 'docs/deploy.md', bytes: null, waiting: null, ...older },
+    {
+      id: 'convention-review',
+      state: 'changed',
+      source: 'docs/review.md',
+      bytes: 512,
+      waiting: { decision: 'reviewed', pr: null },
+      ...older,
+    },
   ],
   waiting: { branch: 'knowledge/decisions', base: 'main', pushed: true, pr: 'https://github.com/fapost-lab/acme/pull/12' },
 };
@@ -625,6 +642,137 @@ export const knowledgeDiffs: Record<string, SourceDiff | 'reading'> = {
   },
   'convention-release': 'reading',
   'convention-review': { id: 'acme', state: 'unreadable', code: 'failed' },
+};
+
+/** What Jig 0.41.0 reads of each record a decision can be sent on now. */
+const judged = { decidable: true, reason: null, lossy: false };
+
+/**
+ * Knowledge Jig 0.41.0 lists: proposals whose text can be read — one not pushed, one that reached the base after the
+ * decisions were cut, one whose file name lost bytes —, and linked files that can be dropped, one dropped and waiting, one
+ * changed only here.
+ */
+export const knowledgeLater: ReadyKnowledge = {
+  state: 'ready',
+  revision: 1,
+  canRead: true,
+  canDrop: true,
+  proposals: [
+    {
+      id: 'feature-checkout',
+      type: 'feature',
+      domains: ['shop'],
+      path: '.ai/knowledge/features/checkout.md',
+      paths: ['src/checkout/**'],
+      summary: 'How checkout takes a card payment',
+      source: null,
+      bytes: null,
+      waiting: null,
+      ...judged,
+    },
+    {
+      id: 'convention-coding-style',
+      type: 'convention',
+      domains: [],
+      path: '.ai/knowledge/sources/coding-style.md',
+      paths: [],
+      summary: null,
+      source: 'docs/style.md',
+      bytes: 26,
+      waiting: null,
+      ...judged,
+    },
+    {
+      id: 'convention-build',
+      type: 'convention',
+      domains: [],
+      path: '.ai/knowledge/sources/build.md',
+      paths: [],
+      summary: null,
+      source: 'Makefile',
+      bytes: 31,
+      waiting: null,
+      ...judged,
+    },
+    {
+      id: 'feature-search',
+      type: 'feature',
+      domains: [],
+      path: '.ai/knowledge/features/search.md',
+      paths: ['src/search/**'],
+      summary: null,
+      source: null,
+      bytes: null,
+      waiting: null,
+      decidable: false,
+      reason: 'not-on-base',
+      lossy: false,
+    },
+    {
+      id: 'feature-billing',
+      type: 'feature',
+      domains: [],
+      path: '.ai/knowledge/features/billing.md',
+      paths: ['src/billing/**'],
+      summary: 'How invoices are issued',
+      source: null,
+      bytes: null,
+      waiting: null,
+      decidable: false,
+      reason: 'not-on-branch',
+      lossy: true,
+    },
+  ],
+  sources: [
+    { id: 'convention-team-rules', state: 'changed', source: 'docs/rules.md', bytes: 85, waiting: null, ...judged },
+    { id: 'convention-legacy', state: 'unrecorded', source: 'docs/legacy.md', bytes: 20, waiting: null, ...judged },
+    { id: 'convention-deploy', state: 'missing', source: 'docs/deploy.md', bytes: null, waiting: null, ...judged },
+    {
+      id: 'convention-release',
+      state: 'changed',
+      source: 'docs/release.md',
+      bytes: 3400,
+      waiting: { decision: 'rejected', pr: null },
+      ...judged,
+    },
+    {
+      id: 'convention-review',
+      state: 'changed',
+      source: 'docs/review.md',
+      bytes: 512,
+      waiting: null,
+      decidable: false,
+      reason: 'not-on-base',
+      lossy: false,
+    },
+  ],
+  waiting: { branch: 'knowledge/decisions', base: 'main', pushed: true, pr: null },
+};
+
+/** Open document texts: a feature's, a stub's with its Markdown file (bytes dropped), a stub's with a file that is not Markdown, one being read, one Jig could not read. */
+export const knowledgeTexts: Record<string, DocumentText | 'reading'> = {
+  'feature-checkout': {
+    state: 'ready',
+    content:
+      '---\nid: feature-checkout\ntype: feature\nstatus: proposed\n---\n# Checkout\n\n## What\n\nHow checkout takes a card payment: the cart calls `pay()` once, and a declined card leaves the order open.\n\n## Constraints\n\n- One provider (see the payments ADR).\n- No card number is stored.\n',
+    lossy: false,
+    source: null,
+  },
+  'convention-coding-style': {
+    state: 'ready',
+    content:
+      '---\nid: convention-coding-style\ntype: convention\nstatus: proposed\nsource: docs/style.md\n---\n# Coding style\n\nLinked source: [docs/style.md](../../../docs/style.md). The source owns its rules.\n',
+    lossy: false,
+    source: { content: '# Style\n\nUse tabs  here.\n', lossy: true },
+  },
+  'convention-build': {
+    state: 'ready',
+    content: '---\nid: convention-build\nsource: Makefile\n---\n# Build\n\nLinked source: [Makefile](../../../Makefile).\n',
+    lossy: false,
+    source: { content: 'build:\n\tnpm run build\n\ttsc -p .\n', lossy: false },
+  },
+  'feature-search': 'reading',
+  'feature-billing': { id: 'acme', state: 'unreadable', code: 'failed' },
 };
 
 /** The project item that sends the person to the Knowledge view. */

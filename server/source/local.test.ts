@@ -106,11 +106,12 @@ function project(
     settings?: unknown;
     /** What `spec item add|move|file` prints once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
     item?: unknown;
-    /** What `knowledge proposed`, `knowledge sources` and `sources --diff` print, and a decision once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
+    /** What `knowledge proposed`, `knowledge sources`, `sources --diff` and `knowledge read` print, and a decision once no file `hold` is in the project: an envelope's `data`, or a refusal's code. */
     knowledge?: {
       proposed?: unknown;
       sources?: unknown;
       diff?: unknown;
+      text?: unknown;
       decision?: unknown;
     };
     /** What `task set` prints on stderr, and its exit code. */
@@ -153,6 +154,7 @@ function project(
   writeFileSync(join(dir, 'proposed.json'), answer(knowledge.proposed ?? { proposals: [], waiting: null }));
   writeFileSync(join(dir, 'sources.json'), answer(knowledge.sources ?? { sources: [], counts: {}, waiting: null }));
   writeFileSync(join(dir, 'diff.json'), answer(knowledge.diff ?? { diff: null, lossy: false }));
+  writeFileSync(join(dir, 'read.json'), answer(knowledge.text ?? { content: '---\nid: x\n---\n# X\n', lossy: false, source: null }));
   writeFileSync(join(dir, 'decision.json'), answer(knowledge.decision ?? { decisions: [], write: { note: null } }));
   writeFileSync(join(dir, 'plan.json'), typeof answers.plan === 'string' ? answers.plan : envelope(answers.plan ?? {}));
   writeFileSync(join(dir, 'upgrade.json'), typeof answers.upgrade === 'string' ? answers.upgrade : envelope(answers.upgrade ?? {}));
@@ -181,6 +183,7 @@ case "$*" in
   "knowledge proposed --json") cat proposed.json; if grep -q '"error"' proposed.json; then exit 1; fi ;;
   "knowledge sources --json") cat sources.json ;;
   "knowledge sources --diff "*) cat diff.json; if grep -q '"error"' diff.json; then exit 1; fi ;;
+  "knowledge read "*) cat read.json; if grep -q '"error"' read.json; then exit 1; fi ;;
   "knowledge accept "*|"knowledge reject "*|"knowledge reviewed "*) while [ -f hold ]; do sleep 0.05; done; cat decision.json; if grep -q '"error"' decision.json; then exit 1; fi ;;
   "task artifact read "*) cat artifact.json; if grep -q '"error"' artifact.json; then exit 1; fi ;;
   "task set "*) cat set.err >&2; exit ${answers.set?.code ?? 0} ;;
@@ -955,7 +958,43 @@ describe('localSource, writing the queue', () => {
         ['gone', 'missing'],
         ['kept', 'changed'],
       ]);
+      // Jig 0.40.0 reads no document's text and drops no link.
+      expect(read).toMatchObject({ canRead: false, canDrop: false });
       expect(await source.knowledge('nobody')).toBeUndefined();
+    });
+
+    it("offers a document's text and a dropped link from Jig 0.41.0", async () => {
+      await source.connect(project('knowing-041', '0.41.0', { knowledge }));
+      expect(await source.knowledge('knowing-041')).toMatchObject({ state: 'ready', canRead: true, canDrop: true });
+    });
+
+    it("reads a document's text only for a document the proposals list, from Jig 0.41.0", async () => {
+      const text = { content: '---\nid: style\n---\n# Style\n', lossy: false, source: { content: '# Style\n\nUse tabs.\n', lossy: false } };
+      const dir = project('reading', '0.41.0', {
+        knowledge: { ...knowledge, text: { id: 'style', status: 'proposed', path: 'x', bytes: 1, ...text } },
+      });
+      await source.connect(dir);
+      expect(await source.knowledgeText('reading', 'style')).toEqual({ state: 'ready', text });
+      expect(await source.knowledgeText('reading', 'decided')).toMatchObject({ state: 'ready', text: { content: text.content } });
+      for (const id of ['rules', '--json', 'nobody'])
+        expect(await source.knowledgeText('reading', id)).toEqual({ state: 'ready', text: null });
+      expect(knows(dir).filter((c) => c.startsWith('knowledge read'))).toEqual([
+        'knowledge read style --json',
+        'knowledge read decided --json',
+      ]);
+      expect(await source.knowledgeText('nobody', 'style')).toBeUndefined();
+    });
+
+    it("answers a document's text as unsupported below Jig 0.41.0, running no read", async () => {
+      const dir = project('reading-040', '0.40.0', { knowledge });
+      await source.connect(dir);
+      expect(await source.knowledgeText('reading-040', 'style')).toEqual({
+        id: 'reading-040',
+        state: 'unsupported',
+        jigVersion: '0.40.0',
+        minimum: '0.41.0',
+      });
+      expect(knows(dir)).toEqual([]);
     });
 
     it("answers a list Jig could not give as unreadable, never Jig's message", async () => {
@@ -1019,6 +1058,47 @@ describe('localSource, writing the queue', () => {
       await source.connect(dir);
       expect(await source.decideKnowledge(name, id, decision, 7)).toEqual({ state: 'refused', code: 'not-found' });
       expect(decisions(dir)).toEqual([]);
+    });
+
+    it('drops the link of a stub whose file changed, has no approved text or is gone, from Jig 0.41.0', async () => {
+      const dir = project('dropping', '0.41.0', { knowledge });
+      await source.connect(dir);
+      for (const id of ['rules', 'old', 'gone']) {
+        expect(await source.decideKnowledge('dropping', id, 'reject', 7)).toMatchObject({ state: 'written' });
+      }
+      for (const id of ['kept', 'fine'])
+        expect(await source.decideKnowledge('dropping', id, 'reject', 7)).toEqual({ state: 'refused', code: 'not-found' });
+      expect(await source.decideKnowledge('dropping', 'gone', 'accept', 7)).toEqual({ state: 'refused', code: 'not-found' });
+      expect(decisions(dir)).toEqual([
+        'knowledge reject rules --revision 7 --json',
+        'knowledge reject old --revision 7 --json',
+        'knowledge reject gone --revision 7 --json',
+      ]);
+    });
+
+    it("sends a decision on a record Jig reads as not decidable now, and carries Jig's refusal by its code", async () => {
+      const judged = {
+        ...knowledge,
+        proposed: { ...knowledge.proposed, proposals: [proposal('search', { decidable: false, reason: 'not-on-base', lossy: false })] },
+        decision: 'not-on-base',
+      };
+      const dir = project('unjudged', '0.41.0', { knowledge: judged });
+      await source.connect(dir);
+      expect(await source.decideKnowledge('unjudged', 'search', 'accept', 7)).toEqual({
+        state: 'refused',
+        code: 'not-on-base',
+        reasons: ['refused'],
+      });
+      expect(decisions(dir)).toEqual(['knowledge accept search --revision 7 --json']);
+    });
+
+    it("keeps Jig 0.41.0's not-found as it is", async () => {
+      await source.connect(project('unfound-041', '0.41.0', { knowledge: { ...knowledge, decision: 'not-found' } }));
+      expect(await source.decideKnowledge('unfound-041', 'checkout', 'accept', 7)).toEqual({
+        state: 'refused',
+        code: 'not-found',
+        reasons: ['refused'],
+      });
     });
 
     it('says a document Jig did not find where it decides is not on its branch', async () => {

@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { LinkedSource, Proposal, ReadyKnowledge } from '@/api';
-import { bindsLine, diffLines, knowledgeRefusal, noKnowledge, readFirst, shownDiff, sourceLine, stubLine, waitingWord } from './knowledge';
+import {
+  bindsLine,
+  body,
+  diffLines,
+  isMarkdown,
+  knowledgeRefusal,
+  noKnowledge,
+  readFirst,
+  shownDiff,
+  shownText,
+  sourceLine,
+  stubLine,
+  undecidable,
+  waitingWord,
+} from './knowledge';
 
 const proposal = (more: Partial<Proposal> = {}): Proposal => ({
   id: 'feature-checkout',
@@ -12,14 +26,21 @@ const proposal = (more: Partial<Proposal> = {}): Proposal => ({
   source: null,
   bytes: null,
   waiting: null,
+  decidable: null,
+  reason: null,
+  lossy: null,
   ...more,
 });
-const linked = (state: LinkedSource['state']): LinkedSource => ({
+const linked = (state: LinkedSource['state'], more: Partial<LinkedSource> = {}): LinkedSource => ({
   id: 'convention-rules',
   state,
   source: 'docs/rules.md',
   bytes: 106,
   waiting: null,
+  decidable: null,
+  reason: null,
+  lossy: null,
+  ...more,
 });
 
 describe('a proposal', () => {
@@ -44,6 +65,57 @@ describe('a proposal', () => {
     expect(waitingWord({ decision: 'accepted', pr: null })).toBe('Accepted, waiting');
     expect(waitingWord({ decision: 'rejected', pr: null })).toBe('Rejected, waiting');
     expect(waitingWord({ decision: 'reviewed', pr: null })).toBe('Kept, waiting');
+    expect(waitingWord({ decision: 'rejected', pr: null }, 'source')).toBe('Dropped, waiting');
+    expect(waitingWord({ decision: 'reviewed', pr: null }, 'source')).toBe('Kept, waiting');
+  });
+
+  it('says why a decision sent now would be refused, and nothing for one that would be judged as shown', () => {
+    expect(undecidable(proposal())).toBeUndefined();
+    expect(undecidable(proposal({ decidable: true }))).toBeUndefined();
+    expect(undecidable(proposal({ decidable: false, reason: 'not-on-base' }))).toBe(
+      "Not on origin's default branch as this checkout has it: commit and push it, then decide.",
+    );
+    expect(undecidable(linked('changed', { decidable: false, reason: 'not-on-branch' }))).toContain(
+      'decide it once the decisions waiting there have landed',
+    );
+    expect(undecidable(proposal({ decidable: false, reason: 'later' }))).toBe('Jig cannot decide it yet.');
+  });
+});
+
+describe("a document's text", () => {
+  it('cuts the frontmatter, and only a frontmatter that opens the file', () => {
+    expect(body('---\nid: x\npaths:\n  - "a/**"\n---\n# X\n\nText.\n')).toBe('# X\n\nText.\n');
+    expect(body('---\r\nid: x\r\n---\r\n# X\r\n')).toBe('# X\r\n');
+    expect(body('# X\n\n---\n\nmore\n---\n')).toBe('# X\n\n---\n\nmore\n---\n');
+    expect(body('---\nid: x\n---')).toBe('');
+    expect(body('---\n---\n# X\n')).toBe('# X\n');
+  });
+
+  it('renders a Markdown file, and shows any other as it is', () => {
+    expect(['a.md', 'docs/B.MDX', 'c.markdown'].map(isMarkdown)).toEqual([true, true, true]);
+    expect(['a.txt', 'Makefile', 'a.md.bak', 'md'].map(isMarkdown)).toEqual([false, false, false, false]);
+  });
+
+  it("shows a document being read, gone, unreadable, or its text and a stub's linked file", () => {
+    const stub = proposal({ path: '.ai/knowledge/sources/style.md', source: 'docs/style.txt', bytes: 9 });
+    expect(shownText(stub, 'reading')).toEqual({ kind: 'reading' });
+    expect(shownText(stub, 'not-found')).toEqual({ kind: 'gone' });
+    expect(shownText(stub, { id: 'x', state: 'unreadable', code: 'timeout' })).toEqual({ kind: 'failed' });
+    const read = {
+      state: 'ready' as const,
+      content: '---\nid: s\n---\n# Style\n',
+      lossy: false,
+      source: { content: 'Use tabs.\n', lossy: true },
+    };
+    expect(shownText(stub, read)).toEqual({
+      kind: 'text',
+      parts: [
+        { path: '.ai/knowledge/sources/style.md', text: '# Style\n', markdown: true, lossy: false },
+        { path: 'docs/style.txt', text: 'Use tabs.\n', markdown: false, lossy: true },
+      ],
+    });
+    // A stub whose file is gone reads no linked file.
+    expect(shownText(stub, { ...read, source: null })).toMatchObject({ parts: [{ path: '.ai/knowledge/sources/style.md' }] });
   });
 });
 
@@ -55,11 +127,12 @@ describe('sourceLine', () => {
       text: 'docs/rules.md is gone: move the link in the project (jig-accept).',
       tone: 'bad',
     });
+    expect(sourceLine(linked('missing'), true).text).toBe('docs/rules.md is gone: drop the link, or move it in the project (jig-accept).');
   });
 });
 
 describe('noKnowledge', () => {
-  const ready: ReadyKnowledge = { state: 'ready', revision: 1, proposals: [], sources: [], waiting: null };
+  const ready: ReadyKnowledge = { state: 'ready', revision: 1, proposals: [], sources: [], waiting: null, canRead: false, canDrop: false };
 
   it('says nothing waits, and nothing while something does', () => {
     expect(noKnowledge(ready)).toBe('Nothing waits for your decision.');
@@ -122,6 +195,14 @@ describe('knowledgeRefusal', () => {
       'Jig did not decide feature-checkout: knowledge/decisions is checked out in … and Jig never moves a checkout.',
     ],
     ['upgrading', [], 'Jig is being upgraded in this project: try deciding feature-checkout again once it has finished.'],
+    // Jig 0.41.0 says itself why a document is not where the decision is judged.
+    [
+      'not-on-branch',
+      ['feature-checkout, as this checkout has it, reached main after knowledge/decisions was cut'],
+      'Jig did not decide feature-checkout: feature-checkout, as this checkout has it, reached main after knowledge/decisions was cut',
+    ],
+    ['not-on-base', ['commit and push it, then decide'], 'Jig did not decide feature-checkout: commit and push it, then decide'],
+    ['write-still-waits', ['Move them to a branch of your own'], 'Jig did not decide feature-checkout: Move them to a branch of your own'],
   ])('says %s', (code, reasons, text) => {
     expect(knowledgeRefusal(code, reasons, 'feature-checkout')).toBe(text);
   });

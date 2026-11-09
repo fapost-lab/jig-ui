@@ -29,6 +29,12 @@ export const SETTINGS_JIG_VERSION = '0.40.0';
 export const ROADMAP_JIG_VERSION = '0.40.0';
 /** The first Jig that lists knowledge waiting for a decision as JSON and commits a decision on a branch of its own. */
 export const KNOWLEDGE_JIG_VERSION = '0.40.0';
+/**
+ * The first Jig that reads a knowledge document's text (`jig knowledge read`, fapost-lab/jig#391), drops the link of an
+ * approved stub whose file changed or is gone (`reject`, fapost-lab/jig#392), and says of each record whether a decision
+ * on it would be judged on what the read shows.
+ */
+export const KNOWLEDGE_TEXT_JIG_VERSION = '0.41.0';
 
 const SCRIPT = '.ai/scripts/jig';
 /** A read's limit: 10 s ran out with several projects read at once, each four Jig runs (task `read-timeout`). */
@@ -255,6 +261,9 @@ const CODES = new Set([
   'commit-refused',
   'not-proposed',
   'source-missing',
+  'not-on-base',
+  'not-on-branch',
+  'write-still-waits',
   'failed',
 ]);
 
@@ -953,6 +962,23 @@ export function fileItem(
 /** A decision on a document waiting on Jig's `knowledge/decisions` branch, its pull request's address once there is one. */
 const KnowledgeWaiting = z.object({ decision: z.enum(['accepted', 'rejected', 'reviewed']), pr: maybe }).nullable();
 
+/**
+ * Jig 0.41.0, on each record: whether a decision sent now would be judged on what the read shows, and the code it would be
+ * refused with when not (`not-on-base`, `not-on-branch`); `lossy` when one of the record's strings lost bytes that are not
+ * UTF-8, so its file's name may be another file's. `null` from an older Jig.
+ */
+const Judged = {
+  decidable: z
+    .boolean()
+    .nullish()
+    .transform((d) => d ?? null),
+  reason: maybe.optional().transform((r) => r ?? null),
+  lossy: z
+    .boolean()
+    .nullish()
+    .transform((l) => l ?? null),
+};
+
 const KnowledgeProposed = z.object({
   proposals: z.array(
     z.object({
@@ -966,14 +992,14 @@ const KnowledgeProposed = z.object({
       /** The file a stub links, relative to the project. */
       source: maybe,
       waiting: KnowledgeWaiting,
+      ...Judged,
     }),
   ),
   waiting: z.object({ branch: text, base: text, pushed: z.boolean(), pr: maybe }).nullable(),
 });
 
-const KnowledgeSources = z.object({
-  sources: z.array(z.object({ id: text, state: text, source: text, bytes: count.nullable(), waiting: KnowledgeWaiting })),
-});
+const KnowledgeSource = z.object({ id: text, state: text, source: text, bytes: count.nullable(), waiting: KnowledgeWaiting, ...Judged });
+const KnowledgeSources = z.object({ sources: z.array(KnowledgeSource) });
 
 /** The states of an approved stub's linked file that wait for a person: changed since approved, no approved text kept, gone. */
 const LOOK = ['changed', 'unrecorded', 'missing'] as const;
@@ -986,13 +1012,7 @@ export interface Knowledge {
   /** Each proposed document in Jig's order; `bytes` the size of a stub's linked file, `null` when it is gone or there is none. */
   proposals: (z.output<typeof KnowledgeProposed>['proposals'][number] & { bytes: number | null })[];
   /** Each approved stub whose linked file waits for a look, in Jig's order. */
-  sources: {
-    id: string;
-    state: Look;
-    source: string;
-    bytes: number | null;
-    waiting: z.output<typeof KnowledgeWaiting>;
-  }[];
+  sources: (Omit<z.output<typeof KnowledgeSource>, 'state'> & { state: Look })[];
   /** Where the decisions taken wait, `null` when none does. */
   waiting: z.output<typeof KnowledgeProposed>['waiting'];
 }
@@ -1031,6 +1051,27 @@ export async function readSourceDiff(
   return parsed(SourceDiff, data);
 }
 
+const KnowledgeText = z.object({
+  content: text,
+  lossy: z.boolean(),
+  /** The file a stub links, as it is now; `null` for any other document, and for a stub whose file is gone. */
+  source: z.object({ content: text, lossy: z.boolean() }).nullable(),
+});
+
+/**
+ * A knowledge document's text (`jig knowledge read <id> --json`, Jig 0.41.0): its whole file, frontmatter included,
+ * whatever its status, and for a stub the file it links; `lossy` beside each where bytes that are not UTF-8 were dropped.
+ * Refused as `not-found` for an id no document has.
+ */
+export async function readKnowledgeText(
+  root: string,
+  id: string,
+  platform: NodeJS.Platform = process.platform,
+): Promise<z.output<typeof KnowledgeText>> {
+  const { data } = await readJson(root, ['knowledge', 'read', id], platform);
+  return parsed(KnowledgeText, data);
+}
+
 /** A person's decision on a knowledge document, as Jig's command is named. */
 export type KnowledgeDecision = 'accept' | 'reject' | 'reviewed';
 
@@ -1038,7 +1079,8 @@ export type KnowledgeDecision = 'accept' | 'reject' | 'reviewed';
  * Decides one document (`jig knowledge accept|reject|reviewed <id> --revision <n> --json`): Jig commits it on
  * `knowledge/decisions` in a tree of its own and goes as far as `agent.git` allows. The revision is never left out —
  * without it Jig decides unchecked. Answers Jig's note without a path; refused as a roadmap edit is, and `not-proposed`
- * (decided already, or not a proposal) and `source-missing`.
+ * (decided already, or not a proposal) and `source-missing`; from Jig 0.41.0 also `not-on-base`, `not-on-branch` (the
+ * document is not on the branch the decision is judged on yet) and `write-still-waits`.
  */
 export async function decideKnowledge(
   root: string,

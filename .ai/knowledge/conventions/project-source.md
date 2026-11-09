@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-11-06
+reviewed_at: 2026-11-09
 ---
 # ProjectSource — how the server reaches a project
 
@@ -22,8 +22,9 @@ MUST:     name projects by id; return typed data, never Jig's raw output; report
           Jig's failure code; keep the last good read when a read fails mid-write
 MUST NOT: expose a path, a file or a child process to its callers — but `scan`'s findings, below,
           a task's documents as written (adr-20261030-a-task-document-is-shown-as-written), and
-          the knowledge's paths relative to the project and a linked file's diff
-          (adr-20261106-knowledge-decisions-from-the-page);
+          the knowledge's paths relative to the project, a linked file's diff, and a proposed
+          document's text with the file a stub links (adr-20261106-knowledge-decisions-from-the-page,
+          adr-20261109-knowledge-text-and-drop-from-jig-0-41);
           write a project file; compute a board column or a legal action itself
 Why:      a later remote adapter (a connector on the projects' machine) must fit behind the
           same port; anything a caller learns about directories or processes breaks that.
@@ -62,8 +63,10 @@ queue — `requestPause(id, taskId, revision)`,
 `setSetting(id, key, value, revision)` and `unsetSetting(id, key, revision)` — the person's own keys, always
 `--local` —, and a spec's roadmap edits `addItem(id, specId, phase, text, revision)`,
 `moveItem(id, specId, item, place, revision)` and `fileItem(id, specId, item, taskId, goal, revision)`, and the
-knowledge waiting for a decision — `knowledge(id)`, with a revision of its own, and a linked file's diff
-`knowledgeDiff(id, doc)`, read through Jig at each call, and the write `decideKnowledge(id, doc, decision, revision)` —,
+knowledge waiting for a decision — `knowledge(id)`, with a revision of its own and whether the project's Jig
+reads a document's text and drops a link (`canRead`, `canDrop`), a linked file's diff `knowledgeDiff(id, doc)`
+and a proposed document's text `knowledgeText(id, doc)`, read through Jig at each call, and the write
+`decideKnowledge(id, doc, decision, revision)` —,
 which answer `written` — with Jig's `note`, paths cut, where a roadmap edit carries one —, `refused` with Jig's code,
 or the project's state when it is not `ready`; and the upgrade of a project's Jig — `planUpgrade(id)`,
 `upgrade(id)`, which answers `started` before Jig has run, and `dismissUpgrade(id)`; its local adapter
@@ -104,11 +107,16 @@ with the same id — now live — names it (adr-20261106-editing-a-roadmap-from-
 
 A knowledge decision reads the knowledge again first — no held read lists it — and runs Jig only for
 an id that read lists open to the decision: `accept` and `reject` a proposal, `reviewed` a linked file
-not `missing`, either with no decision waiting on it; anything else is `refused: not-found` without Jig.
-A diff runs Jig only for a file the sources read just before lists as `changed`. Jig's own `not-found`
-on a decision the read allowed answers `not-on-branch`, a code of Jig UI's own: the document is not on
-`knowledge/decisions`, cut from origin's base. Below `KNOWLEDGE_JIG_VERSION` the reads answer
-`unsupported` and a decision `refused: unsupported` (adr-20261106-knowledge-decisions-from-the-page).
+not `missing`, and from `KNOWLEDGE_TEXT_JIG_VERSION` `reject` a listed linked file too, which drops its
+link — each with no decision waiting on it; anything else is `refused: not-found` without Jig. A record
+Jig reads as not decidable now is still sent: Jig's write fetches first and judges it. A diff runs Jig
+only for a file the sources read just before lists as `changed`, a text only for a document the
+proposals read lists. Below Jig 0.41.0, Jig's own `not-found` on a decision the read allowed answers
+`not-on-branch`, a code of Jig UI's own: the document is not on `knowledge/decisions`, cut from origin's
+base; from 0.41.0 Jig says so itself, as `not-on-base` or `not-on-branch`. Below `KNOWLEDGE_JIG_VERSION`
+the reads answer `unsupported` and a decision `refused: unsupported`; a text below
+`KNOWLEDGE_TEXT_JIG_VERSION` is `unsupported` (adr-20261106-knowledge-decisions-from-the-page,
+adr-20261109-knowledge-text-and-drop-from-jig-0-41).
 
 An upgrade is offered only for a project whose last read carries Jig's `upgrade-available` item
 (else `refused: not-found`), one at a time (`refused: running`). Its run — `running`, then `done`

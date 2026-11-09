@@ -19,7 +19,23 @@ describe('rendered', () => {
       },
     ];
     expect(given).toContain('<table>');
-    expect(given).toContain('<script>');
+    // Raw HTML is shown as written: DOMPurify still cleans what marked gives.
+    expect(given).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(given).not.toContain('<script>');
     expect(config).toEqual({ USE_PROFILES: { html: true }, FORBID_TAGS: expect.arrayContaining(['form', 'input', 'button', 'style']) });
+  });
+
+  it("shows a template's placeholders as written, and keeps a comment unseen", () => {
+    expect(rendered('# <Title of the linked source>\n\nLinked source: [a](b) and <id>.\n\n<!-- for the agent -->\n')).toBe(
+      'clean:<h1>&lt;Title of the linked source&gt;</h1>\n<p>Linked source: a and &lt;id&gt;.</p>\n<!-- for the agent -->\n',
+    );
+  });
+
+  it('keeps a link that leads away and shows a relative one as its text', () => {
+    expect(
+      rendered('[web](https://example.com/x) [mail](mailto:a@b.c) [host](//example.com) [up](../../../docs/x.md) [**here**](#top)'),
+    ).toBe(
+      'clean:<p><a href="https://example.com/x">web</a> <a href="mailto:a@b.c">mail</a> <a href="//example.com">host</a> up <strong>here</strong></p>\n',
+    );
   });
 });

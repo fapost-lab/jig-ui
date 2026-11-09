@@ -13,6 +13,7 @@ import {
   JigRefusal,
   JigShapeError,
   KNOWLEDGE_JIG_VERSION,
+  KNOWLEDGE_TEXT_JIG_VERSION,
   LAND_JIG_VERSION,
   landUpgrade,
   jigVersion,
@@ -24,6 +25,7 @@ import {
   readArtifact,
   readArtifacts,
   readKnowledge,
+  readKnowledgeText,
   readQueue,
   readSettings,
   readSourceDiff,
@@ -806,9 +808,9 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
    * Reads through the project's Jig in its main checkout on demand, as the board's read holds none: a task's documents —
    * Jig finds a worktree task's workspace itself —, the settings or the finished tasks; kept nowhere, so a failure is its
    * answer and leaves what the project shows alone. With `taskId`, `null` for a task not live in the last
-   * read, Jig not run, or a document Jig does not have. A Jig older than `minimum` answers `unsupported`, with that
-   * version as its minimum. While the project upgrades it runs no Jig there (`unreadable`, `upgrading`), and an upgrade
-   * waits for a read under way.
+   * read, Jig not run, or a document Jig does not have. Ready, it answers with the project's Jig version. A Jig older than
+   * `minimum` answers `unsupported`, with that version as its minimum. While the project upgrades it runs no Jig there
+   * (`unreadable`, `upgrading`), and an upgrade waits for a read under way.
    */
   async function onDemand<T>(
     id: string,
@@ -819,6 +821,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     | {
         state: 'ready';
         read: T | null;
+        jigVersion: string;
       }
     | Exclude<ProjectView, { state: 'ready' }>
     | undefined
@@ -830,7 +833,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     const { jigVersion } = view;
     if (!supports(jigVersion, minimum)) return { id, state: 'unsupported', jigVersion, minimum };
     // Only a live task's id reaches Jig, never one the address made up (`--help`).
-    if (taskId !== undefined && !details.some((t) => t.id === taskId)) return { state: 'ready', read: null };
+    if (taskId !== undefined && !details.some((t) => t.id === taskId)) return { state: 'ready', read: null, jigVersion };
     const entry = entryOf(project);
     // Jig replaces its own scripts while it upgrades (adr-20261027-upgrading-a-project-runs-in-the-background).
     if (entry.upgrade?.state === 'running') return { id, state: 'unreadable', code: 'upgrading' };
@@ -841,9 +844,9 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     );
     entry.writes.add(held);
     try {
-      return { state: 'ready', read: await run };
+      return { state: 'ready', read: await run, jigVersion };
     } catch (error) {
-      if (error instanceof JigRefusal && error.code === 'not-found') return { state: 'ready', read: null };
+      if (error instanceof JigRefusal && error.code === 'not-found') return { state: 'ready', read: null, jigVersion };
       if (error instanceof JigShapeError) return { id, state: 'incompatible', jigVersion };
       // Only the code goes on: Jig's message may name a path.
       return { id, state: 'unreadable', code: error instanceof JigRefusal ? error.code : 'failed' };
@@ -1031,7 +1034,10 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       const answer = await onDemand(id, KNOWLEDGE_JIG_VERSION, (root) => readKnowledge(root));
       if (answer?.state !== 'ready') return answer;
       // The lists name nothing that could be missing: a `not-found` from them is a Jig that failed.
-      return answer.read ? { state: 'ready', ...answer.read } : { id, state: 'unreadable', code: 'failed' };
+      if (!answer.read) return { id, state: 'unreadable', code: 'failed' };
+      // A document's text and a dropped link came in the same Jig.
+      const later = supports(answer.jigVersion, KNOWLEDGE_TEXT_JIG_VERSION);
+      return { state: 'ready', ...answer.read, canRead: later, canDrop: later };
     },
     async knowledgeDiff(id, docId) {
       const answer = await onDemand(id, KNOWLEDGE_JIG_VERSION, async (root) =>
@@ -1040,21 +1046,32 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       );
       return answer?.state === 'ready' ? { state: 'ready', diff: answer.read } : answer;
     },
+    async knowledgeText(id, docId) {
+      const answer = await onDemand(id, KNOWLEDGE_TEXT_JIG_VERSION, async (root) =>
+        // Only a document Jig itself listed as proposed reaches Jig's arguments.
+        (await readKnowledge(root)).proposals.some((p) => p.id === docId) ? readKnowledgeText(root, docId) : null,
+      );
+      return answer?.state === 'ready' ? { state: 'ready', text: answer.read } : answer;
+    },
     decideKnowledge(id, docId, decision, revision) {
       return writing(id, [], async (root, jigVersion) => {
         if (!supports(jigVersion, KNOWLEDGE_JIG_VERSION)) throw new JigRefusal('unsupported');
         // No held read lists knowledge: Jig's own lists, read now, name what each decision may take.
         const { proposals, sources } = await readKnowledge(root);
+        const later = supports(jigVersion, KNOWLEDGE_TEXT_JIG_VERSION);
+        // From Jig 0.41.0 `reject` also drops the link of a stub listed as changed, unrecorded or missing.
         const open =
           decision === 'reviewed'
             ? sources.some((s) => s.id === docId && s.state !== 'missing' && s.waiting === null)
-            : proposals.some((p) => p.id === docId && p.waiting === null);
+            : proposals.some((p) => p.id === docId && p.waiting === null) ||
+              (decision === 'reject' && later && sources.some((s) => s.id === docId && s.waiting === null));
         if (!open) throw new JigRefusal('not-found');
         try {
           return await decideKnowledge(root, decision, docId, revision);
         } catch (error) {
-          // Listed in the checkout, yet not where Jig decides: `knowledge/decisions`, cut from origin's base (fapost-lab/jig#392).
-          throw error instanceof JigRefusal && error.code === 'not-found' ? new JigRefusal('not-on-branch') : error;
+          // Listed in the checkout, yet not where Jig 0.40.0 decides: `knowledge/decisions`, cut from origin's base. Jig
+          // 0.41.0 says so itself, as `not-on-base` or `not-on-branch`, and its `not-found` is one.
+          throw error instanceof JigRefusal && error.code === 'not-found' && !later ? new JigRefusal('not-on-branch') : error;
         }
       });
     },

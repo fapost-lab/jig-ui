@@ -39,6 +39,8 @@ export type Proposal = ReadyKnowledge['proposals'][number];
 export type LinkedSource = ReadyKnowledge['sources'][number];
 /** How a stub's linked file changed since it was approved, or why the project's Jig cannot say. */
 export type SourceDiff = Ok<KnowledgeApi[':doc']['diff']['$get']>['diff'];
+/** A proposed document's text and the file a stub links (Jig 0.41.0), or why the project's Jig cannot give them. */
+export type DocumentText = Ok<KnowledgeApi[':doc']['text']['$get']>['text'];
 /** A decision as the route takes it: Jig's command, `reviewed` keeping a changed file. */
 export type Decision = NonNullable<InferRequestType<KnowledgeApi['decide']['$post']>['json']['decision']>;
 /** The answer to a knowledge decision. */

@@ -988,22 +988,45 @@ describe('/api/projects/:id/knowledge', () => {
         source: null,
         bytes: null,
         waiting: null,
+        decidable: true,
+        reason: null,
+        lossy: false,
       },
     ],
-    sources: [{ id: 'convention-rules', state: 'changed', source: 'docs/rules.md', bytes: 106, waiting: null }],
+    sources: [
+      {
+        id: 'convention-rules',
+        state: 'changed',
+        source: 'docs/rules.md',
+        bytes: 106,
+        waiting: null,
+        decidable: true,
+        reason: null,
+        lossy: false,
+      },
+    ],
     waiting: null,
   };
+  const text = { content: '---\nid: feature-checkout\n---\n# Checkout\n', lossy: false, source: null };
 
   function faked(outcome: Written | undefined) {
     const sent: unknown[][] = [];
     const source: ProjectSource = {
       ...localSource(join(webRoot, 'knowledge-config')),
-      knowledge: (id) => Promise.resolve(id === 'x' ? { state: 'ready', ...read } : undefined),
+      knowledge: (id) => Promise.resolve(id === 'x' ? { state: 'ready', ...read, canRead: true, canDrop: true } : undefined),
       knowledgeDiff: (id, doc) =>
         Promise.resolve(
           id === 'x'
             ? { state: 'ready', diff: doc === 'convention-rules' ? { diff: '--- docs/rules.md (approved)\n', lossy: false } : null }
             : undefined,
+        ),
+      knowledgeText: (id, doc) =>
+        Promise.resolve(
+          id === 'x'
+            ? { state: 'ready', text: doc === 'feature-checkout' ? text : null }
+            : id === 'old'
+              ? { id, state: 'unsupported', jigVersion: '0.40.0', minimum: '0.41.0' }
+              : undefined,
         ),
       decideKnowledge: (...a) => (sent.push(a), Promise.resolve(outcome)),
     };
@@ -1012,7 +1035,9 @@ describe('/api/projects/:id/knowledge', () => {
 
   it("reads the knowledge as Jig gave it, the project's own paths included, and a changed file's diff", async () => {
     const { app } = faked(undefined);
-    expect(await (await app.request('/api/projects/x/knowledge', { headers })).json()).toEqual({ knowledge: { state: 'ready', ...read } });
+    expect(await (await app.request('/api/projects/x/knowledge', { headers })).json()).toEqual({
+      knowledge: { state: 'ready', ...read, canRead: true, canDrop: true },
+    });
     expect((await app.request('/api/projects/y/knowledge', { headers })).status).toBe(404);
     expect(await (await app.request('/api/projects/x/knowledge/convention-rules/diff', { headers })).json()).toEqual({
       diff: { state: 'ready', diff: '--- docs/rules.md (approved)\n', lossy: false },
@@ -1021,6 +1046,20 @@ describe('/api/projects/:id/knowledge', () => {
     expect([none.status, ((await none.json()) as { error: { code: string } }).error.code]).toEqual([404, 'not-found']);
     expect((await app.request('/api/projects/y/knowledge/convention-rules/diff', { headers })).status).toBe(404);
     expect((await app.request('/api/projects/x/knowledge', { headers: { host: HOST } })).status).toBe(401);
+  });
+
+  it("reads a proposed document's text, and none for a document not proposed", async () => {
+    const { app } = faked(undefined);
+    expect(await (await app.request('/api/projects/x/knowledge/feature-checkout/text', { headers })).json()).toEqual({
+      text: { state: 'ready', ...text },
+    });
+    const none = await app.request('/api/projects/x/knowledge/convention-rules/text', { headers });
+    expect([none.status, ((await none.json()) as { error: { code: string } }).error.code]).toEqual([404, 'not-found']);
+    expect(await (await app.request('/api/projects/old/knowledge/feature-checkout/text', { headers })).json()).toEqual({
+      text: { id: 'old', state: 'unsupported', jigVersion: '0.40.0', minimum: '0.41.0' },
+    });
+    expect((await app.request('/api/projects/y/knowledge/feature-checkout/text', { headers })).status).toBe(404);
+    expect((await app.request('/api/projects/x/knowledge/feature-checkout/text', { headers: { host: HOST } })).status).toBe(401);
   });
 
   it("hands a decision to the source as the page sent it, and answers Jig's note", async () => {
@@ -1058,6 +1097,8 @@ describe('/api/projects/:id/knowledge', () => {
     ['a stale read', { state: 'refused', code: 'stale-revision' }, 409, 'stale-revision'],
     ['a document not open to the decision', { state: 'refused', code: 'not-found' }, 404, 'not-found'],
     ['one not on the branch', { state: 'refused', code: 'not-on-branch' }, 422, 'not-on-branch'],
+    ['one not on the base', { state: 'refused', code: 'not-on-base' }, 422, 'not-on-base'],
+    ['an earlier write still waiting', { state: 'refused', code: 'write-still-waits' }, 422, 'write-still-waits'],
     ['agent.git none', { state: 'refused', code: 'git-not-allowed' }, 422, 'git-not-allowed'],
     ['a project not connected', undefined, 404, 'not-connected'],
   ] as const)('answers %s', async (_, outcome, status, code) => {

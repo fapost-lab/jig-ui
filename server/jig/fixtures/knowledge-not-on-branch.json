@@ -1,0 +1,1 @@
+{"schema":1,"revision":1794230823,"generated_at":"2026-11-09T13:27:47Z","error":{"code":"not-on-branch","message":"knowledge accept: feature-search, as this checkout has it, reached main after knowledge/decisions was cut, and the decision is judged on that branch; decide it once the decisions waiting there have landed"}}

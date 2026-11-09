@@ -1,0 +1,1 @@
+{"schema":1,"revision":1794230818,"generated_at":"2026-11-09T13:27:34Z","error":{"code":"not-on-base","message":"knowledge accept: feature-search, as this checkout has it, is not on main as origin/main has it, and the decision is judged there; commit and push it, then decide"}}

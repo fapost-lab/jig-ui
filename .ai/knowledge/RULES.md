@@ -37,14 +37,16 @@ are added as sections of this file.
 - The API and the page name connected projects by id; no path reaches `web/` but Find projects'
   answer — the folder it looked through and what it found there, under the folder the person named,
   with `~` for the home folder —, a task's documents, whose content is shown as its authors wrote it,
-  and the knowledge waiting for a decision: its documents' paths relative to the project, and a linked
-  file's diff as Jig gives it.
+  and the knowledge waiting for a decision: its documents' paths relative to the project, a linked
+  file's diff as Jig gives it, and a proposed document's text with the file a stub links.
   (adr-20261014-project-source-port-keeps-hosting-open, adr-20261029-finding-projects-shows-their-paths,
-  adr-20261030-a-task-document-is-shown-as-written, adr-20261106-knowledge-decisions-from-the-page.
+  adr-20261030-a-task-document-is-shown-as-written, adr-20261106-knowledge-decisions-from-the-page,
+  adr-20261109-knowledge-text-and-drop-from-jig-0-41.
   Checked by tests on the API responses.)
-- `v-html` takes only what `rendered()` in `web/lib/markdown.ts` gives: Markdown cleaned by DOMPurify.
-  (adr-20261030-a-task-document-is-shown-as-written. Checked in review; `web/lib/markdown.test.ts`
-  pins that every rendering goes through DOMPurify.)
+- `v-html` takes only what `rendered()` in `web/lib/markdown.ts` gives: Markdown, its raw HTML shown
+  as text, cleaned by DOMPurify.
+  (adr-20261030-a-task-document-is-shown-as-written, adr-20261109-knowledge-text-and-drop-from-jig-0-41. Checked in review;
+  `web/lib/markdown.test.ts` pins that every rendering goes through DOMPurify.)
 - The server binds 127.0.0.1 unless a guard other than the local token is in place, refuses a
   foreign `Host` or `Origin`, and refuses every API call without the token.
 - `jig-ui stop` never signals a pid read from `instance.json` on its own word: it asks the instance

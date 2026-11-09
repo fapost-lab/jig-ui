@@ -21,6 +21,7 @@ import {
   readArtifact,
   readArtifacts,
   readKnowledge,
+  readKnowledgeText,
   readQueue,
   readSettings,
   readSourceDiff,
@@ -561,7 +562,11 @@ esac
 }
 
 // knowledge-*.json are what Jig 0.40.0 answered in a scratch project with a bare origin, at `agent.git: commit`; the
-// checkout's path is replaced by one of no one's.
+// checkout's path is replaced by one of no one's. Those named *-041, -read*, -drop, -not-on-*, -still-waits and
+// -sources-dropped are Jig 0.41.0's, from a scratch project at `agent.git: push`.
+/** What a record of Jig 0.40.0 reads for the fields Jig 0.41.0 added. */
+const older = { decidable: null, reason: null, lossy: null };
+
 describe('readKnowledge', () => {
   it('reads the proposals and the linked files that wait for a look, decisions waiting on the branch included', async () => {
     expect(await readKnowledge(knowing('knowledge', 'knowledge-proposed-waiting.json', 'knowledge-sources-waiting.json'))).toEqual({
@@ -577,6 +582,7 @@ describe('readKnowledge', () => {
           source: null,
           bytes: null,
           waiting: null,
+          ...older,
         },
         {
           id: 'convention-coding-style',
@@ -588,6 +594,7 @@ describe('readKnowledge', () => {
           source: 'docs/style.md',
           bytes: 43,
           waiting: null,
+          ...older,
         },
         {
           id: 'convention-ops',
@@ -599,11 +606,19 @@ describe('readKnowledge', () => {
           source: 'docs/ops.md',
           bytes: null,
           waiting: { decision: 'rejected', pr: null },
+          ...older,
         },
       ],
       // A proposed stub's file shows with its proposal, an approved one whose file is as approved needs nobody.
       sources: [
-        { id: 'convention-team-rules', state: 'changed', source: 'docs/rules.md', bytes: 106, waiting: { decision: 'reviewed', pr: null } },
+        {
+          id: 'convention-team-rules',
+          state: 'changed',
+          source: 'docs/rules.md',
+          bytes: 106,
+          waiting: { decision: 'reviewed', pr: null },
+          ...older,
+        },
       ],
       waiting: { branch: 'knowledge/decisions', base: 'main', pushed: false, pr: null },
     });
@@ -628,6 +643,56 @@ describe('readKnowledge', () => {
     expect(read.waiting).toBeNull();
   });
 
+  it('reads whether a decision on each record would be judged on what the read shows (Jig 0.41.0)', async () => {
+    const read = await readKnowledge(knowing(`case-${cases++}`, 'knowledge-proposed-041.json', 'knowledge-sources-041.json'));
+    expect(read.proposals.map((p) => [p.id, p.decidable, p.reason, p.lossy, p.bytes])).toEqual([
+      ['feature-checkout', true, null, false, null],
+      ['feature-search', false, 'not-on-base', false, null],
+      ['convention-coding-style', true, null, false, 19],
+    ]);
+    expect(read.sources).toEqual([
+      {
+        id: 'convention-deploy',
+        state: 'missing',
+        source: 'docs/deploy.md',
+        bytes: null,
+        waiting: null,
+        decidable: true,
+        reason: null,
+        lossy: false,
+      },
+      {
+        id: 'convention-legacy',
+        state: 'unrecorded',
+        source: 'docs/legacy.md',
+        bytes: 20,
+        waiting: null,
+        decidable: true,
+        reason: null,
+        lossy: false,
+      },
+      {
+        id: 'convention-team-rules',
+        state: 'changed',
+        source: 'docs/rules.md',
+        bytes: 85,
+        waiting: null,
+        decidable: true,
+        reason: null,
+        lossy: false,
+      },
+    ]);
+  });
+
+  it('reads a dropped link as a rejection waiting on the branch', async () => {
+    const read = await readKnowledge(knowing(`case-${cases++}`, 'knowledge-proposed-041.json', 'knowledge-sources-dropped.json'));
+    expect(read.sources.map((s) => [s.id, s.waiting])).toEqual([
+      ['convention-deploy', { decision: 'rejected', pr: null }],
+      ['convention-legacy', { decision: 'reviewed', pr: null }],
+      ['convention-team-rules', { decision: 'rejected', pr: null }],
+    ]);
+  });
+
   it.each([
     ['a proposal without its paths', 'proposed', (d: Record<string, any>) => delete d.proposals[0].paths],
     [
@@ -636,6 +701,7 @@ describe('readKnowledge', () => {
       (d: Record<string, any>) => (d.proposals[0].waiting = { decision: 'merged', pr: null }),
     ],
     ['a source without its size', 'sources', (d: Record<string, any>) => delete d.sources[0].bytes],
+    ['a decidable that is no boolean', 'proposed', (d: Record<string, any>) => (d.proposals[0].decidable = 'yes')],
   ])('refuses %s', async (_, read, change) => {
     const proposed = read === 'proposed' ? changed('knowledge-proposed.json', change) : 'knowledge-proposed.json';
     const sources = read === 'sources' ? changed('knowledge-sources.json', change) : 'knowledge-sources.json';
@@ -667,7 +733,53 @@ describe('readSourceDiff', () => {
   });
 });
 
+describe('readKnowledgeText', () => {
+  it("reads a document's whole file, frontmatter included, and no linked file for one that links none", async () => {
+    const dir = logging(`case-${cases++}`, 'knowledge-read.json');
+    const read = await readKnowledgeText(dir, 'feature-checkout');
+    expect(read.content).toMatch(/^---\nid: feature-checkout\n[^]*\n---\n# <Feature name>\n[^]*How checkout takes a card payment\.\n$/);
+    expect(read).toMatchObject({ lossy: false, source: null });
+    expect(args(dir)).toEqual(['knowledge', 'read', 'feature-checkout', '--json']);
+  });
+
+  it('reads the file a stub links as it is now', async () => {
+    const read = await readKnowledgeText(answering(`case-${cases++}`, 'knowledge-read-stub.json'), 'convention-coding-style');
+    expect(read.content).toContain('source: docs/style.md\n---\n');
+    expect(read.source).toEqual({ content: '# Style\n\nUse tabs.\n', lossy: false });
+  });
+
+  it("reads no linked file for a stub whose file is gone, and says where a file's bytes were dropped", async () => {
+    expect(
+      (await readKnowledgeText(answering(`case-${cases++}`, 'knowledge-read-stub-missing.json'), 'convention-deploy')).source,
+    ).toBeNull();
+    expect((await readKnowledgeText(answering(`case-${cases++}`, 'knowledge-read-lossy.json'), 'convention-coding-style')).source).toEqual({
+      content: '# Style\n\nUse tabs  here.\n',
+      lossy: true,
+    });
+  });
+
+  it('carries an id no document has as not-found', async () => {
+    await expect(readKnowledgeText(answering(`case-${cases++}`, 'knowledge-read-not-found.json', 1), 'nobody')).rejects.toMatchObject({
+      code: 'not-found',
+      reasons: ['no document with id: nobody'],
+    });
+  });
+
+  it('refuses a text without its content', async () => {
+    const json = changed('knowledge-read.json', (data) => {
+      delete data.content;
+    });
+    await expect(readKnowledgeText(answering(`case-${cases++}`, json), 'x')).rejects.toBeInstanceOf(JigShapeError);
+  });
+});
+
 describe('decideKnowledge', () => {
+  it("drops an approved stub's link with reject (Jig 0.41.0)", async () => {
+    const dir = logging(`case-${cases++}`, 'knowledge-drop.json');
+    expect(await decideKnowledge(dir, 'reject', 'convention-team-rules', 1794230818)).toBe('agent.git is push: the pull request is yours');
+    expect(args(dir)).toEqual(['knowledge', 'reject', 'convention-team-rules', '--revision', '1794230818', '--json']);
+  });
+
   it.each([
     ['accept', 'knowledge-accept.json'],
     ['reject', 'knowledge-reject.json'],
@@ -704,6 +816,30 @@ describe('decideKnowledge', () => {
       'reject',
       [
         'knowledge/decisions is checked out in … and Jig never moves a checkout; finish the work there, or switch that checkout to another branch, then try again',
+      ],
+    ],
+    [
+      'knowledge-not-on-base.json',
+      'not-on-base',
+      'accept',
+      [
+        'feature-search, as this checkout has it, is not on main as origin/main has it, and the decision is judged there; commit and push it, then decide',
+      ],
+    ],
+    [
+      'knowledge-not-on-branch.json',
+      'not-on-branch',
+      'accept',
+      [
+        'feature-search, as this checkout has it, reached main after knowledge/decisions was cut, and the decision is judged on that branch; decide it once the decisions waiting there have landed',
+      ],
+    ],
+    [
+      'knowledge-still-waits.json',
+      'write-still-waits',
+      'accept',
+      [
+        'knowledge/decisions has 1 edit(s) that never reached origin, above edits origin no longer has; Jig neither sends them out with those nor leaves them where nobody sees them wait. Move them to a branch of your own (git branch -m knowledge/decisions <name>), then try again',
       ],
     ],
   ] as const)(

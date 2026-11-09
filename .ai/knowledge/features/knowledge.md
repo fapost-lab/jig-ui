@@ -7,8 +7,8 @@ paths:
   - web/components/KnowledgeView.vue
   - web/lib/knowledge.ts
   - "server/jig/fixtures/knowledge-*.json"
-summary: "The Knowledge view of a project's page: proposals to accept or reject and changed linked files to keep after their diff, read on demand from Jig 0.40.0, decisions waiting on knowledge/decisions marked; linked from the workspace card's attention items"
-reviewed_at: 2026-11-06
+summary: "The Knowledge view of a project's page: proposals to accept or reject after reading their text, and changed linked files to keep or drop after their diff, read on demand from Jig 0.40.0 (text and Drop from 0.41.0), decisions waiting on knowledge/decisions marked; linked from the workspace card's attention items"
+reviewed_at: 2026-11-09
 ---
 # Deciding knowledge
 
@@ -22,17 +22,25 @@ lists it (`readKnowledge` in `server/jig/client.ts`: `jig knowledge proposed --j
 
 - **Proposed** — each document nobody agreed to yet, in Jig's order: its id, type, summary and file;
   the paths and domains it would bind agents to; for a stub, the file it links and its size, or that
-  the file is gone; the file to read before deciding; **Accept** and **Reject**.
+  the file is gone; **Accept** and **Reject**. From Jig 0.41.0 its **Document** opens its text
+  (`GET /api/projects/:id/knowledge/:doc/text`, `jig knowledge read`), the frontmatter cut, and for a
+  stub the file it links as it is now: Markdown through `rendered()`, any other file in a `<pre>`.
+  Below 0.41.0 the proposal names the file to read before deciding. A record Jig reads as not
+  decidable as of the last fetch (`decidable: false`) says why above its buttons: push the commit,
+  or decide once the decisions waiting have landed.
 - **Changed sources** — each approved stub whose linked file is `changed`, `unrecorded` (no approved
   text kept) or `missing`. A changed one's **Diff since approved** opens Jig's unified diff
   (`GET /api/projects/:id/knowledge/:doc/diff`, `jig knowledge sources --diff`), plain text in a
   `<pre>`, each line toned by its first character; **Keep** (`jig knowledge reviewed`) on changed
-  and unrecorded; a missing one has no button.
+  and unrecorded; from Jig 0.41.0 **Drop** (`jig knowledge reject`) on all three, which ends the
+  link. Below 0.41.0 a missing one has no button.
 
 A decision is `POST /api/projects/:id/knowledge/decide` `{doc, decision, revision}`, Jig's
 `jig knowledge accept|reject|reviewed` (adr-20261106-knowledge-decisions-from-the-page). A decided
 document stays listed — Jig lists it until `knowledge/decisions` lands — marked "Accepted, waiting",
-"Rejected, waiting" or "Kept, waiting", under a line saying where the decisions wait. The workspace
+"Rejected, waiting", "Kept, waiting" or "Dropped, waiting", under a line saying where the decisions
+wait. Bytes Jig dropped as not UTF-8 are said, on a text and on a record whose file name may then be
+another file's. The workspace
 card's attention items `knowledge-proposed` and `sources-changed` link to the view
 (`#/projects/<id>?view=knowledge`; the board drops `view` from the address once shown).
 
@@ -48,8 +56,8 @@ decision is the same one an agent session would commit.
 - **Read on demand.** Two Jig runs per read, only while the view is shown and on the project's change
   signal; never part of the held read the board serves (convention-project-source).
 - **Only what Jig listed reaches Jig.** A diff runs for an id the sources read just before lists as
-  `changed`; a decision for an id the knowledge read just before lists open to it, with no decision
-  waiting. Anything else is `not-found` without Jig.
+  `changed`, a text for an id the proposals read lists; a decision for an id the knowledge read just
+  before lists open to it, with no decision waiting. Anything else is `not-found` without Jig.
 - **Paths are shown as Jig gives them**, relative to the project; Jig's refusal messages lose theirs
   (adr-20261106-knowledge-decisions-from-the-page).
 - **One decision at a time**: while one is on its way, every button in the view is disabled.
@@ -58,11 +66,14 @@ decision is the same one an agent session would commit.
 
 Task `knowledge-decisions` (2026-11-06), decided with the maintainer at the design gate.
 
-- **No document text yet**: Jig 0.40.0 gives none (fapost-lab/jig#391); each proposal names the file
-  to read. Built now, the text added in a small task once Jig gives it.
-- **No Drop**: Jig 0.40.0's `reject` refuses an active stub (`not-proposed`); the view says so beside
-  Keep (fapost-lab/jig#392).
-- **A proposal not on `origin/<base>`** is listed but refused `not-found` by Jig; the adapter turns it
-  into `not-on-branch` and the page says to push the commit that proposed it, or let the decisions
-  waiting land (fapost-lab/jig#392 asks Jig to say so in the read).
+- **On Jig 0.40.0, no document text and no Drop**: Jig gives no text (fapost-lab/jig#391), and its
+  `reject` refuses an active stub (`not-proposed`); the view names the file to read and says Drop has
+  no Jig command. A proposal not on `origin/<base>` is listed but refused `not-found`; the adapter
+  turns it into `not-on-branch`.
+- **From Jig 0.41.0** (task `knowledge-drop-and-text`, adr-20261109-knowledge-text-and-drop-from-jig-0-41): the text and Drop, one
+  version for both; Jig's `decidable` puts its reason above the buttons, which stay, and the adapter
+  sends what it is sent, since Jig fetches before it judges; Jig's own `not-on-base`, `not-on-branch` and `write-still-waits` come
+  through with its line. A Jig template's placeholders (`<Title of the linked source>`) show as
+  written: `rendered()` escapes raw HTML; a relative link, which would lead to the page's own
+  address, shows as its text.
 - **A view, not a dialog**; **one id per decision**, not Accept all — see the ADR.

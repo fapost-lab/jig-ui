@@ -1,12 +1,13 @@
 <script setup lang="ts">
   import { BookCheck, Columns3, Milestone, Plus, Rows3 } from '@lucide/vue';
-  import { computed, onUnmounted, ref, watch } from 'vue';
+  import { computed, onUnmounted, type Ref, ref, watch } from 'vue';
   import { useRoute, useRouter } from 'vue-router';
   import {
     type Board,
     call,
     client,
     type Decision,
+    type DocumentText,
     type Edited,
     type Finished,
     type ItemPlace,
@@ -428,9 +429,10 @@
       client.api.projects[':id'].queue.priority.$post({ param, json: { task, priority, revision } }),
     );
 
-  /** What waits for a decision in the project's knowledge, read only while the view shows it, and each diff open there. */
+  /** What waits for a decision in the project's knowledge, read only while the view shows it, and each diff and text open there. */
   const knowledge = ref<Knowledge | 'not-connected'>();
   const diffs = ref<Partial<Record<string, SourceDiff | 'reading' | 'not-found'>>>({});
+  const texts = ref<Partial<Record<string, DocumentText | 'reading' | 'not-found'>>>({});
   const loadKnowledge = lastWins(
     async () => {
       const res = await call(() => client.api.projects[':id'].knowledge.$get({ param }));
@@ -447,25 +449,65 @@
         if (changed.has(doc)) void readDiff(doc);
         else delete diffs.value[doc];
       }
+      // A document's text likewise, while the document is still proposed.
+      const proposed = new Set(typeof read === 'object' && read.state === 'ready' ? read.proposals.map((p) => p.id) : []);
+      for (const doc of Object.keys(texts.value)) {
+        if (proposed.has(doc)) void readText(doc);
+        else delete texts.value[doc];
+      }
     },
   );
 
   const noneKnown = computed(() => (typeof knowledge.value === 'object' ? noKnowledge(knowledge.value) : undefined));
 
-  async function readDiff(doc: string): Promise<void> {
-    if (diffs.value[doc] === undefined) diffs.value[doc] = 'reading';
+  /**
+   * Reads what one document shows while it is open, each document through its own `lastWins`: an older answer never
+   * overwrites a newer one, and nothing lands once the document is closed.
+   */
+  function perDocument<T>(
+    open: Ref<Partial<Record<string, T | 'reading' | 'not-found'>>>,
+    read: (doc: string) => Promise<T | 'not-found' | undefined>,
+  ): (doc: string) => Promise<unknown> {
+    const reads = new Map<string, () => Promise<unknown>>();
+    return (doc) => {
+      if (open.value[doc] === undefined) open.value[doc] = 'reading';
+      let run = reads.get(doc);
+      if (!run) {
+        run = lastWins(
+          () => read(doc),
+          (answer) => doc in open.value && (open.value[doc] = answer),
+        );
+
+        reads.set(doc, run);
+      }
+      return run();
+    };
+  }
+
+  const readDiff = perDocument(diffs, async (doc) => {
     const res = await call(() =>
       client.api.projects[':id'].knowledge[':doc'].diff.$get({ param: { ...param, doc: encodeURIComponent(doc) } }),
     );
 
-    // Closed meanwhile: nothing lands.
-    if (!res || !(doc in diffs.value)) return;
-    diffs.value[doc] = res.status === 200 ? (await res.json()).diff : 'not-found';
-  }
+    return res && (res.status === 200 ? (await res.json()).diff : 'not-found');
+  });
 
   function toggleDiff(doc: string, open: boolean): void {
     if (open) void readDiff(doc);
     else delete diffs.value[doc];
+  }
+
+  const readText = perDocument(texts, async (doc) => {
+    const res = await call(() =>
+      client.api.projects[':id'].knowledge[':doc'].text.$get({ param: { ...param, doc: encodeURIComponent(doc) } }),
+    );
+
+    return res && (res.status === 200 ? (await res.json()).text : 'not-found');
+  });
+
+  function toggleText(doc: string, open: boolean): void {
+    if (open) void readText(doc);
+    else delete texts.value[doc];
   }
 
   /** The document whose decision is on its way to Jig. */
@@ -647,10 +689,12 @@
         v-else-if="knowledge.state === 'ready'"
         :knowledge="knowledge"
         :diffs="diffs"
+        :texts="texts"
         :busy="deciding"
         :disabled="deciding !== undefined"
         @decide="decide"
         @toggle="toggleDiff"
+        @toggle-text="toggleText"
       />
     </div>
 

@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-11-06
+reviewed_at: 2026-11-09
 ---
 # JigClient — the only module that knows Jig
 
@@ -31,7 +31,7 @@ first Jig with a queue (0.29.0 was the first that prints JSON). A write a later 
 does not raise it: it carries a version of its own, checked by the local adapter against the
 project's Jig before the page is offered the write — `RESUME_JIG_VERSION`, 0.35.0, for
 `resumeTask`, `ARTIFACTS_JIG_VERSION`, 0.39.0, for a task's documents, `ROADMAP_JIG_VERSION`, 0.40.0, for a
-roadmap's edits, and `KNOWLEDGE_JIG_VERSION`, 0.40.0, for the knowledge waiting for a decision — so a project on an older Jig is still read, and only that write is missing. `CLOSE_JIG_VERSION`, 0.40.0, is the other kind: the close is offered on any Jig, and the version picks how `closeTask` checks it. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
+roadmap's edits, `KNOWLEDGE_JIG_VERSION`, 0.40.0, for the knowledge waiting for a decision, and `KNOWLEDGE_TEXT_JIG_VERSION`, 0.41.0, for a proposed document's text and a dropped link — so a project on an older Jig is still read, and only that write is missing. `CLOSE_JIG_VERSION`, 0.40.0, is the other kind: the close is offered on any Jig, and the version picks how `closeTask` checks it. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
 found from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`), never a
 `bash` on PATH, which may be WSL's. It is asked once per process; a failed ask is not kept.
 
@@ -134,12 +134,16 @@ The knowledge waiting for a decision — `readKnowledge` (`jig knowledge propose
 `jig knowledge sources --json`, at the lower of their revisions; of the sources only `changed`,
 `unrecorded` and `missing` kept, a stub proposal's `bytes` taken from the sources read) and
 `readSourceDiff` (`jig knowledge sources --diff <id> --json`) — keeps Jig's paths, relative to the
-project, and the diff as Jig prints it (adr-20261106-knowledge-decisions-from-the-page).
+project, and the diff as Jig prints it (adr-20261106-knowledge-decisions-from-the-page). Each record's
+`decidable`, `reason` and `lossy` (Jig 0.41.0) read `null` from an older Jig. `readKnowledgeText`
+(`jig knowledge read <id> --json`, Jig 0.41.0) keeps the document's whole file and a stub's linked file
+as Jig gives them, each with its `lossy` (adr-20261109-knowledge-text-and-drop-from-jig-0-41).
 `decideKnowledge` (`jig knowledge accept|reject|reviewed <id> --revision <n> --json`, 60 s,
 `KNOWLEDGE_TIMEOUT_MS`) always passes the revision — without it Jig decides unchecked — and reads only
 `write.note`, through `withoutPaths`, with the roadmap edits' `WriteNote` schema. Its refusals add
-`not-proposed` (decided already, or an active stub given to `reject`) and `source-missing` (a stub
-whose linked file is gone).
+`not-proposed` (decided already, or an active stub given to `reject` by Jig 0.40.0, or one whose file
+is as approved) and `source-missing` (a stub whose linked file is gone); Jig 0.41.0's `not-on-base`,
+`not-on-branch` and `write-still-waits` are Jig's codes, carried with its line as reasons.
 
 ## Rationale
 

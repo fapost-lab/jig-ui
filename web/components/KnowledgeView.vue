@@ -1,18 +1,35 @@
 <script setup lang="ts">
   import { ChevronDown, ChevronRight, ExternalLink } from '@lucide/vue';
   import { computed } from 'vue';
-  import { type Decision, link, type ReadyKnowledge, type SourceDiff } from '@/api';
+  import { type Decision, type DocumentText, link, type ReadyKnowledge, type SourceDiff } from '@/api';
   import { Badge } from '@/components/ui/badge';
   import { Button } from '@/components/ui/button';
   import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-  import { bindsLine, NO_DROP, readFirst, shownDiff, sourceLine, stubLine, waitingWord } from '@/lib/knowledge';
+  import {
+    bindsLine,
+    LOSSY,
+    LOSSY_NAME,
+    NO_DROP,
+    readFirst,
+    shownDiff,
+    shownText,
+    sourceLine,
+    stubLine,
+    undecidable,
+    waitingWord,
+  } from '@/lib/knowledge';
+  import { prose, rendered } from '@/lib/markdown';
   import { waitingState } from '@/lib/specs';
   import { toneText } from '@/lib/tones';
 
-  /** What waits for a person's decision in a project's knowledge, and each open diff — being read, read, or gone. */
+  /**
+   * What waits for a person's decision in a project's knowledge, and each open diff and document text — being read, read,
+   * or gone.
+   */
   const props = defineProps<{
     knowledge: ReadyKnowledge;
     diffs: Partial<Record<string, SourceDiff | 'reading' | 'not-found'>>;
+    texts: Partial<Record<string, DocumentText | 'reading' | 'not-found'>>;
     /** The document whose decision is on its way to Jig. */
     busy?: string;
     /** A decision is on its way to Jig: every other one waits. */
@@ -22,13 +39,30 @@
   const emit = defineEmits<{
     decide: [doc: string, decision: Decision];
     toggle: [doc: string, open: boolean];
+    toggleText: [doc: string, open: boolean];
   }>();
 
-  /** Each linked file with its line and its diff as shown, `undefined` while closed. */
+  /** Each proposal with why Jig cannot decide it as of the last fetch, and its text as shown — a Markdown file as HTML cleaned of anything that could run —, `undefined` while closed. */
+  const proposals = computed(() =>
+    props.knowledge.proposals.map((p) => {
+      const read = props.texts[p.id];
+      const text = read && shownText(p, read);
+      return {
+        p,
+        blocked: undecidable(p),
+        text:
+          text?.kind === 'text'
+            ? { kind: text.kind, parts: text.parts.map((part) => ({ ...part, html: part.markdown ? rendered(part.text) : undefined })) }
+            : text,
+      };
+    }),
+  );
+
+  /** Each linked file with its line, why Jig cannot decide it as of the last fetch, and its diff as shown, `undefined` while closed. */
   const sources = computed(() =>
     props.knowledge.sources.map((s) => {
       const read = props.diffs[s.id];
-      return { s, line: sourceLine(s), diff: read && shownDiff(read) };
+      return { s, line: sourceLine(s, props.knowledge.canDrop), blocked: undecidable(s), diff: read && shownDiff(read) };
     }),
   );
 </script>
@@ -53,7 +87,7 @@
     <section v-if="knowledge.proposals.length > 0" aria-labelledby="proposed" class="flex flex-col gap-2">
       <h2 id="proposed" class="font-semibold tracking-wider uppercase">Proposed</h2>
       <ul class="border-y">
-        <li v-for="p in knowledge.proposals" :key="p.id" class="flex flex-col gap-1 border-b px-3 py-2 last:border-b-0">
+        <li v-for="{ p, blocked, text } in proposals" :key="p.id" class="flex min-w-0 flex-col gap-1 border-b px-3 py-2 last:border-b-0">
           <p class="flex flex-wrap items-center gap-2">
             <span class="font-semibold">{{ p.id }}</span>
             <Badge variant="outline">{{ p.type }}</Badge>
@@ -63,6 +97,31 @@
             <code>{{ p.path }}</code> · {{ bindsLine(p) }}
           </p>
           <p v-if="stubLine(p)" :class="p.bytes === null ? toneText.bad : 'text-muted-foreground'">{{ stubLine(p) }}</p>
+          <p v-if="p.lossy" :class="toneText.attention">{{ LOSSY_NAME }}</p>
+          <Collapsible v-if="knowledge.canRead" :open="p.id in texts" @update:open="(open: boolean) => emit('toggleText', p.id, open)">
+            <CollapsibleTrigger class="inline-flex items-center gap-1 underline-offset-2 hover:underline">
+              <ChevronDown v-if="p.id in texts" class="size-3" />
+              <ChevronRight v-else class="size-3" />
+              Document
+            </CollapsibleTrigger>
+            <CollapsibleContent class="flex flex-col gap-2 pt-1">
+              <p v-if="text?.kind === 'reading'" class="text-muted-foreground">Reading…</p>
+              <p v-else-if="text?.kind === 'gone'" class="text-muted-foreground">Jig no longer lists it as proposed.</p>
+              <p v-else-if="text?.kind === 'failed'" :class="toneText.bad">Jig could not read it.</p>
+              <template v-else-if="text?.kind === 'text'">
+                <div v-for="(part, i) in text.parts" :key="part.path" class="flex min-w-0 flex-col gap-1">
+                  <p v-if="i > 0" class="text-muted-foreground">
+                    <code>{{ part.path }}</code
+                    >, as it is now:
+                  </p>
+                  <p v-if="part.lossy" :class="toneText.attention">{{ LOSSY }}</p>
+                  <!-- eslint-disable-next-line vue/no-v-html -- cleaned by DOMPurify in lib/markdown.ts -->
+                  <div v-if="part.html !== undefined" class="rounded border px-3" :class="prose" v-html="part.html" />
+                  <pre v-else class="overflow-x-auto rounded bg-muted p-2 text-xs">{{ part.text }}</pre>
+                </div>
+              </template>
+            </CollapsibleContent>
+          </Collapsible>
           <p v-if="p.waiting" :class="toneText.attention">
             {{ waitingWord(p.waiting) }}
             <a
@@ -75,7 +134,8 @@
             /></a>
           </p>
           <template v-else>
-            <p class="text-muted-foreground">{{ readFirst(p) }}</p>
+            <p v-if="blocked" :class="toneText.attention">{{ blocked }}</p>
+            <p v-if="!knowledge.canRead" class="text-muted-foreground">{{ readFirst(p) }}</p>
             <p class="flex flex-wrap items-center gap-2">
               <Button size="xs" :disabled="disabled" @click="emit('decide', p.id, 'accept')">
                 {{ busy === p.id ? 'Sending…' : 'Accept' }}
@@ -90,9 +150,14 @@
     <section v-if="knowledge.sources.length > 0" aria-labelledby="changed" class="flex flex-col gap-2">
       <h2 id="changed" class="font-semibold tracking-wider uppercase">Changed sources</h2>
       <ul class="border-y">
-        <li v-for="{ s, line, diff } in sources" :key="s.id" class="flex min-w-0 flex-col gap-1 border-b px-3 py-2 last:border-b-0">
+        <li
+          v-for="{ s, line, blocked, diff } in sources"
+          :key="s.id"
+          class="flex min-w-0 flex-col gap-1 border-b px-3 py-2 last:border-b-0"
+        >
           <p class="font-semibold">{{ s.id }}</p>
           <p :class="toneText[line.tone]">{{ line.text }}</p>
+          <p v-if="s.lossy" :class="toneText.attention">{{ LOSSY_NAME }}</p>
           <Collapsible v-if="s.state === 'changed'" :open="s.id in diffs" @update:open="(open: boolean) => emit('toggle', s.id, open)">
             <CollapsibleTrigger class="inline-flex items-center gap-1 underline-offset-2 hover:underline">
               <ChevronDown v-if="s.id in diffs" class="size-3" />
@@ -107,7 +172,7 @@
                 No approved text to compare with: read {{ s.source }} whole before you keep it.
               </p>
               <template v-else-if="diff?.kind === 'lines'">
-                <p v-if="diff.lossy" :class="toneText.attention">Jig dropped bytes of it that are not UTF-8.</p>
+                <p v-if="diff.lossy" :class="toneText.attention">{{ LOSSY }}</p>
                 <pre
                   class="overflow-x-auto rounded bg-muted p-2 text-xs"
                 ><code><span v-for="(row, i) in diff.lines" :key="i" class="block" :class="row.tone && toneText[row.tone]">{{ row.text || ' ' }}</span></code></pre>
@@ -115,7 +180,7 @@
             </CollapsibleContent>
           </Collapsible>
           <p v-if="s.waiting" :class="toneText.attention">
-            {{ waitingWord(s.waiting) }}
+            {{ waitingWord(s.waiting, 'source') }}
             <a
               v-if="link(s.waiting.pr)"
               :href="link(s.waiting.pr)"
@@ -125,12 +190,18 @@
               >pull request<ExternalLink class="size-3"
             /></a>
           </p>
-          <p v-else-if="s.state !== 'missing'" class="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Button size="xs" :disabled="disabled" @click="emit('decide', s.id, 'reviewed')">{{
-              busy === s.id ? 'Sending…' : 'Keep'
-            }}</Button>
-            <span class="text-muted-foreground">{{ NO_DROP }}</span>
-          </p>
+          <template v-else>
+            <p v-if="blocked" :class="toneText.attention">{{ blocked }}</p>
+            <p v-if="knowledge.canDrop || s.state !== 'missing'" class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Button v-if="s.state !== 'missing'" size="xs" :disabled="disabled" @click="emit('decide', s.id, 'reviewed')">{{
+                busy === s.id ? 'Sending…' : 'Keep'
+              }}</Button>
+              <Button v-if="knowledge.canDrop" variant="outline" size="xs" :disabled="disabled" @click="emit('decide', s.id, 'reject')">{{
+                busy === s.id && s.state === 'missing' ? 'Sending…' : 'Drop'
+              }}</Button>
+              <span v-else class="text-muted-foreground">{{ NO_DROP }}</span>
+            </p>
+          </template>
         </li>
       </ul>
     </section>

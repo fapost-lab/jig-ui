@@ -349,7 +349,14 @@ export type ProjectSettings =
  * gone or has no approved text — with the revision a decision carries; or why it cannot be read. Paths in it are the
  * project's own, relative to it (adr-20261106-knowledge-decisions-from-the-page).
  */
-export type ProjectKnowledge = ({ state: 'ready' } & Knowledge) | Exclude<ProjectView, { state: 'ready' }>;
+export type ProjectKnowledge =
+  | ({
+      state: 'ready';
+      /** Jig 0.41.0 and later: a proposal's text can be read (`knowledgeText`), and `reject` drops a stub's link. */
+      canRead: boolean;
+      canDrop: boolean;
+    } & Knowledge)
+  | Exclude<ProjectView, { state: 'ready' }>;
 
 /** How the file a stub links changed since it was approved, `null` when it links none that changed; or why it cannot be read. */
 export type SourceChange =
@@ -358,6 +365,25 @@ export type SourceChange =
       diff: {
         diff: string | null;
         lossy: boolean;
+      } | null;
+    }
+  | Exclude<ProjectView, { state: 'ready' }>;
+
+/**
+ * A proposed document's whole file, frontmatter included, and for a stub the file it links as it is now (`null` for any
+ * other document and for a stub whose file is gone), `lossy` where bytes that are not UTF-8 were dropped; `null` for a
+ * document not proposed; or why it cannot be read.
+ */
+export type KnowledgeText =
+  | {
+      state: 'ready';
+      text: {
+        content: string;
+        lossy: boolean;
+        source: {
+          content: string;
+          lossy: boolean;
+        } | null;
       } | null;
     }
   | Exclude<ProjectView, { state: 'ready' }>;
@@ -543,11 +569,18 @@ export interface ProjectSource {
    */
   knowledgeDiff(id: string, docId: string): Promise<SourceChange | undefined>;
   /**
+   * A proposed document's text, read through the project's Jig for a document a knowledge read just before lists as
+   * proposed — anything else is `null`, Jig not run. Below Jig 0.41.0 `unsupported`. `undefined` when no project has that id.
+   */
+  knowledgeText(id: string, docId: string): Promise<KnowledgeText | undefined>;
+  /**
    * Decides one document against the revision of the knowledge read it was based on: `accept` or `reject` a proposal,
-   * `reviewed` keeps a stub's changed or unrecorded file. Jig runs only for what a knowledge read just before lists as
-   * open to that decision — else `refused: not-found` —, commits it on `knowledge/decisions` and goes as far as
-   * `agent.git` allows; its note comes back. A document Jig does not find there, as the branch starts from origin's base
-   * and the checkout's commits may not be on it, is `refused: not-on-branch`. Below Jig 0.40.0 refused `unsupported`. `undefined` when no project has that id.
+   * `reviewed` keeps a stub's changed or unrecorded file, and from Jig 0.41.0 `reject` drops the link of a stub whose file
+   * changed, has no approved text or is gone. Jig runs only for what a knowledge read just before lists as open to that
+   * decision — else `refused: not-found` —, commits it on `knowledge/decisions` and goes as far as `agent.git` allows; its
+   * note comes back. A document not yet where the decision is judged is `refused: not-on-base` or `not-on-branch` by Jig
+   * 0.41.0; Jig 0.40.0 does not find it, as the branch starts from origin's base, and that is `refused: not-on-branch`
+   * too. Below Jig 0.40.0 refused `unsupported`. `undefined` when no project has that id.
    */
   decideKnowledge(id: string, docId: string, decision: KnowledgeDecision, revision: number): Promise<Written | undefined>;
   /**

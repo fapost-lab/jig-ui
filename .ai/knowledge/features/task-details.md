@@ -16,7 +16,7 @@ paths:
   - web/lib/artifacts.ts
   - web/lib/markdown.ts
 summary: What a task's details show from Jig's task row and queue, and its documents on the full page; why only offered actions reach the page and a document is shown as written
-reviewed_at: 2026-10-30
+reviewed_at: 2026-11-09
 ---
 # Task details
 
@@ -63,6 +63,9 @@ so the page never decides what is allowed.
   adds about it names none: its kind, time, size, and Jig's fixed word for one it cannot read.
 - **Rendered, then cleaned:** `marked` turns the Markdown into HTML and DOMPurify takes out what
   could run or post (scripts, handlers, frames, forms) before `v-html`; never `v-html` anything else.
+  Raw HTML in a document shows as written, so a template's `<id>` stays visible, and a relative link
+  shows as its text, since it would lead to the page's own address (adr-20261109-knowledge-text-and-drop-from-jig-0-41). `prose`
+  in `web/lib/markdown.ts` styles what `rendered()` gives, for every view that shows a document.
 - Documents come from Jig, never from the workspace's files: Jig knows where a worktree task's
   workspace is (adr-20261014-jig-ui-is-an-optional-layer-over-jig; fapost-lab/jig#347 added the
   JSON). They are read for a live task only, and not while the project upgrades.

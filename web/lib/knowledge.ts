@@ -1,12 +1,33 @@
-import type { Knowledge, LinkedSource, Proposal, SourceDiff } from '@/api';
+import type { DocumentText, Knowledge, LinkedSource, Proposal, SourceDiff } from '@/api';
 import { size } from './artifacts';
 import { NO_COMMITS, refusal } from './refusal';
 import type { Tone } from './tones';
 
-/** A decision taken that waits on `knowledge/decisions` until it lands, for a person. */
-export function waitingWord(waiting: NonNullable<Proposal['waiting']>): string {
+/** A decision taken that waits on `knowledge/decisions` until it lands, for a person: a linked file's rejection drops its link. */
+export function waitingWord(waiting: NonNullable<Proposal['waiting']>, of: 'proposal' | 'source' = 'proposal'): string {
+  if (of === 'source' && waiting.decision === 'rejected') return 'Dropped, waiting';
   return { accepted: 'Accepted', rejected: 'Rejected', reviewed: 'Kept' }[waiting.decision] + ', waiting';
 }
+
+/**
+ * Why Jig 0.41.0 reads a record as not decidable as of the last fetch: what it is judged on does not have it yet. The
+ * decision can still be sent — Jig fetches before it judges, so a push since makes it decidable, and a refusal says why.
+ * `undefined` for a decidable record, and for every record of Jig 0.40.0.
+ */
+export function undecidable(record: Proposal | LinkedSource): string | undefined {
+  if (record.decidable !== false) return undefined;
+  if (record.reason === 'not-on-base') return "Not on origin's default branch as this checkout has it: commit and push it, then decide.";
+  if (record.reason === 'not-on-branch') {
+    return "It reached origin's default branch after knowledge/decisions was cut: decide it once the decisions waiting there have landed.";
+  }
+  return 'Jig cannot decide it yet.';
+}
+
+/** A record whose file name lost bytes that are not UTF-8: the name shown may be another file's. */
+export const LOSSY_NAME = "Jig dropped bytes of a file's name here that are not UTF-8: the name shown may be another file's.";
+
+/** A text Jig read with bytes dropped that are not UTF-8. */
+export const LOSSY = 'Jig dropped bytes of it that are not UTF-8.';
 
 /** What accepting a proposal makes agents read it for: the paths and domains Jig lists, each as Jig wrote it. */
 export function bindsLine(proposal: Proposal): string {
@@ -24,8 +45,11 @@ export function stubLine(proposal: Proposal): string | undefined {
 export const readFirst = (proposal: Proposal): string =>
   `Jig cannot give Jig UI a document's text yet (fapost-lab/jig#391): read ${proposal.source ?? proposal.path} before you decide.`;
 
-/** What became of an approved stub's linked file, and what a person can do about it here. */
-export function sourceLine(source: LinkedSource): {
+/** What became of an approved stub's linked file, and what a person can do about it here — from Jig 0.41.0 drop the link too. */
+export function sourceLine(
+  source: LinkedSource,
+  canDrop = false,
+): {
   text: string;
   tone: Tone;
 } {
@@ -33,6 +57,7 @@ export function sourceLine(source: LinkedSource): {
   if (source.state === 'unrecorded') {
     return { text: `${source.source}: no approved text is kept to compare with — read it whole before you keep it.`, tone: 'attention' };
   }
+  if (canDrop) return { text: `${source.source} is gone: drop the link, or move it in the project (jig-accept).`, tone: 'bad' };
   return { text: `${source.source} is gone: move the link in the project (jig-accept).`, tone: 'bad' };
 }
 
@@ -91,15 +116,52 @@ export function shownDiff(read: SourceDiff | 'reading' | 'not-found'): ShownDiff
   return read.diff === null ? { kind: 'whole' } : { kind: 'lines', lines: diffLines(read.diff), lossy: read.lossy };
 }
 
+/** A document's text without its frontmatter, whose fields the view shows above it. */
+export const body = (content: string): string => content.replace(/^---\r?\n(?:[^]*?\r?\n)?---[ \t]*(?:\r?\n|$)/, '');
+
+/** A file the view renders as Markdown; any other is shown as it is. */
+export const isMarkdown = (path: string): boolean => /\.(md|mdx|markdown)$/i.test(path);
+
+/** A file of an open document as the view shows it: its path, its text, whether it is Markdown, whether bytes were dropped. */
+export interface TextPart {
+  path: string;
+  text: string;
+  markdown: boolean;
+  lossy: boolean;
+}
+
+/**
+ * An open document as the view shows it: being read, no longer proposed, unreadable, or its text without the frontmatter
+ * and, for a stub, the file it links as it is now.
+ */
+export type ShownText =
+  | { kind: 'reading' | 'gone' | 'failed' }
+  | {
+      kind: 'text';
+      parts: TextPart[];
+    };
+
+export function shownText(proposal: Proposal, read: DocumentText | 'reading' | 'not-found'): ShownText {
+  if (read === 'reading') return { kind: 'reading' };
+  if (read === 'not-found') return { kind: 'gone' };
+  if (read.state !== 'ready') return { kind: 'failed' };
+  const parts = [{ path: proposal.path, text: body(read.content), markdown: isMarkdown(proposal.path), lossy: read.lossy }];
+  if (read.source && proposal.source !== null) {
+    parts.push({ path: proposal.source, text: read.source.content, markdown: isMarkdown(proposal.source), lossy: read.source.lossy });
+  }
+  return { kind: 'text', parts };
+}
+
 /**
  * The line for a decision Jig refused, other than a stale revision: `agent.git: none` sends the person to Settings; a
- * document no longer open to it, or one Jig did not find on its branch, is said so; otherwise Jig's own reasons, paths
- * already cut out by the server, or the code.
+ * document no longer open to it, or one Jig 0.40.0 did not find on its branch, is said so; otherwise Jig's own reasons —
+ * Jig 0.41.0 says itself why a document is not where the decision is judged —, paths already cut out by the server, or
+ * the code.
  */
 export function knowledgeRefusal(code: string, reasons: string[], doc: string): string {
   if (code === 'git-not-allowed') return NO_COMMITS;
   if (code === 'not-found') return `${doc} no longer waits for that decision: the knowledge is shown as it is now.`;
-  if (code === 'not-on-branch') {
+  if (code === 'not-on-branch' && reasons.length === 0) {
     return `Jig did not find ${doc} on knowledge/decisions, which starts from origin's default branch: push the commit that proposed it, or let the decisions waiting there land first.`;
   }
   if (reasons.length > 0) return `Jig did not decide ${doc}: ${reasons.join(' ')}`;

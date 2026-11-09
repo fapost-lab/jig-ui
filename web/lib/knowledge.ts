@@ -61,6 +61,15 @@ export function sourceLine(
   return { text: `${source.source} is gone: move the link in the project (jig-accept).`, tone: 'bad' };
 }
 
+/** Which buttons a linked file offers: Keep unless it is gone, Drop from Jig 0.41.0 — on Jig 0.40.0 the NO_DROP line in its place. */
+export const sourceActions = (
+  source: LinkedSource,
+  canDrop: boolean,
+): {
+  keep: boolean;
+  drop: boolean;
+} => ({ keep: source.state !== 'missing', drop: canDrop });
+
 /** Jig 0.40.0 cannot drop the link of an approved stub: its `reject` takes only a proposal (fapost-lab/jig#392). */
 export const NO_DROP = 'Dropping the link has no Jig command yet (fapost-lab/jig#392).';
 

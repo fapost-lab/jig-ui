@@ -7,19 +7,22 @@ const FORBID_TAGS = ['form', 'input', 'button', 'select', 'textarea', 'style'];
 const escaped = (text: string): string =>
   text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c);
 
+/** Raw HTML that is nothing but comments: the one kind passed on as it is, unseen. */
+const comments = /^\s*(?:<!--[^]*?-->\s*)+$/;
+
 /** A link that leads somewhere from this page: one with a scheme, or to another host. */
 const away = /^([a-z][a-z0-9+.-]*:|\/\/)/i;
 
 /**
  * GitHub-flavoured Markdown whose raw HTML is shown as written rather than put in the page: Jig's templates hold
  * placeholders such as `<Title of the linked source>`, which a browser reads as a `<title>` that hides all that follows.
- * A comment stays one, unseen. A relative link — `../../docs/rules.md`, from the file the document sits in — would lead
+ * Raw HTML made only of comments stays as it is, unseen. A relative link — `../../docs/rules.md`, from the file the document sits in — would lead
  * to this page's own address, which has no such file: it shows as its text.
  */
 const markdown = new Marked({
   gfm: true,
   renderer: {
-    html: ({ text }) => (text.trimStart().startsWith('<!--') ? text : escaped(text)),
+    html: ({ text }) => (comments.test(text) ? text : escaped(text)),
     link(token) {
       return away.test(token.href) ? false : this.parser.parseInline(token.tokens);
     },

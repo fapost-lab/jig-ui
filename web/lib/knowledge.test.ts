@@ -10,6 +10,7 @@ import {
   readFirst,
   shownDiff,
   shownText,
+  sourceActions,
   sourceLine,
   stubLine,
   undecidable,
@@ -128,6 +129,15 @@ describe('sourceLine', () => {
       tone: 'bad',
     });
     expect(sourceLine(linked('missing'), true).text).toBe('docs/rules.md is gone: drop the link, or move it in the project (jig-accept).');
+  });
+});
+
+describe('sourceActions', () => {
+  it('offers Keep unless the file is gone, and Drop only from Jig 0.41.0', () => {
+    expect(sourceActions(linked('changed'), false)).toEqual({ keep: true, drop: false });
+    expect(sourceActions(linked('unrecorded'), true)).toEqual({ keep: true, drop: true });
+    expect(sourceActions(linked('missing'), false)).toEqual({ keep: false, drop: false });
+    expect(sourceActions(linked('missing'), true)).toEqual({ keep: false, drop: true });
   });
 });
 

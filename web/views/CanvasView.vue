@@ -456,7 +456,7 @@
 
     <CanvasSection
       title="KnowledgeView, Jig 0.41.0"
-      note="proposals — a feature's text, a stub's with its Markdown file (bytes dropped) and with a file that is not Markdown, one not pushed being read, one after the decisions were cut whose name lost bytes and whose text Jig could not read; changed sources — Keep and Drop, Drop on a file gone, one dropped and waiting, one changed only here; then a drop on its way"
+      note="proposals — a feature's text, a stub's with its Markdown file (bytes dropped) and with a file that is not Markdown, one not pushed being read, one after the decisions were cut whose name lost bytes and whose text Jig could not read, one no longer proposed when its text was read; changed sources — Keep and Drop, Drop on a file gone, one dropped and waiting, one changed only here; then a drop on its way"
     >
       <KnowledgeView :knowledge="knowledgeLater" :diffs="{}" :texts="knowledgeTexts" />
       <KnowledgeView

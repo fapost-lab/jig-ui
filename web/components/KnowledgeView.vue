@@ -13,6 +13,7 @@
     readFirst,
     shownDiff,
     shownText,
+    sourceActions,
     sourceLine,
     stubLine,
     undecidable,
@@ -58,11 +59,17 @@
     }),
   );
 
-  /** Each linked file with its line, why Jig cannot decide it as of the last fetch, and its diff as shown, `undefined` while closed. */
+  /** Each linked file with its line, its buttons, why Jig cannot decide it as of the last fetch, and its diff as shown, `undefined` while closed. */
   const sources = computed(() =>
     props.knowledge.sources.map((s) => {
       const read = props.diffs[s.id];
-      return { s, line: sourceLine(s, props.knowledge.canDrop), blocked: undecidable(s), diff: read && shownDiff(read) };
+      return {
+        s,
+        line: sourceLine(s, props.knowledge.canDrop),
+        actions: sourceActions(s, props.knowledge.canDrop),
+        blocked: undecidable(s),
+        diff: read && shownDiff(read),
+      };
     }),
   );
 </script>
@@ -151,7 +158,7 @@
       <h2 id="changed" class="font-semibold tracking-wider uppercase">Changed sources</h2>
       <ul class="border-y">
         <li
-          v-for="{ s, line, blocked, diff } in sources"
+          v-for="{ s, line, actions, blocked, diff } in sources"
           :key="s.id"
           class="flex min-w-0 flex-col gap-1 border-b px-3 py-2 last:border-b-0"
         >
@@ -192,11 +199,11 @@
           </p>
           <template v-else>
             <p v-if="blocked" :class="toneText.attention">{{ blocked }}</p>
-            <p v-if="knowledge.canDrop || s.state !== 'missing'" class="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <Button v-if="s.state !== 'missing'" size="xs" :disabled="disabled" @click="emit('decide', s.id, 'reviewed')">{{
+            <p v-if="actions.keep || actions.drop" class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Button v-if="actions.keep" size="xs" :disabled="disabled" @click="emit('decide', s.id, 'reviewed')">{{
                 busy === s.id ? 'Sending…' : 'Keep'
               }}</Button>
-              <Button v-if="knowledge.canDrop" variant="outline" size="xs" :disabled="disabled" @click="emit('decide', s.id, 'reject')">{{
+              <Button v-if="actions.drop" variant="outline" size="xs" :disabled="disabled" @click="emit('decide', s.id, 'reject')">{{
                 busy === s.id && s.state === 'missing' ? 'Sending…' : 'Drop'
               }}</Button>
               <span v-else class="text-muted-foreground">{{ NO_DROP }}</span>

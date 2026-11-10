@@ -649,7 +649,7 @@ const judged = { decidable: true, reason: null, lossy: false };
 
 /**
  * Knowledge Jig 0.41.0 lists: proposals whose text can be read — one not pushed, one that reached the base after the
- * decisions were cut, one whose file name lost bytes —, and linked files that can be dropped, one dropped and waiting, one
+ * decisions were cut, one whose file name lost bytes, one Jig no longer lists by the time its text is read —, and linked files that can be dropped, one dropped and waiting, one
  * changed only here.
  */
 export const knowledgeLater: ReadyKnowledge = {
@@ -722,6 +722,18 @@ export const knowledgeLater: ReadyKnowledge = {
       reason: 'not-on-branch',
       lossy: true,
     },
+    {
+      id: 'feature-legacy-auth',
+      type: 'feature',
+      domains: [],
+      path: '.ai/knowledge/features/legacy-auth.md',
+      paths: ['src/auth/**'],
+      summary: 'How the old login works',
+      source: null,
+      bytes: null,
+      waiting: null,
+      ...judged,
+    },
   ],
   sources: [
     { id: 'convention-team-rules', state: 'changed', source: 'docs/rules.md', bytes: 85, waiting: null, ...judged },
@@ -749,8 +761,8 @@ export const knowledgeLater: ReadyKnowledge = {
   waiting: { branch: 'knowledge/decisions', base: 'main', pushed: true, pr: null },
 };
 
-/** Open document texts: a feature's, a stub's with its Markdown file (bytes dropped), a stub's with a file that is not Markdown, one being read, one Jig could not read. */
-export const knowledgeTexts: Record<string, DocumentText | 'reading'> = {
+/** Open document texts: a feature's, a stub's with its Markdown file (bytes dropped), a stub's with a file that is not Markdown, one being read, one Jig could not read, one no longer proposed. */
+export const knowledgeTexts: Record<string, DocumentText | 'reading' | 'not-found'> = {
   'feature-checkout': {
     state: 'ready',
     content:
@@ -773,6 +785,7 @@ export const knowledgeTexts: Record<string, DocumentText | 'reading'> = {
   },
   'feature-search': 'reading',
   'feature-billing': { id: 'acme', state: 'unreadable', code: 'failed' },
+  'feature-legacy-auth': 'not-found',
 };
 
 /** The project item that sends the person to the Knowledge view. */

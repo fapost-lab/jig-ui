@@ -31,6 +31,12 @@ describe('rendered', () => {
     );
   });
 
+  it('shows a placeholder after a comment on the same line as written', () => {
+    expect(rendered('<!-- note --> <Title of the linked source>\n\nNext.\n')).toBe(
+      'clean:&lt;!-- note --&gt; &lt;Title of the linked source&gt;<p>Next.</p>\n',
+    );
+  });
+
   it('keeps a link that leads away and shows a relative one as its text', () => {
     expect(
       rendered('[web](https://example.com/x) [mail](mailto:a@b.c) [host](//example.com) [up](../../../docs/x.md) [**here**](#top)'),

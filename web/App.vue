@@ -6,7 +6,7 @@
   import ThemeToggle from './components/ThemeToggle.vue';
   import { lastWins } from './lib/last-wins';
   import { byName } from './lib/projects';
-  import { toneText } from './lib/tones';
+  import { toneRule, toneText } from './lib/tones';
 
   const route = useRoute();
   const router = useRouter();
@@ -33,14 +33,14 @@
 
 <template>
   <div class="flex h-screen flex-col">
-    <p v-if="failure?.kind === 'registry-unreadable'" role="alert" class="p-4 text-destructive">{{ failure.message }}</p>
-    <p v-else-if="failure?.kind === 'session-ended'" role="alert" class="p-4">
+    <p v-if="failure?.kind === 'registry-unreadable'" role="alert" class="m-4 text-[13px]" :class="toneRule.bad">{{ failure.message }}</p>
+    <p v-else-if="failure?.kind === 'session-ended'" role="alert" class="m-4 text-[13px]" :class="toneRule.attention">
       This page's session has ended. Run <code>jig-ui open</code>, or <code>npx @fapost/jig-ui</code>, to reopen it.
     </p>
-    <p v-else-if="failure?.kind === 'internal'" role="alert" class="p-4 text-destructive">
+    <p v-else-if="failure?.kind === 'internal'" role="alert" class="m-4 text-[13px]" :class="toneRule.bad">
       Jig UI hit an error it did not expect; its terminal says what. Reload the page to try again.
     </p>
-    <p v-else-if="failure?.kind === 'not-running'" role="alert" class="p-4">
+    <p v-else-if="failure?.kind === 'not-running'" role="alert" class="m-4 text-[13px]" :class="toneRule.attention">
       Jig UI is not running. Start it with <code>npx @fapost/jig-ui</code>, or <code>jig-ui</code>.
     </p>
     <template v-else>

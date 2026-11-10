@@ -26,9 +26,9 @@
   import EpicMenu from '@/components/EpicMenu.vue';
   import QueueMenu from '@/components/QueueMenu.vue';
   import FileItemDialog from '@/components/FileItemDialog.vue';
-  import SpecCard from '@/components/SpecCard.vue';
+  import SpecBoard from '@/components/SpecBoard.vue';
+  import SpecItemCard from '@/components/SpecItemCard.vue';
   import SpecItemMenu from '@/components/SpecItemMenu.vue';
-  import SpecItemRow from '@/components/SpecItemRow.vue';
   import TaskBrief from '@/components/TaskBrief.vue';
   import TaskCard from '@/components/TaskCard.vue';
   import TaskDocuments from '@/components/TaskDocuments.vue';
@@ -43,8 +43,10 @@
   import { Label } from '@/components/ui/label';
   import { Progress } from '@/components/ui/progress';
   import { Separator } from '@/components/ui/separator';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
   import { Toggle } from '@/components/ui/toggle';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+  import { itemStanding } from '@/lib/specs';
   import { toneRule, toneText } from '@/lib/tones';
   import UpgradePanel from '@/components/UpgradePanel.vue';
   import CanvasSection from './CanvasSection.vue';
@@ -73,6 +75,12 @@
     tasks,
     waitingSpecs,
   } from './canvas-samples';
+
+  /** The board columns of the samples' live tasks, as the Specs view's cards say them. */
+  const specColumns = new Map([
+    ['design-system', { id: 'in-progress', title: 'In progress' }],
+    ['specs-and-epics', { id: 'ready', title: 'Ready' }],
+  ]);
 
   const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;
   const buttonSizes = ['xs', 'sm', 'default', 'lg'] as const;
@@ -172,6 +180,20 @@
         <ToggleGroupItem value="board">Board</ToggleGroupItem>
         <ToggleGroupItem value="list">List</ToggleGroupItem>
       </ToggleGroup>
+    </CanvasSection>
+
+    <CanvasSection title="Tabs" note="the Specs view's specs, one chosen, one with its priority; a press chooses another">
+      <Tabs default-value="jig-ui">
+        <TabsList aria-label="Specs">
+          <TabsTrigger v-for="spec in specs" :key="spec.id" :value="spec.id">
+            {{ spec.id }}
+            <Badge v-if="spec.queue?.priority != null" variant="secondary">P{{ spec.queue.priority }}</Badge>
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent v-for="spec in specs" :key="spec.id" :value="spec.id" class="text-muted-foreground">{{
+          spec.title ?? spec.id
+        }}</TabsContent>
+      </Tabs>
     </CanvasSection>
 
     <CanvasSection title="Toggle" note="the board's finished tasks: off, on">
@@ -547,15 +569,37 @@
     />
 
     <CanvasSection
-      title="SpecItemRow"
-      note="done with a live task; open with dependencies; a task no longer live; no task; fog; changed by a waiting edit; with its roadmap menu"
+      title="SpecItemCard"
+      note="done with a live task; in work with dependencies; a task no longer live; to file; fog; opened, its rest under the title; changed by a waiting edit; with its roadmap menu"
     >
-      <ul>
-        <SpecItemRow v-for="(item, i) in specItems" :key="i" :item="item" project="jig-ui" :live="i < 2" />
-        <SpecItemRow :item="specItems[3]!" project="jig-ui" :live="false" waiting />
-        <SpecItemRow :item="specItems[3]!" project="jig-ui" :live="false">
+      <ul class="grid max-w-sm gap-2">
+        <SpecItemCard
+          v-for="(item, i) in specItems"
+          :key="i"
+          :item="item"
+          project="jig-ui"
+          :standing="itemStanding(item, specColumns)"
+          :live="item.task !== null && specColumns.has(item.task)"
+          :open="false"
+        />
+        <SpecItemCard :item="specItems[1]!" project="jig-ui" :standing="itemStanding(specItems[1]!, specColumns)" live open />
+        <SpecItemCard
+          :item="specItems[3]!"
+          project="jig-ui"
+          :standing="itemStanding(specItems[3]!, specColumns)"
+          :live="false"
+          :open="false"
+          waiting
+        />
+        <SpecItemCard
+          :item="specItems[3]!"
+          project="jig-ui"
+          :standing="itemStanding(specItems[3]!, specColumns)"
+          :live="false"
+          :open="false"
+        >
           <template #menu><SpecItemMenu :items="specItems" :index="3" :phase="1" :phases="[0, 1, 2]" /></template>
-        </SpecItemRow>
+        </SpecItemCard>
       </ul>
     </CanvasSection>
 
@@ -594,38 +638,33 @@
     />
 
     <CanvasSection
-      title="SpecCard"
-      note="no epic, a finished phase folded; an open epic in the queue at P1, with its queue menu; a lost epic branch, not queued, with its change on its way; missing files"
+      title="SpecBoard"
+      note="no epic, opened on the first phase with work left; an open epic in the queue at P1, with its queue menu; a lost epic branch, not queued, with its change on its way; missing files"
     >
-      <SpecCard
-        v-for="spec in specs"
-        :key="spec.id"
-        :spec="spec"
-        project="jig-ui"
-        :live="['design-system', 'specs-and-epics']"
-        :busy="spec.id === 'lost-epic'"
-      >
-        <template v-if="spec.epic?.state === 'open'" #menu>
-          <EpicMenu :spec="spec" :specs="specs" :disabled="spec.id === 'lost-epic'" />
-        </template>
-      </SpecCard>
-    </CanvasSection>
-
-    <CanvasSection
-      title="SpecCard, editable"
-      note="its roadmap edited from the page (Jig 0.40.0): each item's menu and Add item under each numbered phase — none before the first; edits waiting on the spec's branch committed only, pushed, in a pull request, the roadmap there with the items they changed marked; while an edit is on its way"
-    >
-      <div class="flex flex-col gap-3">
-        <SpecCard :spec="specs[1]!" project="jig-ui" :live="[]" editable />
-        <SpecCard
-          v-for="spec in waitingSpecs"
+      <div class="flex flex-col gap-10">
+        <SpecBoard
+          v-for="spec in specs"
           :key="spec.id"
           :spec="spec"
           project="jig-ui"
-          :live="['design-system', 'specs-and-epics']"
-          editable
-        />
-        <SpecCard :spec="specs[0]!" project="jig-ui" :live="['design-system', 'specs-and-epics']" editable busy disabled />
+          :columns="specColumns"
+          :busy="spec.id === 'lost-epic'"
+        >
+          <template v-if="spec.epic?.state === 'open'" #menu>
+            <EpicMenu :spec="spec" :specs="specs" :disabled="spec.id === 'lost-epic'" />
+          </template>
+        </SpecBoard>
+      </div>
+    </CanvasSection>
+
+    <CanvasSection
+      title="SpecBoard, editable"
+      note="its roadmap edited from the page (Jig 0.40.0): each item's menu, Up and Down among its lane, and Add item under the lanes of a numbered phase — none before the first; edits waiting on the spec's branch committed only, pushed, in a pull request, the roadmap there with the items they changed marked; while an edit is on its way"
+    >
+      <div class="flex flex-col gap-10">
+        <SpecBoard :spec="specs[1]!" project="jig-ui" :columns="new Map()" editable />
+        <SpecBoard v-for="spec in waitingSpecs" :key="spec.id" :spec="spec" project="jig-ui" :columns="specColumns" editable />
+        <SpecBoard :spec="specs[0]!" project="jig-ui" :columns="specColumns" editable busy disabled />
       </div>
     </CanvasSection>
   </div>

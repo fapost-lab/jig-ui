@@ -10,9 +10,9 @@
     DropdownMenuSeparator,
     DropdownMenuTrigger,
   } from '@/components/ui/dropdown-menu';
-  import { itemStep, itemWords } from '@/lib/specs';
+  import { itemWords, laneStep } from '@/lib/specs';
 
-  /** A roadmap item's moves within its phase and to another, and the filing of its task, as Jig's `spec item` makes them. */
+  /** A roadmap item's moves among its lane's cards and to another phase, and the filing of its task, as Jig's `spec item` makes them. */
   const props = defineProps<{
     /** The items of its phase, in the roadmap's order. */
     items: SpecItem[];
@@ -30,8 +30,8 @@
   }>();
 
   const item = computed(() => props.items[props.index] as SpecItem);
-  const up = computed(() => itemStep(props.items, props.index, -1));
-  const down = computed(() => itemStep(props.items, props.index, 1));
+  const up = computed(() => laneStep(props.items, props.index, -1));
+  const down = computed(() => laneStep(props.items, props.index, 1));
   const others = computed(() => props.phases.filter((n) => n !== props.phase));
   const fileable = computed(() => !item.value.checked && item.value.task === null);
   const label = computed(

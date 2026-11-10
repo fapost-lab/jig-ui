@@ -69,7 +69,13 @@ readable project's card shows:
   knowledge waiting for your decision with **Decide on the page** ([Deciding knowledge](#deciding-knowledge)).
 - **A note when pull request facts may be out of date.** Jig reads pull requests only during
   `jig housekeeping`; when its last run is old or the forge did not answer, a waiting pull request
-  may be missing until you run it.
+  may be missing until it runs.
+- **Housekeeping**, beside **Board**, runs `jig housekeeping` in the project — what Jig's session
+  hook runs once a day: merged tasks' workspaces go to Jig's trash for 7 days, abandoned ones to the
+  archive, the pull request facts are read again, and merged branches are deleted as far as the
+  project's settings let Jig. The card shows Jig's report until you **Dismiss** it. Jig fetches
+  first, so a dialog for your git credentials, such as the macOS keychain's, may ask you to allow
+  it; the run waits for it up to two minutes.
 - **The newer Jig on this machine**, after the project's own version, when the project runs an
   older Jig than the one installed here: *0.34.0 → 0.35.0 on this machine*, and **Upgrade…** to
   upgrade it from the page ([Upgrading a project's Jig](#upgrading-a-projects-jig)). Above the

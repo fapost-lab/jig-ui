@@ -20,7 +20,7 @@
   import { Button } from '@/components/ui/button';
   import { Progress } from '@/components/ui/progress';
   import { lastWins } from '@/lib/last-wins';
-  import { byName, chosen, landed, type Listed, readOnes, readProgress } from '@/lib/projects';
+  import { byName, chosen, type HousekeepingState, landed, type Listed, readOnes, readProgress } from '@/lib/projects';
   import { withConnected } from '@/lib/scan';
   import { settingRefusal } from '@/lib/settings';
   import { toneRule, toneText } from '@/lib/tones';
@@ -51,6 +51,8 @@
   const busy = ref(false);
   /** Each card's open upgrade panel, by project id, until the upgrade starts or the panel closes. */
   const plans = ref<Record<string, PlanState>>({});
+  /** Housekeeping run from each card, until dismissed; a reload forgets it. */
+  const housekept = ref<Record<string, HousekeepingState>>({});
   const upgrades = computed(() => projects.value && upgradeLine(read.value));
   /** Upgrade all's confirmation is open. */
   const confirmingAll = ref(false);
@@ -333,6 +335,20 @@
     reasons: error.reasons ?? [],
   });
 
+  /** Housekeeping on a card: Jig tidies the project, and the card shows its report until dismissed. */
+  async function housekeep(id: string): Promise<void> {
+    housekept.value[id] = { state: 'running' };
+    const res = await call(() => client.api.projects[':id'].housekeeping.$post(param(id)));
+    if (!res) return void delete housekept.value[id];
+    const body = await res.json();
+    if ('report' in body) housekept.value[id] = { state: 'done', report: body.report };
+    else if ('error' in body) {
+      const reasons = 'reasons' in body.error && Array.isArray(body.error.reasons) ? body.error.reasons.map(String) : [];
+      housekept.value[id] = { state: 'refused', message: body.error.message, reasons };
+    } else delete housekept.value[id]; // the project cannot be read now: its card says why
+    await load();
+  }
+
   /** Opens the card's upgrade panel with Jig's dry run of the upgrade. */
   async function plan(id: string): Promise<void> {
     plans.value[id] = { state: 'reading' };
@@ -425,6 +441,7 @@
         :held="held"
         :release="release"
         :reading="reading.has(shown.id)"
+        :housekeeping="housekept[shown.id]"
         class="min-w-0 flex-1"
         @settings="openSettings(shown.id)"
         @disconnect="disconnect(shown.id)"
@@ -435,6 +452,8 @@
         @land="land(shown.id)"
         @close="delete plans[shown.id]"
         @dismiss="dismiss(shown.id)"
+        @housekeeping="housekeep(shown.id)"
+        @dismiss-housekeeping="delete housekept[shown.id]"
       />
     </div>
     <SettingsDialog

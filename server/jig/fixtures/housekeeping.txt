@@ -1,0 +1,15 @@
+needs you (1):
+  merged but not consolidated, run jig-consolidate: release-0-6-0
+removed (2): moved to .ai/runtime/trash/2026-11-10/, recoverable for 7 days
+  quiet-design-nits, quiet-design
+in progress (1):
+  housekeeping-from-card
+kept, cannot tell whether it landed (5):
+  never started, so there is no branch to check: file-item-in-one-write-findings,
+    knowledge-drop-and-text-findings, quiet-design-findings, roadmap-from-page-findings,
+    settings-dialog-findings
+abandoned, waiting to go to the archive (1):
+  goes to the archive in 4 days: board-sort-filter-findings
+housekeeping: deleted branch task/quiet-design
+housekeeping: deleted branch task/quiet-design on origin
+action needed: consolidate the tasks flagged needs-consolidation

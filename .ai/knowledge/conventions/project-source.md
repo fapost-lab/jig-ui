@@ -18,7 +18,9 @@ ProjectSource (server/source/)
 
 MAY:      read a project's tasks, specs, attention items and legal actions; subscribe to
           "project changed, revision R"; send a command with the revision it was based on
-MUST:     name projects by id; return typed data, never Jig's raw output; report a refusal by
+MUST:     name projects by id; return typed data, never Jig's raw output — but housekeeping's
+          report, Jig's text a line each with its paths cut, which the page shows and never reads
+          (adr-20261110-housekeeping-runs-from-the-project-card); report a refusal by
           Jig's failure code; keep the last good read when a read fails mid-write
 MUST NOT: expose a path, a file or a child process to its callers — but `scan`'s findings, below,
           a task's documents as written (adr-20261030-a-task-document-is-shown-as-written), and
@@ -59,7 +61,8 @@ disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revi
 `prioritise(id, taskId, priority, revision)`, `moveEpic(id, specId, place, revision)` and
 `prioritiseEpic(id, specId, priority, revision)` — a spec's open epic, among the top level of the
 queue — `requestPause(id, taskId, revision)`,
-`cancelPause(id, taskId, revision)`, `resume(id, taskId, revision)`, `fileTask(id, taskId, goal)`, and
+`cancelPause(id, taskId, revision)`, `resume(id, taskId, revision)`, `fileTask(id, taskId, goal)`, `housekeeping(id)` —
+Jig's report on `written` as `report` —, and
 `setSetting(id, key, value, revision)` and `unsetSetting(id, key, revision)` — the person's own keys, always
 `--local` —, and a spec's roadmap edits `addItem(id, specId, phase, text, revision)`,
 `moveItem(id, specId, item, place, revision)` and `fileItem(id, specId, item, taskId, goal, revision)`, and the
@@ -94,7 +97,9 @@ showed — anything else is `refused: not-found` without Jig — and answers aft
 read again (adr-20261022-writes-carry-the-revision-of-their-read). A board's `revision` is the
 lowest of its reads' revisions (status, task list, queue). `fileTask` is the exception: its id is
 new, so it names no live task and carries no revision; `http/` checks the id and the goal against
-Jig's grammar before the port sees them (adr-20261022-filing-a-task-carries-no-revision).
+Jig's grammar before the port sees them (adr-20261022-filing-a-task-carries-no-revision). `housekeeping` is the other:
+it names no task and acts on the clone as it is, under Jig's own lock
+(adr-20261110-housekeeping-runs-from-the-project-card).
 
 A roadmap edit runs Jig only for the spec, the phase and the item handles of the roadmap the last
 read shows — the one on the spec's write branch while edits wait there — and below

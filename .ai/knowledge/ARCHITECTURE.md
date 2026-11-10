@@ -76,6 +76,7 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `/queue/pause/cancel`, `/tasks/resume` (adr-20261022-writes-carry-the-revision-of-their-read) and
   `/tasks/close` (adr-20261029-close-a-ready-task-from-the-board),
   `POST /api/projects/:id/tasks` (adr-20261022-filing-a-task-carries-no-revision),
+  `POST /api/projects/:id/housekeeping` (adr-20261110-housekeeping-runs-from-the-project-card),
   `POST /api/projects/:id/specs/items/add`, `/move` and `/file` (adr-20261106-editing-a-roadmap-from-the-page),
   `GET` and `POST /api/projects/:id/settings` and `POST /api/projects/:id/settings/unset` (feature-settings),
   `GET /api/projects/:id/knowledge`, `/knowledge/:doc/diff`, `/knowledge/:doc/text` and
@@ -132,9 +133,10 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   marked (adr-20261022-writes-carry-the-revision-of-their-read, feature-board). Built for the
   queue: order, priority and pause requests; and for a resume
   (adr-20261026-a-drop-out-of-paused-resumes-at-once); and for closing a ready task as done, after the
-  person confirms, its refusal shown in Jig's words (adr-20261029-close-a-ready-task-from-the-board). Filing a task is the one write with no revision: it
+  person confirms, its refusal shown in Jig's words (adr-20261029-close-a-ready-task-from-the-board). Filing a task is a write with no revision: it
   names a new id, which Jig claims or refuses `already-exists`
-  (adr-20261022-filing-a-task-carries-no-revision). A roadmap's edits are writes like the queue's,
+  (adr-20261022-filing-a-task-carries-no-revision); housekeeping is the other, a sweep of the clone as it is, under
+  Jig's own lock (adr-20261110-housekeeping-runs-from-the-project-card). A roadmap's edits are writes like the queue's,
   with the specs' revision, committed by Jig on the spec's branch; from Jig 0.41.0 filing an item's
   new task is one of them too (adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41), and on Jig 0.40.0 it is that filing and then naming it on the
   item, with a revision the adapter reads between the two
@@ -191,7 +193,9 @@ The start flow, read-and-follow and change, with its conflict display, are built
   resumes the task at once (adr-20261026-a-drop-out-of-paused-resumes-at-once).
 - A hosted or self-hosted Jig UI stays possible: projects by id, access behind a replaceable
   guard, writes carrying a revision (adr-20261014-project-source-port-keeps-hosting-open) — all but
-  the upgrade (adr-20261027-upgrading-a-project-runs-in-the-background) and, on Jig 0.40.0, the
+  the upgrade (adr-20261027-upgrading-a-project-runs-in-the-background), filing a task
+  (adr-20261022-filing-a-task-carries-no-revision), housekeeping
+  (adr-20261110-housekeeping-runs-from-the-project-card) and, on Jig 0.40.0, the
   naming of an item's new task, which carries the revision read after its filing
   (adr-20261106-editing-a-roadmap-from-the-page; from Jig 0.41.0 one write with the person's
   revision, adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41).

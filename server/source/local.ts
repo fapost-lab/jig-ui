@@ -12,6 +12,7 @@ import {
   fileNewItem,
   fileTask,
   hasJig,
+  housekeeping,
   JigRefusal,
   JigShapeError,
   KNOWLEDGE_JIG_VERSION,
@@ -745,7 +746,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
   async function writing(
     id: string,
     taskIds: string[],
-    write: (root: string, jigVersion: string, read: Read) => Promise<string | null | void>,
+    write: (root: string, jigVersion: string, read: Read) => Promise<string | string[] | null | void>,
     specIds: string[] = [],
     allowed: (task: Task) => boolean = () => true,
   ): Promise<Written | undefined> {
@@ -767,7 +768,8 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     entry.writes.add(run);
     try {
       const note = await run;
-      if (note) written = { state: 'written', note };
+      if (Array.isArray(note)) written = { state: 'written', report: note };
+      else if (note) written = { state: 'written', note };
     } catch (error) {
       // Only the code goes on, and reasons Jig UI cut the paths out of: Jig's message may name a path.
       written =
@@ -972,6 +974,9 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     fileTask(id, taskId, goal) {
       // A new id names no live task: Jig itself refuses a taken one.
       return writing(id, [], (root) => fileTask(root, taskId, goal));
+    },
+    housekeeping(id) {
+      return writing(id, [], (root) => housekeeping(root));
     },
     addItem(id, specId, phase, text, revision) {
       return roadmapWriting(

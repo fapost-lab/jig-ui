@@ -447,6 +447,8 @@ export type Written =
       state: 'written';
       /** Jig's note for the person, without a path, where a write carries one: whose step is next, or what failed after the commit (a roadmap edit). */
       note?: string;
+      /** Jig's report as it printed it, a line each, without a path (housekeeping). */
+      report?: string[];
     }
   | {
       state: 'refused';
@@ -552,6 +554,13 @@ export interface ProjectSource {
    * a taken id is Jig's `already-exists`. `undefined` when no project has that id.
    */
   fileTask(id: string, taskId: string, goal: string): Promise<Written | undefined>;
+  /**
+   * Tidies the project as Jig's session hook does once a day — merged tasks' workspaces to the trash, merged branches
+   * deleted as its settings allow — then reads it again, answering Jig's report. No revision and no live id: it acts on
+   * the clone as it is when it runs, under Jig's own lock. Refused `upgrading` while the project's upgrade runs.
+   * `undefined` when no project has that id.
+   */
+  housekeeping(id: string): Promise<Written | undefined>;
   /** A connected project's settings, read through its Jig at each call; `undefined` when no project has that id. */
   settings(id: string): Promise<ProjectSettings | undefined>;
   /**

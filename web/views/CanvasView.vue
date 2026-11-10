@@ -118,7 +118,7 @@
 <template>
   <div>
     <div class="border-b px-4 py-3">
-      <h1 class="font-semibold tracking-wider uppercase">Canvas</h1>
+      <h1 class="text-xl font-semibold">Canvas</h1>
       <p class="text-muted-foreground">Every component of the page in every variant and state; the left panel light, the right dark.</p>
     </div>
 
@@ -129,7 +129,7 @@
       </p>
     </CanvasSection>
 
-    <h2 class="border-b px-4 py-2 font-bold tracking-widest uppercase">components/ui</h2>
+    <h2 class="border-b px-4 py-2 text-[15px] font-semibold">components/ui</h2>
 
     <CanvasSection title="Button" note="variant × size; icon sizes; disabled">
       <div v-for="variant in buttonVariants" :key="variant" class="flex flex-wrap items-center gap-2">
@@ -212,7 +212,7 @@
       </Collapsible>
     </CanvasSection>
 
-    <h2 class="border-b px-4 py-2 font-bold tracking-widest uppercase">components</h2>
+    <h2 class="border-b px-4 py-2 text-[15px] font-semibold">components</h2>
 
     <CanvasSection title="ProjectSwitcher" note="on the workspace; on a project (open it to search); no projects">
       <ProjectSwitcher :projects="projects" version="0.1.0"><ThemeToggle /></ProjectSwitcher>

@@ -8,10 +8,10 @@ paths:
   - server/source/local.ts
   - server/http/app.ts
   - web/views/BoardView.vue
-  - web/components/SpecCard.vue
   - web/components/FileItemDialog.vue
+  - web/components/SpecBoard.vue
 summary: Roadmap edits from the page are jig spec item commands with the specs' revision, shown on the spec's write branch while they wait; filing an item's new task is two writes (amends two ADRs for it), none checked first, filed:true recovered by filing again
-reviewed_at: 2026-11-06
+reviewed_at: 2026-11-10
 ---
 # A roadmap is edited from the page on the spec's branch, and an item's task is filed in two writes
 

@@ -14,7 +14,7 @@ paths:
   - web/lib/refusal.ts
   - web/lib/sift.ts
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
-reviewed_at: 2026-11-06
+reviewed_at: 2026-11-10
 ---
 # Board
 
@@ -31,11 +31,14 @@ keeps (`web/components/FinishedList.vue`, its words from `web/lib/finished.ts`).
 `web/views/BoardView.vue` reads the board and shows it two ways, switched by the person and
 remembered by the browser (`localStorage` `jig-ui.board-view`): Board (`BoardColumns`), the
 columns side by side, where a click expands a card into its details; List (`BoardList`), the
-columns as folding groups of one-line rows, a selected row's details in a pane on the right. The
+columns as folding groups of one-line rows, a selected row's details in a pane on the right. An
+empty column is a dashed "nothing here" box, an empty group one muted header line; both still take a
+drop, so Paused does (adr-20261110-the-page-speaks-a-quiet-design-language). The
 two take the columns and the selected task as props and emit the choice; the view holds it. Both read the details on demand (feature-task-details).
 Specs (feature-specs) and Knowledge (feature-knowledge) are the third and fourth choices of the same switch; the sort
 and filters show for Board and List only. `?view=` in the address (the workspace card's link to Knowledge) opens that
-view as a press on it would, remembered, and is dropped from the address.
+view as a press on it would, remembered, and is dropped from the address; `?spec=` names the spec
+the Specs view shows, and the sort and filters keep it.
 
 ## Why
 

@@ -6,7 +6,7 @@ domains: []
 paths:
   - "web/**"
 summary: MAY/MUST/MUST NOT for web/ layers (views → components → components/ui), styling, lib decisions with tests, and the canvas
-reviewed_at: 2026-10-30
+reviewed_at: 2026-11-10
 ---
 # The page in Vue
 
@@ -39,6 +39,9 @@ MUST:     be the only callers of call(), client and onChange()
   with an `eslint-disable-next-line vue/no-v-html` naming it (adr-20261030-a-task-document-is-shown-as-written).
 - Styling is Tailwind utilities and the theme's tokens (`bg-background`, `text-muted-foreground`…);
   no `<style>` blocks. A colour that means something comes from `lib/tones.ts` only.
+- Text is the system's sans; `font-mono` (or `<code>`) only for ids, commands, code, branches,
+  versions, settings keys and paths. 14px body, 13px secondary text and controls, 12px meta;
+  headings in sentence case (adr-20261110-the-page-speaks-a-quiet-design-language).
 - Variants go through class-variance-authority, as shadcn-vue's own do.
 - An interactive widget (a toggle, a disclosure, a menu) is a Reka UI primitive, for its keyboard
   and ARIA, not a `<div>` with handlers.
@@ -47,7 +50,9 @@ MUST:     be the only callers of call(), client and onChange()
 - A component in `components/`, or one of `components/ui/` the page uses directly, has a section
   in `views/CanvasView.vue` covering its variants and states.
 - shadcn-vue components are added with `npx shadcn-vue@latest add <name>`, then moved to
-  devDependencies if the CLI put anything under `dependencies`.
+  devDependencies if the CLI put anything under `dependencies`, and its bumps of packages already
+  installed reverted. A component comes in `reka-lyra`'s shape: give it the theme's radius and the
+  page's sizes, as the others have.
 - A preference of one browser goes to `localStorage` under a `jig-ui.` key, every read and write
   in try/catch; a refusal keeps the default.
 

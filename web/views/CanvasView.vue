@@ -89,7 +89,12 @@
       label: 'the id taken',
       busy: false,
       taken: true,
-      refusal: 'The project has a task called invoices already, maybe a finished one. Choose another id.',
+      refusal: 'The project has a finished task called invoices. Choose another id.',
+    },
+    {
+      label: 'the item filed already',
+      busy: false,
+      refusal: 'Jig did not file invoices: i-5d729342e61f already names task orders',
     },
     {
       label: 'filed, not named',

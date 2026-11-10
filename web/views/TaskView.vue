@@ -98,15 +98,15 @@
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-3xl flex-col gap-4 p-4">
+  <div class="mx-auto flex max-w-3xl flex-col gap-5 px-6 py-6">
     <RouterLink
       :to="`/projects/${encodeURIComponent(project)}`"
-      class="inline-flex items-center gap-1 self-start text-muted-foreground hover:text-foreground"
+      class="inline-flex items-center gap-1 self-start text-[13px] text-muted-foreground hover:text-foreground"
     >
       <ArrowLeft class="size-3" />board of {{ project }}
     </RouterLink>
     <div class="flex items-center gap-3">
-      <h1 class="text-sm font-bold break-all">{{ task }}</h1>
+      <h1 class="font-mono text-lg font-semibold break-all">{{ task }}</h1>
       <CopyButton :text="task" label="copy id" />
       <Badge v-if="typeof details === 'object' && details.state === 'ready' && details.class" variant="outline">{{ details.class }}</Badge>
     </div>
@@ -117,7 +117,7 @@
     </p>
     <p v-else-if="details.state !== 'ready'"><StateLine :project="details" :reading="reading" @read-again="reread" /></p>
     <template v-else>
-      <p v-if="details.goal">{{ details.goal }}</p>
+      <p v-if="details.goal" class="text-base">{{ details.goal }}</p>
       <p v-if="note" :class="toneRule[note.tone]">{{ note.text }}</p>
       <TaskFacts :details="details" class="border-y py-3" />
 
@@ -131,12 +131,12 @@
       />
 
       <section v-if="details.attention.length > 0" aria-labelledby="needs-you" class="flex flex-col gap-3">
-        <h2 id="needs-you" class="font-semibold tracking-wider uppercase">Needs you</h2>
+        <h2 id="needs-you" class="text-[15px] font-semibold">Needs you</h2>
         <AttentionItem v-for="(item, i) in details.attention" :key="i" :item="item" />
       </section>
 
       <section v-if="details.housekeepingFlags.length > 0" aria-labelledby="flags" class="flex flex-col gap-2">
-        <h2 id="flags" class="font-semibold tracking-wider uppercase">Housekeeping flags</h2>
+        <h2 id="flags" class="text-[15px] font-semibold">Housekeeping flags</h2>
         <ul class="flex flex-wrap gap-2">
           <li v-for="flag in details.housekeepingFlags" :key="flag">
             <Badge variant="secondary">{{ flag }}</Badge>
@@ -145,9 +145,9 @@
       </section>
 
       <section aria-labelledby="actions" class="flex flex-col gap-2">
-        <h2 id="actions" class="font-semibold tracking-wider uppercase">What Jig offers now</h2>
+        <h2 id="actions" class="text-[15px] font-semibold">What Jig offers now</h2>
         <ActionList :actions="details.actions" />
-        <p class="text-muted-foreground">Run a command in the project; this page follows what changes.</p>
+        <p class="text-[13px] text-muted-foreground">Run a command in the project; this page follows what changes.</p>
       </section>
     </template>
   </div>

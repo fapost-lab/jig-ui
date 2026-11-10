@@ -27,7 +27,7 @@
 </script>
 
 <template>
-  <section :aria-label="`Upgrade Jig in ${project}`" class="flex flex-col gap-2">
+  <section :aria-label="`Upgrade Jig in ${project}`" class="flex flex-col gap-2 text-[13px]">
     <p v-if="run?.state === 'running' && run.landing" :class="toneRule.quiet">
       Checking the merge… If it is merged, Jig checks the base branch out and brings it up to origin's.
     </p>

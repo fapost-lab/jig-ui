@@ -20,10 +20,13 @@
 
 <template>
   <div :class="toneRule.attention">
-    <p class="font-semibold">
-      {{ item.title }}<span v-if="item.subject.id" class="font-normal"> — {{ item.subject.id }}</span>
+    <p class="font-medium">
+      {{ item.title
+      }}<span v-if="item.subject.id" class="font-normal">
+        — <code class="text-xs">{{ item.subject.id }}</code></span
+      >
     </p>
-    <p v-if="item.detail" class="text-muted-foreground">{{ item.detail }}</p>
+    <p v-if="item.detail" class="text-[13px] text-muted-foreground">{{ item.detail }}</p>
     <p class="text-foreground">
       {{ item.todo }}
       <a

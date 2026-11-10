@@ -29,7 +29,7 @@
   <p v-if="actions.length === 0" class="text-muted-foreground">Nothing for now.</p>
   <ul v-else class="flex flex-col gap-2">
     <li v-for="action in actions" :key="action.id">
-      <p class="text-muted-foreground">› {{ ACTIONS[action.id] ?? action.id }}</p>
+      <p class="text-[13px] text-muted-foreground">{{ ACTIONS[action.id] ?? action.id }}</p>
       <CopyCommand :command="action.command" class="mt-1" />
     </li>
   </ul>

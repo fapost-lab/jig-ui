@@ -52,7 +52,7 @@
         @pick="(id) => router.push(`/projects/${encodeURIComponent(id)}`)"
         ><ThemeToggle
       /></ProjectSwitcher>
-      <p v-if="newer" class="shrink-0 border-b px-4 py-1.5" :class="toneText.attention">
+      <p v-if="newer" class="shrink-0 border-b px-4 py-2 text-[13px]" :class="toneText.attention">
         Jig UI {{ newer.version }} is out. To update, run <code>{{ newer.stop }}</code
         >, then start Jig UI again.
       </p>

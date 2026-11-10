@@ -56,7 +56,7 @@
             :aria-invalid="taken"
             aria-describedby="item-task-hint item-task-refusal"
           />
-          <p id="item-task-hint" class="text-muted-foreground">
+          <p id="item-task-hint" class="text-[13px] text-muted-foreground">
             <template v-if="filed">Names {{ task.trim() }}, filed already: Jig runs <code>jig spec item file</code>.</template>
             <template v-else>
               Letters, digits, ".", "_" and "-", not starting with "." or "-". Jig files the task and names it on the item with
@@ -68,7 +68,7 @@
           <Label for="item-task-goal">Goal</Label>
           <Input id="item-task-goal" v-model="goal" required maxlength="500" />
         </div>
-        <p v-if="refusal" id="item-task-refusal" role="alert" class="text-destructive">{{ refusal }}</p>
+        <p v-if="refusal" id="item-task-refusal" role="alert" class="text-[13px] text-destructive">{{ refusal }}</p>
         <div class="flex justify-end gap-2">
           <Button type="button" variant="outline" @click="open = false">Cancel</Button>
           <Button type="submit" :disabled="busy">{{ busy ? 'Filing…' : 'File task' }}</Button>

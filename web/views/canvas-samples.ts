@@ -17,6 +17,7 @@ import type {
   UpgradePlan,
 } from '@/api';
 import type { FinishedTask } from '@/lib/finished';
+import type { HousekeepingState } from '@/lib/projects';
 import type { PlanState, UpgradeRun } from '@/lib/upgrade';
 
 const task = (id: string, more: Partial<Task>): Task => ({
@@ -292,6 +293,22 @@ export const projects: Project[] = [
 ];
 
 const plan: UpgradePlan = { mode: 'copy', from: '0.34.0', to: '0.35.0', outcome: 'planned', git: null, manualSteps: [], wouldStop: [] };
+
+/** Housekeeping from a card: under way, Jig's report as it printed it, Jig's refusal with its reasons. */
+export const housekeepingRuns: HousekeepingState[] = [
+  { state: 'running' },
+  {
+    state: 'done',
+    report: [
+      'needs you (1):',
+      '  merged but not consolidated, run jig-consolidate: release-0-6-0',
+      'removed (2): moved to …, recoverable for 7 days',
+      '  quiet-design-nits, quiet-design',
+      'housekeeping: deleted branch task/quiet-design',
+    ],
+  },
+  { state: 'refused', message: "Jig's housekeeping failed.", reasons: ['housekeeping.trash_ttl: not a duration'] },
+];
 
 /** The upgrade panel before a run: reading the dry run, its plan with and without steps by hand, a stop, a refusal. */
 export const plans: PlanState[] = [

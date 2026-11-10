@@ -114,6 +114,12 @@ function project(
       text?: unknown;
       decision?: unknown;
     };
+    /** What `housekeeping` prints on stdout and stderr, and its exit code. */
+    housekeeping?: {
+      out?: string;
+      err?: string;
+      code?: number;
+    };
     /** What `task set` prints on stderr, and its exit code. */
     set?: {
       err?: string;
@@ -163,6 +169,8 @@ function project(
   writeFileSync(join(dir, 'self.out'), self.out ?? 'self-update: already current');
   writeFileSync(join(dir, 'self.err'), self.err ?? '');
   writeFileSync(join(dir, 'set.err'), answers.set?.err ?? '');
+  writeFileSync(join(dir, 'housekeeping.out'), answers.housekeeping?.out ?? '');
+  writeFileSync(join(dir, 'housekeeping.err'), answers.housekeeping?.err ?? '');
   if (self.statusAfter !== undefined) writeFileSync(join(dir, 'status-after.json'), envelope(self.statusAfter));
   writeFileSync(
     join(dir, '.ai', 'scripts', 'jig'),
@@ -187,6 +195,7 @@ case "$*" in
   "knowledge accept "*|"knowledge reject "*|"knowledge reviewed "*) while [ -f hold ]; do sleep 0.05; done; cat decision.json; if grep -q '"error"' decision.json; then exit 1; fi ;;
   "task artifact read "*) cat artifact.json; if grep -q '"error"' artifact.json; then exit 1; fi ;;
   "task set "*) cat set.err >&2; exit ${answers.set?.code ?? 0} ;;
+  housekeeping) cat housekeeping.out; cat housekeeping.err >&2; exit ${answers.housekeeping?.code ?? 0} ;;
   "upgrade --dry-run --json") cat plan.json ;;
   "self-update") while [ -f hold-self ]; do sleep 0.05; done; cat self.out; echo; cat self.err >&2; if [ -f status-after.json ] && [ ${self.code ?? 0} -eq 0 ]; then cp status-after.json status.json; fi; exit ${self.code ?? 0} ;;
   "upgrade --land --json") while [ -f hold-land ]; do sleep 0.05; done; cat land.json; if grep -q '"error"' land.json; then exit 1; fi ;;
@@ -803,6 +812,41 @@ describe('localSource, writing the queue', () => {
     expect(filed).toBeGreaterThanOrEqual(0);
     expect(ran.slice(filed + 1)).toEqual(expect.arrayContaining(['task list --json']));
     expect(await source.fileTask('nobody', 'zeta', 'x')).toBeUndefined();
+  });
+
+  it("tidies the project, answers Jig's report and reads the project again", async () => {
+    const out = 'removed (1): moved to .ai/runtime/trash/2026-11-10/, recoverable for 7 days\n  a\n';
+    const dir = project('tidier', '0.31.0', { tasks, housekeeping: { out } });
+    await source.connect(dir);
+    const from = calls(dir).length;
+    expect(await source.housekeeping('tidier')).toEqual({
+      state: 'written',
+      report: ['removed (1): moved to …, recoverable for 7 days', '  a'],
+    });
+    const ran = since(dir, from);
+    expect(ran.slice(ran.indexOf('housekeeping') + 1)).toEqual(expect.arrayContaining(['status --json', 'task list --json']));
+    expect(await source.housekeeping('nobody')).toBeUndefined();
+  });
+
+  it('answers the report of a run that left a task to consolidate, which Jig ends with 3', async () => {
+    const out =
+      'needs you (1):\n  merged but not consolidated, run jig-consolidate: a\naction needed: consolidate the tasks flagged needs-consolidation\n';
+    const dir = project('consolidate-me', '0.31.0', { tasks, housekeeping: { out, code: 3 } });
+    await source.connect(dir);
+    expect(await source.housekeeping('consolidate-me')).toEqual({
+      state: 'written',
+      report: [
+        'needs you (1):',
+        '  merged but not consolidated, run jig-consolidate: a',
+        'action needed: consolidate the tasks flagged needs-consolidation',
+      ],
+    });
+  });
+
+  it("carries Jig's failure with its reasons", async () => {
+    const dir = project('untidy', '0.31.0', { tasks, housekeeping: { err: 'jig: error: housekeeping: a lock is broken\n', code: 1 } });
+    await source.connect(dir);
+    expect(await source.housekeeping('untidy')).toEqual({ state: 'refused', code: 'failed', reasons: ['a lock is broken'] });
   });
 
   it('asks a pause and takes it back', async () => {
@@ -1882,6 +1926,7 @@ describe('localSource, upgrading a project', () => {
     await source.workspace();
     await settled(behind);
     expect(await source.fileTask('behind', 'zeta', 'Do the thing')).toEqual({ state: 'refused', code: 'upgrading' });
+    expect(await source.housekeeping('behind')).toEqual({ state: 'refused', code: 'upgrading' });
     expect(others()).toBe(before);
     writeFileSync(join(behind, 'go'), '');
     await ended('behind');

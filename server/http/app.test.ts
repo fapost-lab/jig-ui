@@ -1227,6 +1227,52 @@ describe('/api/projects/:id/tasks', () => {
   });
 });
 
+describe('POST /api/projects/:id/housekeeping', () => {
+  const appOf = (outcome: Awaited<ReturnType<ProjectSource['housekeeping']>>) =>
+    createApp({
+      port: PORT,
+      token: TOKEN,
+      source: { ...localSource(join(webRoot, 'fake-housekeeping')), housekeeping: () => Promise.resolve(outcome) },
+      webRoot,
+    });
+  const post = (target: Hono, headers: Record<string, string> = { cookie: COOKIE }) =>
+    target.request('/api/projects/x/housekeeping', { method: 'POST', headers: { host: HOST, ...headers } });
+
+  it("answers Jig's report once it ran", async () => {
+    const res = await post(appOf({ state: 'written', report: ['removed (1): moved to …, recoverable for 7 days', '  a'] }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ report: ['removed (1): moved to …, recoverable for 7 days', '  a'] });
+  });
+
+  it("words Jig's failure and carries its reasons", async () => {
+    const res = await post(appOf({ state: 'refused', code: 'failed', reasons: ['a lock is broken'] }));
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({ error: { code: 'failed', message: "Jig's housekeeping failed.", reasons: ['a lock is broken'] } });
+  });
+
+  it.each([
+    ['a run past the limit', { state: 'refused', code: 'timeout' }, 422, 'timeout'],
+    ['an upgrade under way', { state: 'refused', code: 'upgrading' }, 409, 'upgrading'],
+    ['a project not connected', undefined, 404, 'not-connected'],
+  ] as const)('answers %s', async (_, outcome, status, code) => {
+    const res = await post(appOf(outcome));
+    expect(res.status).toBe(status);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);
+  });
+
+  it('answers the state of a project that is not ready', async () => {
+    const res = await post(appOf({ id: 'x', state: 'unreadable', code: 'timeout' }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ project: { id: 'x', state: 'unreadable', code: 'timeout' } });
+  });
+
+  it('is refused without the token and from another origin', async () => {
+    const app = appOf({ state: 'written', report: [] });
+    expect((await post(app, {})).status).toBe(401);
+    expect((await post(app, { cookie: COOKIE, origin: 'https://evil.example' })).status).toBe(403);
+  });
+});
+
 describe('/api/self-update and /api/upgrade-all', () => {
   const base = localSource(join(webRoot, 'machine-config'));
   const appOf = (over: Partial<ProjectSource>) => createApp({ port: PORT, token: TOKEN, source: { ...base, ...over }, webRoot });

@@ -90,6 +90,19 @@ async function bash(platform: NodeJS.Platform): Promise<string> {
  * half as long again (CI, task `conflict-display`).
  */
 async function jig(root: string, args: string[], platform: NodeJS.Platform, timeout = TIMEOUT_MS): Promise<string> {
+  return (await ran(root, args, platform, timeout)).stdout;
+}
+
+/** A Jig run as `jig` makes it, answering what it printed on both streams: for a command whose warnings matter on success. */
+async function ran(
+  root: string,
+  args: string[],
+  platform: NodeJS.Platform,
+  timeout: number,
+): Promise<{
+  stdout: string;
+  stderr: string;
+}> {
   if (stopping) throw new Error('Jig UI is stopping');
   const argv = [SCRIPT, ...args];
   // Elsewhere each run leads a process group of its own, so that stopping Jig UI can stop all of it (`stopJig`).
@@ -103,7 +116,7 @@ async function jig(root: string, args: string[], platform: NodeJS.Platform, time
       : leading(await bash(platform), argv, root, timeout);
   runs.set(running.child, running);
   try {
-    return (await running).stdout;
+    return await running;
   } finally {
     runs.delete(running.child);
   }
@@ -115,12 +128,23 @@ async function jig(root: string, args: string[], platform: NodeJS.Platform, time
  * 0; otherwise an error carrying `stdout`, `stderr` and, past `timeout`, `killed`. Unlike `execFile`, its output has no
  * size limit. The group has no controlling terminal: a prompt on `/dev/tty` fails instead of waiting in Jig UI's.
  */
-function leading(file: string, args: string[], cwd: string, timeout: number): Promise<{ stdout: string }> & { child: ChildProcess } {
+function leading(
+  file: string,
+  args: string[],
+  cwd: string,
+  timeout: number,
+): Promise<{
+  stdout: string;
+  stderr: string;
+}> & { child: ChildProcess } {
   const child = spawn(file, args, { cwd, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let [stdout, stderr, killed] = ['', '', false];
   child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
   child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));
-  const answer = new Promise<{ stdout: string }>((resolve, reject) => {
+  const answer = new Promise<{
+    stdout: string;
+    stderr: string;
+  }>((resolve, reject) => {
     const timer = setTimeout(() => {
       killed = true;
       signalGroup(child, 'SIGTERM');
@@ -131,7 +155,7 @@ function leading(file: string, args: string[], cwd: string, timeout: number): Pr
     });
     child.once('close', (code, signal) => {
       clearTimeout(timer);
-      if (code === 0) resolve({ stdout });
+      if (code === 0) resolve({ stdout, stderr });
       else reject(Object.assign(new Error(`${file} ended with ${signal ?? code}`), { code, signal, stdout, stderr, killed }));
     });
   });
@@ -1218,6 +1242,57 @@ export async function landUpgrade(root: string, platform: NodeJS.Platform = proc
  */
 export async function runUpgrade(root: string, platform: NodeJS.Platform = process.platform): Promise<Upgrade> {
   return parsed(Upgrade, (await readJson(root, ['upgrade'], platform, UPGRADE_TIMEOUT_MS)).data);
+}
+
+/** Housekeeping fetches, asks the forge and may delete branches on origin: network round trips, never a terminal prompt. */
+const HOUSEKEEPING_TIMEOUT_MS = 2 * 60_000;
+
+/** A path in the project's own `.ai/`, as housekeeping's report names its trash (`moved to .ai/runtime/trash/<date>/`). */
+const AI_PATH = /(?<![\w./~-])\.ai\/[^\s,)`'"]*/g;
+
+/**
+ * Tidies the project as Jig's session hook does once a day (`jig housekeeping`): merged tasks' workspaces to the trash,
+ * finished tasks out of the queue, the forge cache written, merged branches deleted as far as the project's settings
+ * let Jig. It prints no JSON: its report is answered as Jig printed it, a line each, grouping kept, with every path cut —
+ * the absolute ones and the project's own `.ai/…`. Exit 3 is a run that finished with something left for a person — a
+ * task to consolidate, a wrong base, an archive refused —, its report answered as any other. Jig's warnings on stderr (a
+ * task not archived, the queue not pruned) come first: the report points up at them ("the reason is above"). Another
+ * run holding the clone is a report too, Jig's `skipping` line. A failure throws JigRefusal `failed` with Jig's error
+ * lines, without a path; past the limit, `timeout`.
+ */
+export async function housekeeping(
+  root: string,
+  platform: NodeJS.Platform = process.platform,
+  timeout = HOUSEKEEPING_TIMEOUT_MS,
+): Promise<string[]> {
+  let out: {
+    stdout: string;
+    stderr: string;
+  };
+  try {
+    out = await ran(root, ['housekeeping'], platform, timeout);
+  } catch (error) {
+    if (timedOut(error)) throw new JigRefusal('timeout');
+    const ended = error as {
+      code?: unknown;
+      stdout?: string;
+      stderr?: string;
+    };
+    if (ended.code !== 3) {
+      const reasons = (ended.stderr ?? '').split('\n').flatMap((line) => {
+        const m = /^jig: error: (?:housekeeping: )?(.+)$/.exec(line.trim());
+        return m?.[1] ? [withoutPaths(m[1]).replace(AI_PATH, '…')] : [];
+      });
+      throw new JigRefusal('failed', reasons);
+    }
+    out = { stdout: ended.stdout ?? '', stderr: ended.stderr ?? '' };
+  }
+  const lines = (text: string) =>
+    text
+      .split('\n')
+      .filter((line) => line.trim() !== '')
+      .map((line) => withoutPaths(line).replace(AI_PATH, '…'));
+  return [...lines(out.stderr), ...lines(out.stdout)];
 }
 
 /** `jig self-update` pulls the framework source's git remote: a network round trip, never a prompt (Jig sets it so). */

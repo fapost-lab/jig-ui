@@ -18,7 +18,7 @@ paths:
   - web/lib/scan.ts
   - web/components/ConnectForm.vue
 summary: "The workspace page: a list of the connected projects with search and the chosen one's card — Jig's attention items, the mark and count of projects whose Jig is older than the machine's, their upgrade from the card — and Find projects, which lists the Jig projects in a folder not connected yet"
-reviewed_at: 2026-11-06
+reviewed_at: 2026-11-10
 ---
 # Workspace — every connected project on one page
 
@@ -31,7 +31,9 @@ that needs the person — not readable, or with an attention item — else the f
 (`web/lib/projects.ts`); a click in the list sets `?project=`, and a project just connected is
 shown. The card has its Jig version, its live tasks counted, what needs the person there — Jig's
 attention items as `jig status --json` lists them, `knowledge-proposed` and `sources-changed` with a link to the
-project's Knowledge view (`AttentionItem.vue`, feature-knowledge) — and the housekeeping note. A readable project's
+project's Knowledge view (`AttentionItem.vue`, feature-knowledge) — and the housekeeping note. **Housekeeping**, left
+of Board, runs `jig housekeeping` in the project and leaves Jig's report on the card until **Dismiss**
+(adr-20261110-housekeeping-runs-from-the-project-card). A readable project's
 name on its card opens its board, and so does **Board** in the card's corner, beside a ⋯ menu that
 holds **Settings…** (feature-settings) and **Disconnect** (task `project-card-actions`): what a person does rarely sits a click further
 away (a colleague, 2026-10-30), and the Board button stays as the action people look for. The menu

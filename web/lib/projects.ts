@@ -11,6 +11,19 @@ export type Listed = Project | Reading;
 
 const isRead = (p: Listed): p is Project => p.state !== 'reading';
 
+/** Housekeeping run from a project's card: under way, Jig's report once it ran, or why it did not, with Jig's reasons. */
+export type HousekeepingState =
+  | { state: 'running' }
+  | {
+      state: 'done';
+      report: string[];
+    }
+  | {
+      state: 'refused';
+      message: string;
+      reasons: string[];
+    };
+
 /** The projects by id, A–Z: case aside, and numbers by value, so `app2` comes before `app10`. */
 export const byName = <P extends { id: string }>(projects: P[]): P[] =>
   [...projects].sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true, sensitivity: 'base' }));

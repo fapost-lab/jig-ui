@@ -5,6 +5,7 @@
   import { Button } from '@/components/ui/button';
   import { Card } from '@/components/ui/card';
   import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+  import type { HousekeepingState } from '@/lib/projects';
   import { toneRule, toneText } from '@/lib/tones';
   import { mergeWaitOf, needsUpgrade, type PlanState, upgradeMark } from '@/lib/upgrade';
   import AttentionItem from './AttentionItem.vue';
@@ -21,6 +22,8 @@
     release?: string | null;
     /** Its Read again is under way. */
     reading?: boolean;
+    /** Housekeeping from the card: under way, or what came of it until dismissed. */
+    housekeeping?: HousekeepingState;
   }>();
 
   const board = computed(() => `/projects/${encodeURIComponent(props.project.id)}`);
@@ -46,6 +49,9 @@
     land: [];
     close: [];
     dismiss: [];
+    /** Housekeeping on the card: the view runs `jig housekeeping` in the project. */
+    housekeeping: [];
+    dismissHousekeeping: [];
   }>();
 </script>
 
@@ -60,6 +66,14 @@
       <span v-if="mark" class="text-[13px]" :class="toneText.attention">{{ mark }}</span>
       <div class="ml-auto flex shrink-0 items-center gap-2">
         <Button v-if="upgradable" variant="outline" size="xs" @click="$emit('start')">Upgrade…</Button>
+        <Button
+          v-if="project.state === 'ready' && project.upgrade?.state !== 'running'"
+          variant="outline"
+          size="xs"
+          :disabled="housekeeping?.state === 'running'"
+          @click="$emit('housekeeping')"
+          >{{ housekeeping?.state === 'running' ? 'Housekeeping…' : 'Housekeeping' }}</Button
+        >
         <Button v-if="project.state === 'ready'" variant="outline" size="xs" as-child><RouterLink :to="board">Board</RouterLink></Button>
         <DropdownMenu v-if="project.upgrade?.state !== 'running'">
           <DropdownMenuTrigger as-child>
@@ -105,8 +119,24 @@
         <li v-for="(item, i) in project.attention" :key="i"><AttentionItem :item="item" :project="project.id" /></li>
       </ul>
       <p v-if="project.housekeepingStale" class="text-[13px] text-muted-foreground">
-        Pull request facts may be out of date: run <code>jig housekeeping</code> in the project.
+        Pull request facts may be out of date until Housekeeping runs.
       </p>
     </template>
+    <section v-if="housekeeping" :aria-label="`Housekeeping in ${project.id}`" class="text-[13px]">
+      <p v-if="housekeeping.state === 'running'" :class="toneRule.quiet">
+        Running <code>jig housekeeping</code>… It fetches and asks the forge; a dialog for your git credentials may wait for you.
+      </p>
+      <div v-else-if="housekeeping.state === 'done'" :class="toneRule.quiet" class="flex flex-col gap-1">
+        <p class="whitespace-pre-wrap">{{ housekeeping.report.join('\n') || 'Housekeeping ran and said nothing.' }}</p>
+        <Button variant="ghost" size="xs" class="self-start" @click="$emit('dismissHousekeeping')">Dismiss</Button>
+      </div>
+      <div v-else :class="toneRule.bad" class="flex flex-col gap-1">
+        <p>{{ housekeeping.message }}</p>
+        <ul v-if="housekeeping.reasons.length" class="list-disc pl-5 text-foreground">
+          <li v-for="(reason, i) in housekeeping.reasons" :key="i">{{ reason }}</li>
+        </ul>
+        <Button variant="ghost" size="xs" class="self-start" @click="$emit('dismissHousekeeping')">Dismiss</Button>
+      </div>
+    </section>
   </Card>
 </template>

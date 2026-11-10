@@ -12,6 +12,7 @@ import {
   closeTask,
   decideKnowledge,
   fileTask,
+  housekeeping,
   jigVersion,
   landUpgrade,
   JigRefusal,
@@ -1298,6 +1299,63 @@ describe('settings', () => {
       code: 'invalid-value',
       reasons: ["agent.git: invalid value 'sometimes': not a level: none, commit, push, pr or merge"],
     });
+  });
+});
+
+describe('housekeeping', () => {
+  it("runs jig housekeeping as text and answers its report a line each, grouping kept, the trash's path cut", async () => {
+    const dir = selfUpdating(`case-${cases++}`, readFileSync(fixture('housekeeping.txt'), 'utf8'));
+    const report = await housekeeping(dir);
+    expect(args(dir)).toEqual(['housekeeping']);
+    expect(report[0]).toBe('needs you (1):');
+    expect(report[2]).toBe('removed (2): moved to …, recoverable for 7 days');
+    expect(report[8]).toBe('    knowledge-drop-and-text-findings, quiet-design-findings, roadmap-from-page-findings,');
+    expect(report).toHaveLength(15);
+    expect(report.join('\n')).not.toMatch(/\.ai\//);
+  });
+
+  it('answers the report of a run that ended 3, a task left to consolidate, as a finished one', async () => {
+    const dir = selfUpdating(`case-${cases++}`, readFileSync(fixture('housekeeping.txt'), 'utf8'), '', 3);
+    const report = await housekeeping(dir);
+    expect(report[0]).toBe('needs you (1):');
+    expect(report.at(-1)).toBe('action needed: consolidate the tasks flagged needs-consolidation');
+  });
+
+  it("puts Jig's warnings first, paths cut, where the report points up at them", async () => {
+    const err = 'housekeeping: old-task was not archived: no state in /Users/me/shop/.ai/workspace/tasks/old-task\n';
+    const out = 'action needed: a task could not be archived; the reason is above\n';
+    expect(await housekeeping(selfUpdating(`case-${cases++}`, out, err, 3))).toEqual([
+      'housekeeping: old-task was not archived: no state in …',
+      'action needed: a task could not be archived; the reason is above',
+    ]);
+  });
+
+  it('cuts an absolute path out of the report', async () => {
+    const dir = selfUpdating(`case-${cases++}`, 'removed (1): moved to /Users/me/shop/.ai/runtime/trash/x/, recoverable\n');
+    expect(await housekeeping(dir)).toEqual(['removed (1): moved to … recoverable']);
+  });
+
+  it("answers Jig's skipping line when another run holds the clone", async () => {
+    const dir = selfUpdating(`case-${cases++}`, 'another housekeeping run holds this clone; skipping\n');
+    expect(await housekeeping(dir)).toEqual(['another housekeeping run holds this clone; skipping']);
+  });
+
+  it('refuses as failed with the reasons of jig: error lines, without the housekeeping prefix and without a path', async () => {
+    const err = [
+      'noise',
+      'jig: error: housekeeping: housekeeping.trash_ttl: not a duration',
+      'jig: error: no .ai/config.yaml in /Users/me/shop',
+    ].join('\n');
+    const refused = await housekeeping(selfUpdating(`case-${cases++}`, '', err, 1)).catch((e: unknown) => e);
+    expect(refused).toBeInstanceOf(JigRefusal);
+    expect((refused as JigRefusal).code).toBe('failed');
+    expect((refused as JigRefusal).reasons).toEqual(['housekeeping.trash_ttl: not a duration', 'no … in …']);
+  });
+
+  it('is timeout when Jig does not answer within the limit', async () => {
+    const slow = selfUpdating(`case-${cases++}`, '');
+    writeFileSync(join(slow, '.ai', 'scripts', 'jig'), '#!/usr/bin/env bash\nsleep 5\n');
+    await expect(housekeeping(slow, process.platform, 200)).rejects.toEqual(refusal('timeout'));
   });
 });
 

@@ -61,6 +61,7 @@
     emptyBoard,
     epics,
     finished,
+    housekeepingRuns,
     knowledge,
     knowledgeAttention,
     knowledgeDiffs,
@@ -259,9 +260,10 @@
 
     <CanvasSection
       title="ProjectCard"
-      note="ready with attention and stale housekeeping; nothing needs you; its Jig older than the machine's, Upgrade… offered; each state it cannot be read in"
+      note="ready with attention and stale housekeeping; nothing needs you; its Jig older than the machine's, Upgrade… offered; each state it cannot be read in; Housekeeping under way, its report, its refusal"
     >
       <ProjectCard v-for="project in projects" :key="project.id" :project="project" />
+      <ProjectCard v-for="(run, i) in housekeepingRuns" :key="`housekeeping-${i}`" :project="projects[1]!" :housekeeping="run" />
     </CanvasSection>
 
     <CanvasSection

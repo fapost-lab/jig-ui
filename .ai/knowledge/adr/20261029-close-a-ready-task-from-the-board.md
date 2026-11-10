@@ -13,7 +13,7 @@ paths:
   - web/lib/refusal.ts
   - web/views/BoardView.vue
 summary: The Ready card's close runs jig task set status consolidated, offered when Jig offers close or only its forge cache is behind; from Jig 0.40.0 Jig claims it against the board's revision, before that a read checks it; refusal reasons shown
-reviewed_at: 2026-11-05
+reviewed_at: 2026-11-10
 ---
 # A ready task is closed from the board with Jig's close command, offered beyond Jig's cached offer and checked against the board's revision by a read
 
@@ -67,7 +67,8 @@ Jig's contract says a cache behind the forge "can only withhold a close the comm
   closes the window.
 - Jig 0.40.0 counts its own note of which session works a task as a write: run with an agent
   session's id in its environment (`CLAUDE_CODE_SESSION_ID`, a Jig UI started from Claude Code), the
-  close is refused as `stale-revision` against any board, a fresh one included (fapost-lab/jig#389).
+  close is refused as `stale-revision` against any board, a fresh one included (fapost-lab/jig#389,
+  fixed in Jig 0.41.0).
   Started from a terminal or as a service, Jig UI passes no such id.
 - A close of a task whose pull request is still open is shown and refused by Jig, with its reason.
 - Closing cannot be undone from the board.

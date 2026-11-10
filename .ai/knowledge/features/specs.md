@@ -16,7 +16,7 @@ paths:
   - server/jig/fixtures/spec-list-items.json
   - server/jig/fixtures/spec-list-waiting.json
 summary: "A project's specs from jig spec list as the Specs view: open epics in Jig's queue order with a menu to move and prioritise them, and from Jig 0.40.0 the roadmap edited on the card (add, move, file) on the spec's write branch; read with the board, no ref or path on the page"
-reviewed_at: 2026-11-06
+reviewed_at: 2026-11-10
 ---
 # Specs and epics
 
@@ -38,7 +38,9 @@ From Jig 0.40.0 (`editable`) a roadmap is edited on its card: **Add item** at th
 numbered phase, an item's ⋯ menu (`SpecItemMenu.vue`) moving it Up, Down or To Phase N, and
 **File task…** (`FileItemDialog.vue`) filing an item's task and naming it on the item — `POST
 /api/projects/:id/specs/items/add`, `/move`, `/file`, Jig's `jig spec item add|move|file`
-(adr-20261106-editing-a-roadmap-from-the-page). While edits wait on the spec's write branch, the
+(adr-20261106-editing-a-roadmap-from-the-page). From Jig 0.41.0 File task… files a new task and
+names it on the item in one Jig write, with the specs' revision (adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41). While edits wait on the
+spec's write branch, the
 card shows the roadmap there (`shownRoadmap`), a line saying where they wait, and a "waiting" mark
 on each item they added, moved to another phase or filed (`waitingItems`).
 
@@ -109,3 +111,6 @@ Task `spec-agent-request` (2026-10-29), decided by the maintainer:
 Task `roadmap-from-page` (2026-11-06), decided by the maintainer at the design gate: the branch's
 roadmap shown with waiting marks, the ⋯ menu only, the two-step filing and no `jig writes ship`
 (adr-20261106-editing-a-roadmap-from-the-page).
+
+Task `file-item-in-one-write` (2026-11-10): from Jig 0.41.0 the filing is one write, `jig spec item
+file --new`, with the person's revision; the two steps stay below it (adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41).

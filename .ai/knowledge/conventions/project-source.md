@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-11-09
+reviewed_at: 2026-11-10
 ---
 # ProjectSource — how the server reaches a project
 
@@ -99,11 +99,13 @@ Jig's grammar before the port sees them (adr-20261022-filing-a-task-carries-no-r
 A roadmap edit runs Jig only for the spec, the phase and the item handles of the roadmap the last
 read shows — the one on the spec's write branch while edits wait there — and below
 `ROADMAP_JIG_VERSION` answers `refused: unsupported`; the specs read says which (`editable`).
-`fileItem` with a live task id runs only `spec item file` with the person's revision. With a new id
-it is the one write of two Jig writes: `agent.git` read first (`none` is `refused: git-not-allowed`
-without Jig writing anything), `task new`, the revision read again, `spec item file` with it; a
-refusal after the task was filed answers `refused` with `filed: true`, and the same request again
-with the same id — now live — names it (adr-20261106-editing-a-roadmap-from-the-page).
+`fileItem` with a live task id runs only `spec item file --task` with the person's revision. With a
+new id, from `FILE_NEW_JIG_VERSION` it runs only `spec item file --new` with the person's revision,
+and a refusal files nothing (adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41). On Jig 0.40.0 it is the one write of two Jig writes: `agent.git`
+read first (`none` is `refused: git-not-allowed` without Jig writing anything), `task new`, the
+revision read again, `spec item file` with it; a refusal after the task was filed answers `refused`
+with `filed: true`, and the same request again with the same id — now live — names it
+(adr-20261106-editing-a-roadmap-from-the-page).
 
 A knowledge decision reads the knowledge again first — no held read lists it — and runs Jig only for
 an id that read lists open to the decision: `accept` and `reject` a proposal, `reviewed` a linked file

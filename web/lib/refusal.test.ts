@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closeRefusal, refusal, roadmapRefusal, unnamedRefusal } from './refusal';
+import { closeRefusal, fileItemRefusal, refusal, roadmapRefusal, unnamedRefusal } from './refusal';
 
 describe('refusal', () => {
   it.each([
@@ -32,6 +32,12 @@ describe('roadmapRefusal', () => {
     ['git-not-allowed', [], "Jig commits nothing in this clone (agent.git is none): choose a level in the project's Settings."],
     ['not-found', [], 'The roadmap of shop no longer has what you were moving: try again on the specs as they are now.'],
     ['branch-checked-out', ['spec/shop is checked out in …'], 'Jig did not change the roadmap of shop: spec/shop is checked out in …'],
+    // Jig 0.41.0: an earlier edit still waits where this one cannot follow; Jig's line says what to do.
+    [
+      'write-still-waits',
+      ['spec/shop has 1 edit(s) that never reached origin, …'],
+      'Jig did not change the roadmap of shop: spec/shop has 1 edit(s) that never reached origin, …',
+    ],
     ['write-busy', [], 'Jig refused moving the roadmap of shop (write-busy).'],
   ])('says %s', (code, reasons, line) => {
     expect(roadmapRefusal(code, reasons, 'moving', 'shop')).toBe(line);
@@ -44,5 +50,28 @@ describe('unnamedRefusal', () => {
       'Filed search, but Jig did not name it on the item (spec/shop is checked out in …). Once that is resolved, File task… again with search.',
     );
     expect(unnamedRefusal('write-busy', [], 'search')).toContain('the item (write-busy).');
+  });
+});
+
+describe('fileItemRefusal', () => {
+  it.each([
+    // Jig 0.40.0: the task was filed and Jig refused to name it.
+    ['branch-checked-out', ['spec/shop is checked out in …'], true, 'Filed search, but Jig did not name it on the item'],
+    // Jig 0.41.0's two `already-exists` of `--new`, told apart by Jig's own line only.
+    ['already-exists', ['task already exists: search'], false, 'Jig did not file search: task already exists: search'],
+    [
+      'already-exists',
+      ['i-aaaaaaaaaaaa already names task other'],
+      false,
+      'Jig did not file search: i-aaaaaaaaaaaa already names task other',
+    ],
+    ['already-exists', [], false, 'The project has a task called search already, maybe a finished one. Choose another id.'],
+    ['usage', [], false, 'Jig does not take this id or goal: one line of goal, not starting with #.'],
+  ])('says %s with %j', (code, reasons, filed, line) => {
+    expect(fileItemRefusal(code, reasons, 'search', filed)).toContain(line);
+  });
+
+  it('leaves any other refusal to roadmapRefusal', () => {
+    expect(fileItemRefusal('git-not-allowed', [], 'search', false)).toBeUndefined();
   });
 });

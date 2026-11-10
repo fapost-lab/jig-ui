@@ -6,6 +6,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
   addItem,
   fileItem,
+  fileNewItem,
   moveItem,
   cancelPause,
   closeTask,
@@ -481,6 +482,28 @@ describe('writing a roadmap', () => {
       'search-products',
       '--revision',
       '1793950066',
+      '--json',
+    ]);
+  });
+
+  // spec-item-file-new.json is what Jig 0.41.0 answered in a scratch project of its own.
+  it("files a new task and names it on an item in one write, and answers Jig's note", async () => {
+    const dir = logging(`case-${cases++}`, 'spec-item-file-new.json');
+    expect(await fileNewItem(dir, 'shop', 'i-5d729342e61f', 'search-products', 'Search products by name', 1794293348)).toBe(
+      'agent.git is commit: pushing spec/shop is yours',
+    );
+    expect(args(dir)).toEqual([
+      'spec',
+      'item',
+      'file',
+      'shop',
+      'i-5d729342e61f',
+      '--new',
+      'search-products',
+      '--goal',
+      'Search products by name',
+      '--revision',
+      '1794293348',
       '--json',
     ]);
   });

@@ -35,6 +35,8 @@ export const KNOWLEDGE_JIG_VERSION = '0.40.0';
  * on it would be judged on what the read shows.
  */
 export const KNOWLEDGE_TEXT_JIG_VERSION = '0.41.0';
+/** The first Jig that files an item's new task and names it on the item in one write (`spec item file --new`, fapost-lab/jig#390). */
+export const FILE_NEW_JIG_VERSION = '0.41.0';
 
 const SCRIPT = '.ai/scripts/jig';
 /** A read's limit: 10 s ran out with several projects read at once, each four Jig runs (task `read-timeout`). */
@@ -914,7 +916,8 @@ const WriteNote = z.object({ write: z.object({ note: maybe }) });
  * Runs `jig spec item <args> --revision <n> --json`: Jig commits the edit on the spec's branch in a tree of its own and
  * goes as far as `agent.git` allows. Answers Jig's note without a path, `null` without one; the item it answers is not
  * read, the caller reads again. Refused as `stale-revision`, `not-found`, `already-exists`, `not-linkable`,
- * `git-not-allowed` (`agent.git: none`), `branch-checked-out` and the other refusals of Jig's writes in its own tree.
+ * `git-not-allowed` (`agent.git: none`), `branch-checked-out` and the other refusals of Jig's writes in its own tree —
+ * from Jig 0.41.0 `write-still-waits` too.
  */
 async function roadmapWrite(root: string, args: string[], revision: number, platform: NodeJS.Platform): Promise<string | null> {
   const { data } = await readJson(root, ['spec', 'item', ...args, '--revision', String(revision)], platform, ROADMAP_TIMEOUT_MS);
@@ -957,6 +960,22 @@ export function fileItem(
   platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
   return roadmapWrite(root, ['file', spec, item, '--task', task], revision, platform);
+}
+
+/**
+ * Files a new task with its goal and names it on a roadmap item in one write (`jig spec item file --new`, from
+ * `FILE_NEW_JIG_VERSION`), so the revision carried is the caller's read; as `roadmapWrite`. A refusal files nothing.
+ */
+export function fileNewItem(
+  root: string,
+  spec: string,
+  item: string,
+  task: string,
+  goal: string,
+  revision: number,
+  platform: NodeJS.Platform = process.platform,
+): Promise<string | null> {
+  return roadmapWrite(root, ['file', spec, item, '--new', task, '--goal', goal], revision, platform);
 }
 
 /** A decision on a document waiting on Jig's `knowledge/decisions` branch, its pull request's address once there is one. */

@@ -453,7 +453,7 @@ export type Written =
       code: string;
       /** Jig's own reasons, without a path, where a command's refusal carries them (closing a task). */
       reasons?: string[];
-      /** Filing an item's task: the task was filed, and Jig refused to name it on the item. */
+      /** Filing an item's task on Jig 0.40.0: the task was filed, and Jig refused to name it on the item. */
       filed?: true;
     }
   | Exclude<ProjectView, { state: 'ready' }>;
@@ -528,9 +528,10 @@ export interface ProjectSource {
   moveItem(id: string, specId: string, item: string, place: ItemPlace, revision: number): Promise<Written | undefined>;
   /**
    * Names a task on an unchecked roadmap item that names none, as `addItem` writes. A live task is named as it is, with
-   * `revision`; any other id is filed first with `goal` (`null`: refused `usage`), then named with the revision read after
-   * it — refused at once as `git-not-allowed` when the clone's `agent.git` is `none`, so nothing is filed that Jig could
-   * not name. A refusal after the filing comes back `filed`.
+   * `revision`; any other id is filed with `goal` (`null`: refused `usage`) and named. From Jig 0.41.0 that is one write
+   * with `revision`, and a refusal files nothing. On Jig 0.40.0 the task is filed first, then named with the revision read
+   * after it — refused at once as `git-not-allowed` when the clone's `agent.git` is `none`, so nothing is filed that Jig
+   * could not name — and a refusal after the filing comes back `filed`.
    */
   fileItem(id: string, specId: string, item: string, taskId: string, goal: string | null, revision: number): Promise<Written | undefined>;
   /** Sets a live task's priority, `null` for none, as `move` writes. */

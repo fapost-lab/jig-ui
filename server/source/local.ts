@@ -7,7 +7,9 @@ import {
   cancelPause,
   closeTask,
   decideKnowledge,
+  FILE_NEW_JIG_VERSION,
   fileItem,
+  fileNewItem,
   fileTask,
   hasJig,
   JigRefusal,
@@ -123,7 +125,7 @@ type Read = {
 
 type Live = TaskSummary & { status: Task['status'] };
 
-/** Filing an item's task: the task was filed, and Jig refused to name it on the item. */
+/** Filing an item's task on Jig 0.40.0: the task was filed, and Jig refused to name it on the item. */
 class Unnamed extends JigRefusal {}
 
 /** A roadmap item of `phases` by its handle. */
@@ -789,13 +791,13 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     id: string,
     specId: string,
     names: (phases: SpecPhase[]) => boolean,
-    write: (root: string, read: Read) => Promise<string | null>,
+    write: (root: string, read: Read, jigVersion: string) => Promise<string | null>,
   ): Promise<Written | undefined> {
     return writing(id, [], async (root, jigVersion, read) => {
       if (!supports(jigVersion, ROADMAP_JIG_VERSION)) throw new JigRefusal('unsupported');
       const spec = read.specs.state === 'ready' ? read.specs.specs.find((s) => s.id === specId) : undefined;
       if (!spec || !names(spec.waiting?.phases ?? spec.phases)) throw new JigRefusal('not-found');
-      return write(root, read);
+      return write(root, read, jigVersion);
     });
   }
 
@@ -997,12 +999,14 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
           const named = itemIn(phases, item);
           return named !== undefined && !named.checked && named.task === null;
         },
-        async (root, read) => {
+        async (root, read, jigVersion) => {
           // A task filed earlier is named as it is, against the read the person saw.
           if (read.tasks.state === 'ready' && read.tasks.tasks.some((t) => t.id === taskId)) {
             return fileItem(root, specId, item, taskId, revision);
           }
           if (goal === null) throw new JigRefusal('usage');
+          // From Jig 0.41.0 one write files the task and names it, against the read the person saw; a refusal files nothing.
+          if (supports(jigVersion, FILE_NEW_JIG_VERSION)) return fileNewItem(root, specId, item, taskId, goal, revision);
           // `none`, the default, refuses every roadmap write: filed first, the task would be left with no item naming it.
           if ((await readSettings(root)).keys.find((k) => k.key === 'agent.git')?.value === 'none') {
             throw new JigRefusal('git-not-allowed');

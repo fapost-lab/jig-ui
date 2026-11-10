@@ -41,7 +41,7 @@
   import { settleFinished } from '@/lib/finished';
   import { knowledgeRefusal, noKnowledge } from '@/lib/knowledge';
   import { lastWins } from '@/lib/last-wins';
-  import { closeRefusal, refusal, roadmapRefusal, unnamedRefusal } from '@/lib/refusal';
+  import { closeRefusal, fileItemRefusal, refusal, roadmapRefusal } from '@/lib/refusal';
   import { filtered, fromQuery, reorders, sift, type Sift, toQuery } from '@/lib/sift';
   import { toneText } from '@/lib/tones';
 
@@ -377,14 +377,7 @@
       spec,
       `filing the task of an item of ${spec}`,
       (revision) => client.api.projects[':id'].specs.items.file.$post({ param, json: { spec, item: id, task, goal, revision } }),
-      ({ code, reasons, filed }) =>
-        filed
-          ? unnamedRefusal(code, reasons, task)
-          : code === 'already-exists'
-            ? `The project has a task called ${task} already, maybe a finished one. Choose another id.`
-            : code === 'usage'
-              ? 'Jig does not take this id or goal: one line of goal, not starting with #.'
-              : undefined,
+      ({ code, reasons, filed }) => fileItemRefusal(code, reasons, task, filed),
     );
 
     if (!outcome || filingItem.value !== shown) return;

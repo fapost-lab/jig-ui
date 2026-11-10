@@ -59,7 +59,7 @@
           <p id="item-task-hint" class="text-muted-foreground">
             <template v-if="filed">Names {{ task.trim() }}, filed already: Jig runs <code>jig spec item file</code>.</template>
             <template v-else>
-              Letters, digits, ".", "_" and "-", not starting with "." or "-". Jig runs <code>jig task new</code>, then
+              Letters, digits, ".", "_" and "-", not starting with "." or "-". Jig files the task and names it on the item with
               <code>jig spec item file</code>; the task goes to Backlog.
             </template>
           </p>

@@ -42,12 +42,13 @@
 </script>
 
 <template>
-  <div class="grid min-h-0 flex-1 grid-cols-[repeat(5,minmax(14rem,1fr))] gap-3 overflow-auto px-3 pt-3 pb-3">
+  <div class="grid min-h-0 flex-1 grid-cols-[repeat(5,minmax(14rem,1fr))] gap-3 overflow-auto px-3 pb-3">
     <GroupPanel
       v-for="column in columns"
       :key="column.id"
       :accent="columnAccent[column.id] ?? 'bg-border'"
       sticky
+      class="mt-3"
       :aria-labelledby="`column-${column.id}`"
       :class="gap?.list === column.id && gap.index < 0 && 'ring-2 ring-primary/40'"
       @dragover="(e: DragEvent) => drag.over(e, column.id, sorted ? undefined : column.cards)"

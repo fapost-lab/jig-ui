@@ -36,7 +36,8 @@ of both ADRs stands.
   headings 15–20px in sentence case, weight 600, no tracking.
 - **Marks**: a plain muted count, a coloured dot for where an item stands, ✓ for a finished phase,
   and a dashed "nothing here" box for an empty column or lane. Selection is `bg-muted`, not
-  inversion.
+  inversion; on a panel, where `bg-muted` is its own tint, a selected item is a white card
+  (`bg-card`), as the chosen project in the project list is.
 - **Groups**: a board column, a List group, a spec's lane and a section of a page (the task's
   facts, documents, attention and actions; Knowledge's proposed and changed sources; the project
   list) are tinted panels (`web/components/GroupPanel.vue`, `bg-foreground/5`, `rounded-xl`), and

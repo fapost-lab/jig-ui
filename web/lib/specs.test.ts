@@ -5,10 +5,12 @@ import {
   filingGoal,
   itemStanding,
   itemTitle,
+  itemWord,
   itemWords,
   laneOf,
   laneStep,
   openingPhase,
+  shownFog,
   shownRoadmap,
   waitingItems,
   waitingState,
@@ -213,6 +215,15 @@ describe('the roadmap board', () => {
     ['to file for fog', item('fog: x', null, true), 'to-file'],
   ] as const)('puts an item in its lane: %s', (_, it_, lane) => {
     expect(laneOf(it_)).toBe(lane);
+  });
+
+  it.each([
+    ['fog, italic, while it is to file', item('fog: x', null, true), 'Fog', true],
+    ['its lane once a fog item names a task', item('`a` — fog: x', 'a', true), 'In work', false],
+    ['its lane once a fog item is done', { ...item('fog: x', null, true), checked: true }, 'Done', false],
+    ['its lane for any other', item('x'), 'To file', false],
+  ] as const)('says what an item is before its title: %s', (_, it_, word, fog) => {
+    expect([itemWord(it_), shownFog(it_)]).toEqual([word, fog]);
   });
 
   it.each([

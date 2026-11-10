@@ -585,8 +585,8 @@
 <template>
   <div class="flex h-full flex-col">
     <Collapsible v-model:open="filing" class="shrink-0" @update:open="filingRefusal = undefined">
-      <div class="flex shrink-0 items-center gap-3 border-b px-3 py-1.5">
-        <h1 class="font-semibold">{{ id }}</h1>
+      <div class="flex shrink-0 items-center gap-3 border-b px-4 py-2">
+        <h1 class="text-[15px] font-semibold">{{ id }}</h1>
         <Toggle v-if="finishedCount > 0" v-model="showFinished" variant="outline" size="sm">
           {{ finishedCount }} finished {{ finishedCount === 1 ? 'task' : 'tasks' }}
         </Toggle>
@@ -609,7 +609,7 @@
           <Button variant="outline" size="sm"><Plus />New task</Button>
         </CollapsibleTrigger>
       </div>
-      <CollapsibleContent class="border-b px-3 py-2">
+      <CollapsibleContent class="border-b px-4 py-3">
         <NewTaskForm :busy="filingBusy" :refusal="filingRefusal?.text" :taken="filingRefusal?.code === 'already-exists'" @file="file" />
       </CollapsibleContent>
     </Collapsible>
@@ -629,14 +629,14 @@
       class="shrink-0"
     />
 
-    <p v-if="notice" role="status" class="flex shrink-0 items-center gap-2 border-b px-3 py-1.5" :class="toneText.attention">
+    <p v-if="notice" role="status" class="flex shrink-0 items-center gap-2 border-b px-4 py-2 text-[13px]" :class="toneText.attention">
       {{ notice.text }}
       <button type="button" class="ml-auto underline underline-offset-2" @click="notice = undefined">dismiss</button>
     </p>
 
-    <p v-if="board === undefined" class="p-3 text-muted-foreground">Reading the board…</p>
-    <p v-else-if="board === 'not-connected'" role="alert" class="p-3 text-destructive">No connected project is called {{ id }}.</p>
-    <p v-else-if="board.state !== 'ready'" class="p-3"><StateLine :project="board" :reading="reading" @read-again="reread" /></p>
+    <p v-if="board === undefined" class="p-4 text-muted-foreground">Reading the board…</p>
+    <p v-else-if="board === 'not-connected'" role="alert" class="p-4 text-destructive">No connected project is called {{ id }}.</p>
+    <p v-else-if="board.state !== 'ready'" class="p-4"><StateLine :project="board" :reading="reading" @read-again="reread" /></p>
 
     <BoardColumns
       v-else-if="view === 'board'"
@@ -657,10 +657,10 @@
     />
 
     <div v-else-if="view === 'specs'" class="min-h-0 flex-1 overflow-y-auto">
-      <p v-if="specs === undefined" class="p-3 text-muted-foreground">Reading the specs…</p>
-      <p v-else-if="specs === 'not-connected'" role="alert" class="p-3 text-destructive">No connected project is called {{ id }}.</p>
-      <p v-else-if="specs.state !== 'ready'" class="p-3"><StateLine :project="specs" :reading="reading" @read-again="reread" /></p>
-      <p v-else-if="specs.specs.length === 0" class="p-3 text-muted-foreground">
+      <p v-if="specs === undefined" class="p-4 text-muted-foreground">Reading the specs…</p>
+      <p v-else-if="specs === 'not-connected'" role="alert" class="p-4 text-destructive">No connected project is called {{ id }}.</p>
+      <p v-else-if="specs.state !== 'ready'" class="p-4"><StateLine :project="specs" :reading="reading" @read-again="reread" /></p>
+      <p v-else-if="specs.specs.length === 0" class="p-4 text-muted-foreground">
         No specs in this project. A spec is written with the <code>jig-idea</code> skill and kept in <code>.ai/specs/</code>.
       </p>
       <Tabs v-else-if="chosenSpec" :model-value="chosenSpec.id" class="gap-5 px-6 py-5" @update:model-value="chooseSpec">
@@ -711,9 +711,9 @@
     </div>
 
     <div v-else-if="view === 'knowledge'" class="min-h-0 flex-1 overflow-y-auto">
-      <p v-if="knowledge === undefined" class="p-3 text-muted-foreground">Reading the knowledge…</p>
-      <p v-else-if="knowledge === 'not-connected'" role="alert" class="p-3 text-destructive">No connected project is called {{ id }}.</p>
-      <p v-else-if="noneKnown" class="p-3 text-muted-foreground">{{ noneKnown }}</p>
+      <p v-if="knowledge === undefined" class="p-4 text-muted-foreground">Reading the knowledge…</p>
+      <p v-else-if="knowledge === 'not-connected'" role="alert" class="p-4 text-destructive">No connected project is called {{ id }}.</p>
+      <p v-else-if="noneKnown" class="p-4 text-muted-foreground">{{ noneKnown }}</p>
       <KnowledgeView
         v-else-if="knowledge.state === 'ready'"
         :knowledge="knowledge"

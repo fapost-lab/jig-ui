@@ -40,8 +40,8 @@
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-2 border-b px-3 py-1.5">
-    <span class="text-muted-foreground" aria-hidden="true">Sort</span>
+  <div class="flex flex-wrap items-center gap-2 border-b px-4 py-2">
+    <span class="text-[13px] text-muted-foreground" aria-hidden="true">Sort</span>
     <ToggleGroup type="single" variant="outline" size="sm" aria-label="Sort" :model-value="view.sort" @update:model-value="sortBy">
       <ToggleGroupItem v-for="sort in SORTS" :key="sort" :value="sort">{{ SORT_NAMES[sort] }}</ToggleGroupItem>
     </ToggleGroup>
@@ -68,12 +68,14 @@
       type="search"
       placeholder="Find a task…"
       aria-label="Find a task"
-      class="h-7 w-48"
+      class="h-8 w-56"
       :model-value="view.text"
       @update:model-value="find"
     />
     <template v-if="filtered(view)">
-      <span class="ml-auto text-muted-foreground">{{ shown }} of {{ total }} {{ total === 1 ? 'task' : 'tasks' }}</span>
+      <span class="ml-auto text-[13px] text-muted-foreground tabular-nums"
+        >{{ shown }} of {{ total }} {{ total === 1 ? 'task' : 'tasks' }}</span
+      >
       <Button variant="ghost" size="sm" @click="clear"><X />Clear</Button>
     </template>
   </div>

@@ -66,7 +66,10 @@
         @drop.prevent="drag.drop(column.id)"
       >
         <h2>
-          <CollapsibleTrigger class="flex w-full items-center gap-2 border-b bg-muted/50 px-3 py-1.5">
+          <CollapsibleTrigger
+            class="flex w-full items-center gap-2 border-b px-4 py-2.5 hover:bg-muted/50"
+            :class="column.cards.length === 0 && 'text-muted-foreground'"
+          >
             <ChevronRight v-if="folded.has(column.id)" class="size-3 shrink-0" />
             <ChevronDown v-else class="size-3 shrink-0" />
             <ColumnHeader :id="column.id" :title="column.title" :count="column.cards.length" />
@@ -104,22 +107,21 @@
               aria-hidden="true"
             />
           </div>
-          <p v-if="column.cards.length === 0" class="border-b px-3 py-2 text-muted-foreground">— empty —</p>
         </CollapsibleContent>
       </Collapsible>
     </div>
     <aside class="w-96 shrink-0 overflow-y-auto border-l" aria-label="Task">
       <template v-if="picked">
-        <div class="flex items-center gap-2 border-b px-4 py-2">
-          <span class="font-semibold break-all">{{ picked.id }}</span>
+        <div class="flex items-center gap-2 border-b px-4 py-2.5">
+          <span class="font-mono text-[13px] font-medium break-all">{{ picked.id }}</span>
           <Badge v-if="picked.class" variant="outline">{{ picked.class }}</Badge>
         </div>
         <div class="flex flex-col gap-3 p-4">
-          <p v-if="picked.goal" class="text-muted-foreground">{{ picked.goal }}</p>
+          <p v-if="picked.goal" class="font-medium">{{ picked.goal }}</p>
           <TaskBrief :project="project" :task="picked.id" :details="details" />
         </div>
       </template>
-      <p v-else class="p-4 text-muted-foreground">Pick a task to see its details.</p>
+      <p v-else class="p-4 text-[13px] text-muted-foreground">Pick a task to see its details.</p>
     </aside>
   </div>
 </template>

@@ -46,21 +46,25 @@
     <div class="flex items-center pr-2 hover:bg-muted/50" :class="[selected && 'bg-muted', busy && 'opacity-60']">
       <button
         type="button"
-        class="flex min-w-0 flex-1 items-center gap-3 px-3 py-2 text-left"
+        class="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left"
         :aria-pressed="selected"
         @click="$emit('select')"
       >
-        <span class="w-40 shrink-0 truncate font-semibold" :title="task.id">{{ task.id }}</span>
-        <Badge v-if="task.class" variant="outline" class="shrink-0">{{ task.class }}</Badge>
-        <span v-else class="w-7 shrink-0" />
-        <span class="w-6 shrink-0 text-muted-foreground" :title="task.priority === null ? undefined : `Priority ${task.priority}`">
+        <span class="w-44 shrink-0 truncate font-mono text-xs" :title="task.id">{{ task.id }}</span>
+        <span class="w-8 shrink-0"
+          ><Badge v-if="task.class" variant="outline">{{ task.class }}</Badge></span
+        >
+        <span
+          class="w-6 shrink-0 text-xs text-muted-foreground tabular-nums"
+          :title="task.priority === null ? undefined : `Priority ${task.priority}`"
+        >
           {{ task.priority === null ? '' : `P${task.priority}` }}
         </span>
-        <span class="min-w-0 flex-1 truncate text-muted-foreground">{{ task.goal }}</span>
-        <span v-if="changed" class="shrink-0" :class="toneText.attention">changed</span>
-        <span v-if="busy" class="shrink-0 text-muted-foreground" role="status">sending to Jig…</span>
-        <span v-else-if="note" class="shrink-0" :class="toneText[note.tone]">{{ note.text }}</span>
-        <span v-if="request && !busy" class="shrink-0" :class="toneText.quiet">{{ request }}</span>
+        <span class="min-w-0 flex-1 truncate">{{ task.goal }}</span>
+        <span v-if="changed" class="shrink-0 text-[13px]" :class="toneText.attention">changed</span>
+        <span v-if="busy" class="shrink-0 text-[13px] text-muted-foreground" role="status">sending to Jig…</span>
+        <span v-else-if="note" class="shrink-0 text-[13px]" :class="toneText[note.tone]">{{ note.text }}</span>
+        <span v-if="request && !busy" class="shrink-0 text-[13px]" :class="toneText.quiet">{{ request }}</span>
       </button>
       <QueueMenu
         v-if="cards"
@@ -89,7 +93,7 @@
     <CloseConfirm
       v-if="task.closable && confirming && !busy"
       :task="task.id"
-      class="mx-3 mb-2"
+      class="mx-4 mb-2.5"
       @close="
         confirming = false;
         $emit('close');

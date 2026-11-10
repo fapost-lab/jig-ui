@@ -40,16 +40,17 @@
 </script>
 
 <template>
-  <div class="grid min-h-0 flex-1 grid-cols-[repeat(5,minmax(14rem,1fr))] divide-x overflow-auto">
+  <div class="grid min-h-0 flex-1 grid-cols-[repeat(5,minmax(14rem,1fr))] gap-3 overflow-auto px-3">
     <section
       v-for="column in columns"
       :key="column.id"
       :aria-labelledby="`column-${column.id}`"
+      class="rounded-lg"
       :class="gap?.list === column.id && gap.index < 0 && 'bg-muted'"
       @dragover="(e) => drag.over(e, column.id, sorted ? undefined : column.cards)"
       @drop.prevent="drag.drop(column.id)"
     >
-      <h2 :id="`column-${column.id}`" class="sticky top-0 z-10 border-b bg-background px-3 py-2">
+      <h2 :id="`column-${column.id}`" class="sticky top-0 z-10 bg-background px-3 pt-3 pb-1">
         <ColumnHeader :id="column.id" :title="column.title" :count="column.cards.length" />
       </h2>
       <ul class="relative flex flex-col gap-2 p-2">
@@ -86,7 +87,9 @@
             aria-hidden="true"
           />
         </li>
-        <li v-if="column.cards.length === 0" class="p-3 text-center text-muted-foreground">— empty —</li>
+        <li v-if="column.cards.length === 0" class="rounded-lg border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
+          nothing here
+        </li>
       </ul>
     </section>
   </div>

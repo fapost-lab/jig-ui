@@ -31,8 +31,8 @@
   <nav class="flex items-stretch border-b" aria-label="Projects">
     <RouterLink
       to="/"
-      class="flex shrink-0 items-center border-r px-4 py-2.5 font-bold whitespace-nowrap"
-      :class="current === undefined ? 'bg-foreground text-background' : 'hover:bg-muted'"
+      class="flex shrink-0 items-center border-r px-4 py-2.5 font-mono text-xs font-bold whitespace-nowrap"
+      :class="current === undefined ? 'bg-muted' : 'hover:bg-muted'"
       :aria-current="current === undefined ? 'page' : undefined"
     >
       jig-ui://
@@ -62,7 +62,7 @@
       </ComboboxList>
     </Combobox>
     <div class="ml-auto flex shrink-0 items-center gap-2 px-2">
-      <span v-if="version" class="px-2 text-muted-foreground">v{{ version }}</span>
+      <span v-if="version" class="px-2 font-mono text-xs text-muted-foreground">v{{ version }}</span>
       <slot />
     </div>
   </nav>

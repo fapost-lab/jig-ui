@@ -7,6 +7,7 @@
   import { documentLine, noDocuments } from '@/lib/artifacts';
   import { prose, rendered } from '@/lib/markdown';
   import { toneText } from '@/lib/tones';
+  import GroupPanel from './GroupPanel.vue';
 
   /** A task's documents: the list Jig gave (`undefined` while it is read), and each open one — being read, read, or gone. */
   const props = defineProps<{
@@ -36,16 +37,16 @@
 </script>
 
 <template>
-  <section aria-labelledby="documents" class="flex flex-col gap-2">
-    <h2 id="documents" class="font-semibold tracking-wider uppercase">Documents</h2>
-    <p v-if="documents === undefined" class="text-muted-foreground">Reading the documents…</p>
-    <p v-else-if="none" class="inline-flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+  <GroupPanel aria-labelledby="documents">
+    <template #head><h2 id="documents" class="px-4 pt-3 pb-2 text-[15px] font-semibold">Documents</h2></template>
+    <p v-if="documents === undefined" class="px-4 pb-4 text-muted-foreground">Reading the documents…</p>
+    <p v-else-if="none" class="inline-flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pb-4 text-muted-foreground">
       {{ none }}
       <Button v-if="documents.state === 'unreadable'" variant="outline" size="xs" :disabled="reading" @click="$emit('readAgain')">
         {{ reading ? 'Reading…' : 'Read again' }}
       </Button>
     </p>
-    <ul v-else class="border-y">
+    <ul v-else class="mx-2 mb-2 rounded-lg border bg-card">
       <li v-for="{ artifact, line } in listed" :key="artifact.kind" class="border-b last:border-b-0">
         <Collapsible
           :open="artifact.kind in open"
@@ -53,25 +54,25 @@
           @update:open="(o: boolean) => $emit('toggle', artifact.kind, o)"
         >
           <h3>
-            <CollapsibleTrigger class="flex w-full items-center gap-2 px-3 py-1.5 text-left enabled:hover:bg-muted/50">
+            <CollapsibleTrigger class="flex w-full items-center gap-2 px-4 py-2.5 text-left enabled:hover:bg-muted/50">
               <ChevronDown v-if="artifact.kind in open" class="size-3 shrink-0" />
               <ChevronRight v-else class="size-3 shrink-0" :class="{ invisible: artifact.state !== 'present' }" />
-              <span class="font-semibold">{{ artifact.kind }}</span>
-              <span class="ml-auto text-right" :class="toneText[line.tone]">{{ line.text }}</span>
+              <span class="font-medium">{{ artifact.kind }}</span>
+              <span class="ml-auto text-right text-[13px]" :class="toneText[line.tone]">{{ line.text }}</span>
             </CollapsibleTrigger>
           </h3>
           <CollapsibleContent>
-            <p v-if="open[artifact.kind] === 'reading'" class="px-3 pb-3 text-muted-foreground">Reading…</p>
-            <p v-else-if="open[artifact.kind] === 'not-found'" class="px-3 pb-3 text-muted-foreground">Jig no longer has it.</p>
-            <p v-else-if="html[artifact.kind] === undefined" class="flex flex-wrap items-center gap-x-3 px-3 pb-3" :class="toneText.bad">
+            <p v-if="open[artifact.kind] === 'reading'" class="px-4 pb-4 text-muted-foreground">Reading…</p>
+            <p v-else-if="open[artifact.kind] === 'not-found'" class="px-4 pb-4 text-muted-foreground">Jig no longer has it.</p>
+            <p v-else-if="html[artifact.kind] === undefined" class="flex flex-wrap items-center gap-x-3 px-4 pb-4" :class="toneText.bad">
               Jig could not read it.
               <Button variant="outline" size="xs" @click="$emit('toggle', artifact.kind, true)">Read again</Button>
             </p>
             <!-- eslint-disable-next-line vue/no-v-html -- cleaned by DOMPurify in lib/markdown.ts -->
-            <div v-else class="px-3 pb-3" :class="prose" v-html="html[artifact.kind]" />
+            <div v-else class="px-4 pb-4" :class="prose" v-html="html[artifact.kind]" />
           </CollapsibleContent>
         </Collapsible>
       </li>
     </ul>
-  </section>
+  </GroupPanel>
 </template>

@@ -10,7 +10,7 @@
 <template>
   <span class="flex items-center gap-2">
     <span
-      class="h-1.5 w-24 shrink-0 bg-muted"
+      class="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-muted"
       role="progressbar"
       aria-valuemin="0"
       :aria-valuemax="total"
@@ -19,6 +19,6 @@
     >
       <span class="block h-full" :class="doneFill" :style="{ width: total === 0 ? '0%' : `${(done / total) * 100}%` }" />
     </span>
-    <span class="text-muted-foreground tabular-nums">{{ done }}/{{ total }}</span>
+    <span class="text-xs text-muted-foreground tabular-nums">{{ done }}/{{ total }}</span>
   </span>
 </template>

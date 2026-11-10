@@ -311,15 +311,21 @@ be undone from the board.
 ## Specs
 
 **Specs** — the third choice beside Board and List — shows the project's specs as Jig's
-`jig spec list` reports them: each with its title, how many roadmap items are done out of all of
-them, and its fog. An epic shows its branch, whether it is open or finished, and whether its
+`jig spec list` reports them, one at a time: with more than one, a tab for each, in the order
+below, chooses which, and the page's address keeps the choice. A spec shows its title, how many
+roadmap items are done out of all of them, and its fog. An epic shows its branch, whether it is open or finished, and whether its
 roadmap was read from the remote branch as it was at the last fetch, or the branch is nowhere;
 the version level its release raises is shown when the roadmap records one.
 
-Each phase folds away (a finished one starts folded) and lists its items: done, open or fog. An
-item that names a live task links to the task's details; its dependencies (`after: …`) are shown
-in grey. A spec missing `spec.md` or `roadmap.md` says so. The specs follow the project like the
-board does.
+Its phases stand in a row of steps, each with how many of its items are done, or ✓ once all of
+them are; items before the first phase heading have a step of their own. The page opens on the
+first phase with an item not done, and a click on a step shows another. The chosen phase's items
+stand in three lanes, each in the roadmap's order: **To file** — not done and naming no task, fog
+included, in italics —, **In work** — naming a task, with the column the board shows it in, or
+*filed* when the board does not show it — and **Done**. Each item is a card: its words up to the
+first dash, and under them the task it names and its dependencies (`after: …`); a click on the card
+shows the rest of its words. An item that names a live task links to the task's details. A spec
+missing `spec.md` or `roadmap.md` says so. The specs follow the project like the board does.
 
 ### Asking your agent
 
@@ -334,19 +340,19 @@ The specs with an open epic come first, in the order of the project's queue — 
 `jig queue next` takes their tasks — then the specs with none. An epic's ⋯ menu moves it **Up** or
 **Down** past the epic next to it, or **To top** or **To bottom** of the whole queue, ahead of or
 after the tasks that belong to no epic too; it also sets the epic's priority, from P0 to P5, shown
-beside its progress. Jig UI runs `jig queue move` and `jig queue set` with the revision of the specs
+beside its title and on its tab. Jig UI runs `jig queue move` and `jig queue set` with the revision of the specs
 you saw, so a change made in the project meanwhile is refused and the specs are read again. An epic
 not moved or prioritised yet is not in the queue; it follows the ones that are, in Jig's order.
 Setting its priority puts it in the queue too, at the bottom.
 
 ### Editing a roadmap
 
-With Jig 0.40.0 or later in the project, a spec's roadmap is edited on its card:
+With Jig 0.40.0 or later in the project, a spec's roadmap is edited on the Specs view:
 
-- **Add item**, at the end of every numbered phase, adds a line to that phase. Items before the
-  first phase heading have none.
-- An item's ⋯ menu moves it **Up** or **Down** within its phase, or **To Phase N** — to the end of
-  another phase.
+- **Add item**, under the lanes of a numbered phase, adds a line at the end of that phase. Items
+  before the first phase heading have none.
+- An item's ⋯ menu moves it **Up** or **Down** past the next card in its lane — the items of the
+  other lanes keep their places — or **To Phase N**, to the end of another phase.
 - **File task…**, on an item not done that names no task, fog included, files the item's task and
   names it on the item: give the task's id, and its goal, which starts as the item's own words.
   A fog item's goal starts without its `fog:`. The task goes to
@@ -359,7 +365,7 @@ and takes it as far as `agent.git` lets it: committed, pushed, a pull request. T
 specs after an edit is Jig's note on the next step, such as *agent.git is commit: pushing
 spec/shop is yours*.
 
-While edits wait on that branch, the card says so — with a link to the pull request, or *pushed,
+While edits wait on that branch, the spec says so — with a link to the pull request, or *pushed,
 no pull request yet*, or *committed in this clone, not pushed* — and shows the roadmap as it is on
 the branch, the one the next edit changes. Each item an edit added, moved to another phase or
 filed there is marked **waiting**. Once the pull request is merged and the project fetched, the

@@ -8,7 +8,7 @@
 </script>
 
 <template>
-  <div data-slot="card-description" :class="cn('text-xs/relaxed text-muted-foreground', props.class)">
+  <div data-slot="card-description" :class="cn('text-[13px]/relaxed text-muted-foreground', props.class)">
     <slot />
   </div>
 </template>

@@ -9,8 +9,8 @@
 <template>
   <section :aria-label="title" class="border-b">
     <h2 class="flex items-baseline gap-3 border-b bg-muted/50 px-4 py-2">
-      <span class="font-semibold tracking-wider uppercase">{{ title }}</span>
-      <span v-if="note" class="text-muted-foreground">{{ note }}</span>
+      <span class="font-semibold">{{ title }}</span>
+      <span v-if="note" class="text-[13px] text-muted-foreground">{{ note }}</span>
     </h2>
     <div class="grid grid-cols-1 divide-y lg:grid-cols-2 lg:divide-x lg:divide-y-0">
       <div v-for="theme in ['light', 'dark']" :key="theme" :class="theme" class="flex flex-col gap-4 bg-background p-4 text-foreground">

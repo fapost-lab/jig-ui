@@ -50,14 +50,14 @@
 </script>
 
 <template>
-  <Card class="gap-3 px-4 py-4" :aria-labelledby="`project-${project.id}`" role="article">
+  <Card class="gap-3 px-5 py-4" :aria-labelledby="`project-${project.id}`" role="article">
     <div class="flex items-center gap-3">
-      <h2 :id="`project-${project.id}`" class="shrink-0 text-sm font-bold">
+      <h2 :id="`project-${project.id}`" class="shrink-0 text-base font-semibold">
         <RouterLink v-if="project.state === 'ready'" :to="board" class="underline-offset-2 hover:underline">{{ project.id }}</RouterLink>
         <template v-else>{{ project.id }}</template>
       </h2>
-      <StateLine :project="project" :reading="reading" class="text-muted-foreground" @read-again="$emit('readAgain')" />
-      <span v-if="mark" :class="toneText.attention">{{ mark }}</span>
+      <StateLine :project="project" :reading="reading" class="text-[13px] text-muted-foreground" @read-again="$emit('readAgain')" />
+      <span v-if="mark" class="text-[13px]" :class="toneText.attention">{{ mark }}</span>
       <div class="ml-auto flex shrink-0 items-center gap-2">
         <Button v-if="upgradable" variant="outline" size="xs" @click="$emit('start')">Upgrade…</Button>
         <Button v-if="project.state === 'ready'" variant="outline" size="xs" as-child><RouterLink :to="board">Board</RouterLink></Button>
@@ -100,11 +100,11 @@
     />
     <template v-if="project.state === 'ready'">
       <p>{{ project.counts.active }} active · {{ project.counts.paused }} paused · {{ project.counts.ready }} ready</p>
-      <p v-if="project.attention.length === 0" class="text-muted-foreground">Nothing needs you here.</p>
+      <p v-if="project.attention.length === 0" class="text-[13px] text-muted-foreground">Nothing needs you here.</p>
       <ul v-else class="flex flex-col gap-3" :aria-label="`What needs you in ${project.id}`">
         <li v-for="(item, i) in project.attention" :key="i"><AttentionItem :item="item" :project="project.id" /></li>
       </ul>
-      <p v-if="project.housekeepingStale" class="text-muted-foreground">
+      <p v-if="project.housekeepingStale" class="text-[13px] text-muted-foreground">
         Pull request facts may be out of date: run <code>jig housekeeping</code> in the project.
       </p>
     </template>

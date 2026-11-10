@@ -20,7 +20,9 @@
   <DialogDescription
     data-slot="dialog-description"
     v-bind="forwardedProps"
-    :class="cn('text-xs/relaxed text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground', props.class)"
+    :class="
+      cn('text-[13px]/relaxed text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground', props.class)
+    "
   >
     <slot />
   </DialogDescription>

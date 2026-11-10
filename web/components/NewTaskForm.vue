@@ -40,10 +40,10 @@
       </div>
       <Button type="submit" :disabled="busy">{{ busy ? 'Filing…' : 'File it' }}</Button>
     </div>
-    <p id="new-task-hint" class="text-muted-foreground">
+    <p id="new-task-hint" class="text-[13px] text-muted-foreground">
       Letters, digits, ".", "_" and "-", not starting with "." or "-". The task goes to Backlog; Jig runs
       <code>jig task new</code>.
     </p>
-    <p v-if="refusal" id="new-task-refusal" role="alert" class="text-destructive">{{ refusal }}</p>
+    <p v-if="refusal" id="new-task-refusal" role="alert" class="text-[13px] text-destructive">{{ refusal }}</p>
   </form>
 </template>

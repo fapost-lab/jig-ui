@@ -14,6 +14,7 @@
   } from '@/api';
   import ConnectForm from '@/components/ConnectForm.vue';
   import FoundProjects from '@/components/FoundProjects.vue';
+  import GroupPanel from '@/components/GroupPanel.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProjectList from '@/components/ProjectList.vue';
   import SettingsDialog from '@/components/SettingsDialog.vue';
@@ -365,9 +366,9 @@
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-6xl flex-col gap-4 p-4">
+  <div class="mx-auto flex max-w-6xl flex-col gap-5 px-6 py-6">
     <div class="flex items-center gap-3">
-      <h1 class="font-semibold tracking-wider uppercase">Projects</h1>
+      <h1 class="text-xl font-semibold">Projects</h1>
       <div class="ml-auto flex items-center gap-2">
         <Button v-if="offerLandAll" variant="outline" size="xs" @click="landAll">Check all merges</Button>
         <Button v-if="offerAll && !confirmingAll" variant="outline" size="xs" @click="confirmingAll = true">Upgrade all…</Button>
@@ -401,7 +402,7 @@
       </ul>
       <Button v-if="said.ended" variant="ghost" size="xs" class="self-start" @click="dismissAll">Dismiss</Button>
     </div>
-    <div class="flex flex-col gap-4 border-b pb-4">
+    <div class="flex flex-col gap-4 border-b pb-5">
       <ConnectForm v-model="path" :busy="busy" :finding="finding" :refusal="refusal" @connect="connect" @find="find" />
       <FoundProjects v-if="found" :result="found" :connecting="connecting" :refusal="foundRefusal" @connect="connectFound" />
     </div>
@@ -415,7 +416,7 @@
     </div>
     <!-- One column on a narrow screen: the list above the card. -->
     <div v-if="projects?.length" class="flex flex-col gap-4 md:flex-row md:items-start">
-      <ProjectList :projects="projects" :chosen="shown?.id" class="md:w-64 md:shrink-0" />
+      <GroupPanel class="md:w-64 md:shrink-0"><ProjectList :projects="projects" :chosen="shown?.id" class="p-2" /></GroupPanel>
       <p v-if="shown?.state === 'reading'" class="min-w-0 flex-1 text-muted-foreground">Reading {{ shown.id }}…</p>
       <ProjectCard
         v-else-if="shown"

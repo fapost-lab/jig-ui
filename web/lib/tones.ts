@@ -34,3 +34,10 @@ export const columnAccent: Record<string, string> = {
   backlog: 'bg-slate-400',
   paused: 'bg-zinc-400',
 };
+
+/** Each lane's accent on a roadmap board: to file a grey that means nothing more, in work as In progress, done as done. */
+export const laneAccent: Record<string, string> = {
+  'to-file': 'bg-muted-foreground/40',
+  'in-work': 'bg-sky-500',
+  done: doneFill,
+};

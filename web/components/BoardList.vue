@@ -5,7 +5,9 @@
   import { Badge } from '@/components/ui/badge';
   import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
   import { useDrop } from '@/lib/drop';
+  import { columnAccent } from '@/lib/tones';
   import ColumnHeader from './ColumnHeader.vue';
+  import GroupPanel from './GroupPanel.vue';
   import TaskBrief from './TaskBrief.vue';
   import TaskRow from './TaskRow.vue';
 
@@ -55,71 +57,86 @@
 
 <template>
   <div class="flex min-h-0 flex-1">
-    <div class="min-w-0 flex-1 overflow-y-auto">
+    <div class="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
       <Collapsible
         v-for="column in columns"
         :key="column.id"
         :open="!folded.has(column.id)"
-        :class="gap?.list === column.id && gap.index < 0 && 'bg-muted'"
         @update:open="(open: boolean) => fold(column.id, open)"
         @dragover="(e: DragEvent) => drag.over(e, column.id, sorted ? undefined : column.cards)"
         @drop.prevent="drag.drop(column.id)"
       >
-        <h2>
-          <CollapsibleTrigger class="flex w-full items-center gap-2 border-b bg-muted/50 px-3 py-1.5">
-            <ChevronRight v-if="folded.has(column.id)" class="size-3 shrink-0" />
-            <ChevronDown v-else class="size-3 shrink-0" />
-            <ColumnHeader :id="column.id" :title="column.title" :count="column.cards.length" />
-          </CollapsibleTrigger>
-        </h2>
-        <CollapsibleContent class="relative">
-          <div
-            v-for="(task, i) in column.cards"
-            :key="task.id"
-            data-card
-            :draggable="pending === undefined"
-            class="relative"
-            @dragstart="(e) => drag.start(e, column.id, task)"
-            @dragend="drag.end()"
+        <GroupPanel
+          :accent="columnAccent[column.id] ?? 'bg-border'"
+          :class="gap?.list === column.id && gap.index < 0 && 'ring-2 ring-primary/40'"
+        >
+          <template #head>
+            <h2>
+              <CollapsibleTrigger
+                class="flex w-full items-center gap-2 px-3 py-2 hover:bg-foreground/5"
+                :class="column.cards.length === 0 && 'text-muted-foreground'"
+              >
+                <ChevronRight v-if="folded.has(column.id)" class="size-3 shrink-0" />
+                <ChevronDown v-else class="size-3 shrink-0" />
+                <ColumnHeader :title="column.title" :count="column.cards.length" />
+              </CollapsibleTrigger>
+            </h2>
+          </template>
+          <CollapsibleContent
+            v-if="column.cards.length > 0"
+            class="relative mx-2 mb-2 overflow-clip rounded-lg border bg-card [&>[data-card]:last-child>div]:border-b-0"
           >
-            <span v-if="gap?.list === column.id && gap.index === i" class="absolute inset-x-0 top-0 h-0.5 bg-primary" aria-hidden="true" />
-            <TaskRow
-              :task="task"
-              :selected="selected === task.id"
-              :cards="column.cards"
-              :sorted="sorted"
-              :filtered="filtered"
-              :busy="pending === task.id"
-              :changed="changed?.includes(task.id)"
-              @select="$emit('select', task.id)"
-              @move="(place) => $emit('move', task.id, place)"
-              @prioritise="(p) => $emit('prioritise', task.id, p)"
-              @pause="(ask) => $emit('pause', task.id, ask)"
-              @resume="$emit('resume', task.id)"
-              @close="$emit('close', task.id)"
-            />
-            <span
-              v-if="gap?.list === column.id && gap.index === column.cards.length && i === column.cards.length - 1"
-              class="absolute inset-x-0 bottom-0 h-0.5 bg-primary"
-              aria-hidden="true"
-            />
-          </div>
-          <p v-if="column.cards.length === 0" class="border-b px-3 py-2 text-muted-foreground">— empty —</p>
-        </CollapsibleContent>
+            <div
+              v-for="(task, i) in column.cards"
+              :key="task.id"
+              data-card
+              :draggable="pending === undefined"
+              class="relative"
+              @dragstart="(e) => drag.start(e, column.id, task)"
+              @dragend="drag.end()"
+            >
+              <span
+                v-if="gap?.list === column.id && gap.index === i"
+                class="absolute inset-x-0 top-0 h-0.5 bg-primary"
+                aria-hidden="true"
+              />
+              <TaskRow
+                :task="task"
+                :selected="selected === task.id"
+                :cards="column.cards"
+                :sorted="sorted"
+                :filtered="filtered"
+                :busy="pending === task.id"
+                :changed="changed?.includes(task.id)"
+                @select="$emit('select', task.id)"
+                @move="(place) => $emit('move', task.id, place)"
+                @prioritise="(p) => $emit('prioritise', task.id, p)"
+                @pause="(ask) => $emit('pause', task.id, ask)"
+                @resume="$emit('resume', task.id)"
+                @close="$emit('close', task.id)"
+              />
+              <span
+                v-if="gap?.list === column.id && gap.index === column.cards.length && i === column.cards.length - 1"
+                class="absolute inset-x-0 bottom-0 h-0.5 bg-primary"
+                aria-hidden="true"
+              />
+            </div>
+          </CollapsibleContent>
+        </GroupPanel>
       </Collapsible>
     </div>
     <aside class="w-96 shrink-0 overflow-y-auto border-l" aria-label="Task">
       <template v-if="picked">
-        <div class="flex items-center gap-2 border-b px-4 py-2">
-          <span class="font-semibold break-all">{{ picked.id }}</span>
+        <div class="flex items-center gap-2 border-b px-4 py-2.5">
+          <span class="font-mono text-[13px] font-medium break-all">{{ picked.id }}</span>
           <Badge v-if="picked.class" variant="outline">{{ picked.class }}</Badge>
         </div>
         <div class="flex flex-col gap-3 p-4">
-          <p v-if="picked.goal" class="text-muted-foreground">{{ picked.goal }}</p>
+          <p v-if="picked.goal" class="font-medium">{{ picked.goal }}</p>
           <TaskBrief :project="project" :task="picked.id" :details="details" />
         </div>
       </template>
-      <p v-else class="p-4 text-muted-foreground">Pick a task to see its details.</p>
+      <p v-else class="p-4 text-[13px] text-muted-foreground">Pick a task to see its details.</p>
     </aside>
   </div>
 </template>

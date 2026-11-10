@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import type { Spec } from '../api';
-import { agentRequests, filingGoal, itemStep, itemWords, shownRoadmap, waitingItems, waitingState } from './specs';
+import {
+  agentRequests,
+  filingGoal,
+  itemStanding,
+  itemTitle,
+  itemWords,
+  laneOf,
+  laneStep,
+  openingPhase,
+  shownRoadmap,
+  waitingItems,
+  waitingState,
+} from './specs';
 
 const item = (text: string, task: string | null = null, fog = false, id: string | null = null) => ({ id, text, checked: false, task, fog });
 
@@ -154,12 +166,31 @@ describe('editing a roadmap', () => {
     [0, 1, { after: 'i-b' }],
     [2, 1, { after: 'i-d' }],
     [3, 1, undefined],
-  ] as const)('moves the item at %i by %i to %o, as Jig moves it: after another, or to the top', (index, by, place) => {
-    expect(itemStep([at('a'), at('b'), at('c'), at('d')], index, by)).toEqual(place);
+  ] as const)(
+    'moves the item at %i by %i to %o in a lane of its own, as Jig moves it: after another, or to the top',
+    (index, by, place) => {
+      expect(laneStep([at('a'), at('b'), at('c'), at('d')], index, by)).toEqual(place);
+    },
+  );
+
+  // a and c to file, b done between them, d in work: a lane's moves skip the other lanes' cards and keep their places.
+  const mixed = [at('a'), { ...at('b'), checked: true }, at('c'), at('d', 'd', 'task-d')];
+  it.each([
+    ['c up goes before a, the top', 2, -1, 'top'],
+    ['a down goes after c, past b', 0, 1, { after: 'i-c' }],
+    ['c is the last card to file', 2, 1, undefined],
+    ['d is alone in work', 3, -1, undefined],
+    ['b is alone done', 1, 1, undefined],
+  ] as const)('moves an item among its lane only: %s', (_, index, by, place) => {
+    expect(laneStep(mixed, index, by)).toEqual(place);
+  });
+
+  it("moves up before a card that stands after another lane's, after that card", () => {
+    expect(laneStep([{ ...at('x'), checked: true }, at('a'), at('b')], 2, -1)).toEqual({ after: 'i-x' });
   });
 
   it('offers no step past an item without a handle, as from an older Jig', () => {
-    expect(itemStep([item('a'), item('b')], 0, 1)).toBeUndefined();
+    expect(laneStep([item('a'), item('b')], 0, 1)).toBeUndefined();
   });
 
   it.each([
@@ -169,5 +200,86 @@ describe('editing a roadmap', () => {
     ["cut to Jig's 500", item('x'.repeat(600)), 'x'.repeat(500)],
   ])('starts a filed goal with %s', (_, it_, goal) => {
     expect(filingGoal(it_)).toBe(goal);
+  });
+});
+
+describe('the roadmap board', () => {
+  const words = (text: string) => [{ text, code: false }];
+
+  it.each([
+    ['done when checked, a task or none', { ...item('x', 'a'), checked: true }, 'done'],
+    ['in work when it names a task', item('`a` — x', 'a'), 'in-work'],
+    ['to file without one', item('x'), 'to-file'],
+    ['to file for fog', item('fog: x', null, true), 'to-file'],
+  ] as const)('puts an item in its lane: %s', (_, it_, lane) => {
+    expect(laneOf(it_)).toBe(lane);
+  });
+
+  it.each([
+    ['up to the first dash', item('Search — by name — and tag'), words('Search'), words('by name — and tag')],
+    ['whole without a seam', item('Search products by name'), words('Search products by name'), []],
+    ['without the task id, fog or dependencies', item('`a` — Search — by name (after: list)', 'a'), words('Search'), words('by name')],
+    [
+      'with its code runs',
+      item('Run `jig init` — then `jig map`'),
+      [
+        { text: 'Run ', code: false },
+        { text: 'jig init', code: true },
+      ],
+      [
+        { text: 'then ', code: false },
+        { text: 'jig map', code: true },
+      ],
+    ],
+    ['whole when the text starts at the seam', item(' — by name'), words(' — by name'), []],
+    [
+      'up to its dependencies when words follow them',
+      item('a consultation request (after: design direction — its looks) - Backend: a form'),
+      words('a consultation request'),
+      words('Backend: a form'),
+    ],
+    [
+      'not at a dash in a code run',
+      item('Run `a — b` — then c'),
+      [
+        { text: 'Run ', code: false },
+        { text: 'a — b', code: true },
+      ],
+      words('then c'),
+    ],
+  ])('titles an item %s', (_, it_, title, rest) => {
+    expect(itemTitle(it_)).toMatchObject({ title, rest });
+  });
+
+  it.each([
+    ['at the end', item('Search — by name (after: list)'), words('list')],
+    [
+      'before more words, up to their closing parenthesis',
+      item('Search (after: list (the old one)) - by name'),
+      words('list (the old one)'),
+    ],
+    ['unclosed, to the end', item('Search (after: list'), words('list')],
+    ['none', item('Search — by name'), null],
+  ])('keeps the dependencies of a titled item apart: %s', (_, it_, after) => {
+    expect(itemTitle(it_).after).toEqual(after);
+  });
+
+  const columns = new Map([['live', { id: 'in-progress', title: 'In progress' }]]);
+  it.each([
+    ['done, which its lane says', { ...item('x', 'live'), checked: true }, null, 'bg-emerald-500'],
+    ['fog', item('fog: x', null, true), 'fog', 'bg-muted-foreground/30'],
+    ['not filed', item('x'), 'not filed', 'border border-muted-foreground'],
+    ["its live task's column", item('`live` — x', 'live'), 'In progress', 'bg-sky-500'],
+    ['filed, a task the board does not show', item('`gone` — x', 'gone'), 'filed', 'bg-muted-foreground/60'],
+  ] as const)('says where an item stands: %s', (_, it_, label, dot) => {
+    expect(itemStanding(it_, columns)).toEqual({ label, dot });
+  });
+
+  it.each([
+    ['the first phase with an item not done', [[{ ...item('a'), checked: true }], [item('b')], [item('c')]], 1],
+    ['the last when all are done', [[{ ...item('a'), checked: true }], [{ ...item('b'), checked: true }]], 1],
+    ['the first of none', [], 0],
+  ] as const)('opens on %s', (_, phases, at) => {
+    expect(openingPhase(phases.map((items) => ({ items: [...items] })))).toBe(at);
   });
 });

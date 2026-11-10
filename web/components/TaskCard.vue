@@ -50,13 +50,13 @@
     <div class="flex items-start gap-1">
       <button type="button" class="flex min-w-0 flex-1 flex-col gap-2 text-left" :aria-expanded="open" @click="$emit('toggle')">
         <span class="flex w-full items-center gap-2">
-          <span class="font-semibold break-all">{{ task.id }}</span>
+          <span class="font-mono text-xs break-all" :class="task.goal ? 'text-muted-foreground' : 'font-medium'">{{ task.id }}</span>
           <Badge v-if="task.priority !== null" variant="secondary" class="ml-auto" :title="`Priority ${task.priority}`">
             P{{ task.priority }}
           </Badge>
           <Badge v-if="task.class" variant="outline" :class="task.priority === null && 'ml-auto'">{{ task.class }}</Badge>
         </span>
-        <span v-if="task.goal" class="text-muted-foreground" :class="!open && 'line-clamp-2'">{{ task.goal }}</span>
+        <span v-if="task.goal" class="font-medium" :class="!open && 'line-clamp-2'">{{ task.goal }}</span>
       </button>
       <QueueMenu
         v-if="cards"
@@ -91,9 +91,9 @@
       "
       @cancel="confirming = false"
     />
-    <p v-if="busy" class="text-muted-foreground" role="status">sending to Jig…</p>
-    <p v-if="changed" :class="toneRule.attention">Changed while you acted</p>
-    <p v-if="note" :class="toneRule[note.tone]">
+    <p v-if="busy" class="text-[13px] text-muted-foreground" role="status">sending to Jig…</p>
+    <p v-if="changed" class="text-[13px]" :class="toneRule.attention">Changed while you acted</p>
+    <p v-if="note" class="text-[13px]" :class="toneRule[note.tone]">
       {{ note.text }}
       <a
         v-if="note.url"
@@ -105,7 +105,7 @@
         open<ExternalLink class="size-3" />
       </a>
     </p>
-    <p v-if="request && !busy" :class="toneRule.quiet">
+    <p v-if="request && !busy" class="text-[13px]" :class="toneRule.quiet">
       {{ request }}
       <button
         type="button"

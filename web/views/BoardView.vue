@@ -30,10 +30,12 @@
   import FinishedList from '@/components/FinishedList.vue';
   import KnowledgeView from '@/components/KnowledgeView.vue';
   import NewTaskForm from '@/components/NewTaskForm.vue';
-  import SpecCard from '@/components/SpecCard.vue';
+  import SpecBoard from '@/components/SpecBoard.vue';
   import StateLine from '@/components/StateLine.vue';
   import { Button } from '@/components/ui/button';
+  import { Badge } from '@/components/ui/badge';
   import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+  import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
   import { Toggle } from '@/components/ui/toggle';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { conflict } from '@/lib/conflict';
@@ -175,10 +177,20 @@
 
   const liveIds = computed(() => cards.value.map((t) => t.id));
 
+  /** Each live task's board column, by its id: the Specs view's cards say where an item's task stands. */
+  const columnOf = computed(
+    () =>
+      new Map(
+        typeof board.value === 'object' && board.value.state === 'ready'
+          ? board.value.columns.flatMap((c) => c.cards.map((t) => [t.id, { id: c.id, title: c.title }] as const))
+          : [],
+      ),
+  );
+
   /** How Board and List look at the board — sort and filters — kept in the page's address, so a reload or a link keeps it. */
   const sifting = computed({
     get: () => fromQuery(route.query),
-    set: (next: Sift) => void router.replace({ query: toQuery(next) }),
+    set: (next: Sift) => void router.replace({ query: { ...toQuery(next), spec: route.query.spec } }),
   });
 
   const sifted = computed(() =>
@@ -257,6 +269,17 @@
       (revision) => client.api.projects[':id'].tasks.close.$post({ param, json: { task, revision } }),
       (code, reasons) => closeRefusal(code, reasons, task),
     );
+
+  /** The spec the Specs view shows, kept in the address (`?spec=`) like the board's sort: the first when it names none of them. */
+  const chosenSpec = computed(() =>
+    typeof specs.value === 'object' && specs.value.state === 'ready'
+      ? (specs.value.specs.find((s) => s.id === route.query.spec) ?? specs.value.specs[0])
+      : undefined,
+  );
+
+  function chooseSpec(spec: unknown): void {
+    if (typeof spec === 'string') void router.replace({ query: { ...route.query, spec } });
+  }
 
   /** The spec whose epic's or roadmap's change is on its way to Jig; the notice says what Jig refused, as for a task. */
   const pendingSpec = ref<string>();
@@ -562,8 +585,8 @@
 <template>
   <div class="flex h-full flex-col">
     <Collapsible v-model:open="filing" class="shrink-0" @update:open="filingRefusal = undefined">
-      <div class="flex shrink-0 items-center gap-3 border-b px-3 py-1.5">
-        <h1 class="font-semibold">{{ id }}</h1>
+      <div class="flex shrink-0 items-center gap-3 border-b px-4 py-2">
+        <h1 class="text-[15px] font-semibold">{{ id }}</h1>
         <Toggle v-if="finishedCount > 0" v-model="showFinished" variant="outline" size="sm">
           {{ finishedCount }} finished {{ finishedCount === 1 ? 'task' : 'tasks' }}
         </Toggle>
@@ -586,7 +609,7 @@
           <Button variant="outline" size="sm"><Plus />New task</Button>
         </CollapsibleTrigger>
       </div>
-      <CollapsibleContent class="border-b px-3 py-2">
+      <CollapsibleContent class="border-b px-4 py-3">
         <NewTaskForm :busy="filingBusy" :refusal="filingRefusal?.text" :taken="filingRefusal?.code === 'already-exists'" @file="file" />
       </CollapsibleContent>
     </Collapsible>
@@ -606,14 +629,14 @@
       class="shrink-0"
     />
 
-    <p v-if="notice" role="status" class="flex shrink-0 items-center gap-2 border-b px-3 py-1.5" :class="toneText.attention">
+    <p v-if="notice" role="status" class="flex shrink-0 items-center gap-2 border-b px-4 py-2 text-[13px]" :class="toneText.attention">
       {{ notice.text }}
       <button type="button" class="ml-auto underline underline-offset-2" @click="notice = undefined">dismiss</button>
     </p>
 
-    <p v-if="board === undefined" class="p-3 text-muted-foreground">Reading the board…</p>
-    <p v-else-if="board === 'not-connected'" role="alert" class="p-3 text-destructive">No connected project is called {{ id }}.</p>
-    <p v-else-if="board.state !== 'ready'" class="p-3"><StateLine :project="board" :reading="reading" @read-again="reread" /></p>
+    <p v-if="board === undefined" class="p-4 text-muted-foreground">Reading the board…</p>
+    <p v-else-if="board === 'not-connected'" role="alert" class="p-4 text-destructive">No connected project is called {{ id }}.</p>
+    <p v-else-if="board.state !== 'ready'" class="p-4"><StateLine :project="board" :reading="reading" @read-again="reread" /></p>
 
     <BoardColumns
       v-else-if="view === 'board'"
@@ -634,37 +657,44 @@
     />
 
     <div v-else-if="view === 'specs'" class="min-h-0 flex-1 overflow-y-auto">
-      <p v-if="specs === undefined" class="p-3 text-muted-foreground">Reading the specs…</p>
-      <p v-else-if="specs === 'not-connected'" role="alert" class="p-3 text-destructive">No connected project is called {{ id }}.</p>
-      <p v-else-if="specs.state !== 'ready'" class="p-3"><StateLine :project="specs" :reading="reading" @read-again="reread" /></p>
-      <p v-else-if="specs.specs.length === 0" class="p-3 text-muted-foreground">
+      <p v-if="specs === undefined" class="p-4 text-muted-foreground">Reading the specs…</p>
+      <p v-else-if="specs === 'not-connected'" role="alert" class="p-4 text-destructive">No connected project is called {{ id }}.</p>
+      <p v-else-if="specs.state !== 'ready'" class="p-4"><StateLine :project="specs" :reading="reading" @read-again="reread" /></p>
+      <p v-else-if="specs.specs.length === 0" class="p-4 text-muted-foreground">
         No specs in this project. A spec is written with the <code>jig-idea</code> skill and kept in <code>.ai/specs/</code>.
       </p>
-      <div v-else class="flex flex-col gap-3 p-3">
-        <SpecCard
-          v-for="spec in specs.specs"
-          :key="spec.id"
-          :spec="spec"
-          :project="id"
-          :live="liveIds"
-          :busy="pendingSpec === spec.id"
-          :editable="specs.editable"
-          :disabled="pendingSpec !== undefined"
-          @add="(phase, text) => addItem(spec.id, phase, text)"
-          @move="(item, place) => moveItem(spec.id, item, place)"
-          @file="(item) => (filingItem = { spec: spec.id, item })"
-        >
-          <template v-if="movable(spec)" #menu>
-            <EpicMenu
-              :spec="spec"
-              :specs="specs.specs"
-              :disabled="pendingSpec !== undefined"
-              @move="(place) => moveEpic(spec.id, place)"
-              @prioritise="(priority) => prioritiseEpic(spec.id, priority)"
-            />
-          </template>
-        </SpecCard>
-      </div>
+      <Tabs v-else-if="chosenSpec" :model-value="chosenSpec.id" class="gap-5 px-6 py-5" @update:model-value="chooseSpec">
+        <TabsList v-if="specs.specs.length > 1" aria-label="Specs" class="max-w-full overflow-x-auto">
+          <TabsTrigger v-for="spec in specs.specs" :key="spec.id" :value="spec.id" :title="spec.title ?? spec.id" class="shrink-0">
+            {{ spec.id }}
+            <Badge v-if="spec.queue?.priority != null" variant="secondary">P{{ spec.queue.priority }}</Badge>
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent :value="chosenSpec.id">
+          <SpecBoard
+            :key="chosenSpec.id"
+            :spec="chosenSpec"
+            :project="id"
+            :columns="columnOf"
+            :busy="pendingSpec === chosenSpec.id"
+            :editable="specs.editable"
+            :disabled="pendingSpec !== undefined"
+            @add="(phase, text) => addItem(chosenSpec!.id, phase, text)"
+            @move="(item, place) => moveItem(chosenSpec!.id, item, place)"
+            @file="(item) => (filingItem = { spec: chosenSpec!.id, item })"
+          >
+            <template v-if="movable(chosenSpec)" #menu>
+              <EpicMenu
+                :spec="chosenSpec"
+                :specs="specs.specs"
+                :disabled="pendingSpec !== undefined"
+                @move="(place) => moveEpic(chosenSpec!.id, place)"
+                @prioritise="(priority) => prioritiseEpic(chosenSpec!.id, priority)"
+              />
+            </template>
+          </SpecBoard>
+        </TabsContent>
+      </Tabs>
       <FileItemDialog
         v-if="filingItem"
         :key="filingItem.item.id ?? ''"
@@ -681,9 +711,9 @@
     </div>
 
     <div v-else-if="view === 'knowledge'" class="min-h-0 flex-1 overflow-y-auto">
-      <p v-if="knowledge === undefined" class="p-3 text-muted-foreground">Reading the knowledge…</p>
-      <p v-else-if="knowledge === 'not-connected'" role="alert" class="p-3 text-destructive">No connected project is called {{ id }}.</p>
-      <p v-else-if="noneKnown" class="p-3 text-muted-foreground">{{ noneKnown }}</p>
+      <p v-if="knowledge === undefined" class="p-4 text-muted-foreground">Reading the knowledge…</p>
+      <p v-else-if="knowledge === 'not-connected'" role="alert" class="p-4 text-destructive">No connected project is called {{ id }}.</p>
+      <p v-else-if="noneKnown" class="p-4 text-muted-foreground">{{ noneKnown }}</p>
       <KnowledgeView
         v-else-if="knowledge.state === 'ready'"
         :knowledge="knowledge"

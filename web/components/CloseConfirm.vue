@@ -14,7 +14,7 @@
 </script>
 
 <template>
-  <section :aria-label="`Close ${task}`" :class="toneRule.attention" class="flex flex-col gap-2">
+  <section :aria-label="`Close ${task}`" :class="toneRule.attention" class="flex flex-col gap-2 text-[13px]">
     <p>
       Close {{ task }} as done? Jig closes it only if its pull request has merged, and asks the forge to be sure. A closed task leaves the
       board for good.

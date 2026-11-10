@@ -22,8 +22,8 @@
       <li v-for="project in shown" :key="project.id">
         <RouterLink
           :to="{ path: '/', query: { project: project.id } }"
-          class="flex items-center gap-2 px-2 py-1.5"
-          :class="project.id === chosen ? 'bg-foreground text-background' : 'hover:bg-muted'"
+          class="flex items-center gap-2 rounded-md px-2 py-1.5"
+          :class="project.id === chosen ? 'bg-card font-medium shadow-xs' : 'hover:bg-card/60'"
           :aria-current="project.id === chosen ? 'page' : undefined"
         >
           <span class="min-w-0 flex-1 truncate">{{ project.id }}</span>

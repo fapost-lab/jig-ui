@@ -22,6 +22,7 @@
   import { prose, rendered } from '@/lib/markdown';
   import { waitingState } from '@/lib/specs';
   import { toneText } from '@/lib/tones';
+  import GroupPanel from './GroupPanel.vue';
 
   /**
    * What waits for a person's decision in a project's knowledge, and each open diff and document text — being read, read,
@@ -75,8 +76,8 @@
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 p-3">
-    <p v-if="knowledge.waiting" :class="toneText.attention">
+  <div class="mx-auto flex w-full max-w-4xl flex-col gap-6 px-6 py-5">
+    <p v-if="knowledge.waiting" class="text-[13px]" :class="toneText.attention">
       Decisions wait on <code>{{ knowledge.waiting.branch }}</code> for <code>{{ knowledge.waiting.base }}</code
       >:
       <a
@@ -91,22 +92,26 @@
       >. The knowledge below is as it is here, with what waits there marked.
     </p>
 
-    <section v-if="knowledge.proposals.length > 0" aria-labelledby="proposed" class="flex flex-col gap-2">
-      <h2 id="proposed" class="font-semibold tracking-wider uppercase">Proposed</h2>
-      <ul class="border-y">
-        <li v-for="{ p, blocked, text } in proposals" :key="p.id" class="flex min-w-0 flex-col gap-1 border-b px-3 py-2 last:border-b-0">
+    <GroupPanel v-if="knowledge.proposals.length > 0" aria-labelledby="proposed">
+      <template #head><h2 id="proposed" class="px-4 pt-3 pb-2 text-[15px] font-semibold">Proposed</h2></template>
+      <ul class="flex flex-col gap-2 px-2 pb-2">
+        <li
+          v-for="{ p, blocked, text } in proposals"
+          :key="p.id"
+          class="flex min-w-0 flex-col gap-1.5 rounded-lg border bg-card px-4 py-3 text-card-foreground shadow-xs"
+        >
           <p class="flex flex-wrap items-center gap-2">
-            <span class="font-semibold">{{ p.id }}</span>
+            <span class="font-mono text-[13px] font-medium">{{ p.id }}</span>
             <Badge variant="outline">{{ p.type }}</Badge>
           </p>
           <p :class="{ 'text-muted-foreground': p.summary === null }">{{ p.summary ?? 'No summary.' }}</p>
-          <p class="break-words text-muted-foreground">
-            <code>{{ p.path }}</code> · {{ bindsLine(p) }}
+          <p class="text-[13px] break-words text-muted-foreground">
+            <code class="text-xs">{{ p.path }}</code> · {{ bindsLine(p) }}
           </p>
           <p v-if="stubLine(p)" :class="p.bytes === null ? toneText.bad : 'text-muted-foreground'">{{ stubLine(p) }}</p>
           <p v-if="p.lossy" :class="toneText.attention">{{ LOSSY_NAME }}</p>
           <Collapsible v-if="knowledge.canRead" :open="p.id in texts" @update:open="(open: boolean) => emit('toggleText', p.id, open)">
-            <CollapsibleTrigger class="inline-flex items-center gap-1 underline-offset-2 hover:underline">
+            <CollapsibleTrigger class="inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
               <ChevronDown v-if="p.id in texts" class="size-3" />
               <ChevronRight v-else class="size-3" />
               Document
@@ -123,8 +128,8 @@
                   </p>
                   <p v-if="part.lossy" :class="toneText.attention">{{ LOSSY }}</p>
                   <!-- eslint-disable-next-line vue/no-v-html -- cleaned by DOMPurify in lib/markdown.ts -->
-                  <div v-if="part.html !== undefined" class="rounded border px-3" :class="prose" v-html="part.html" />
-                  <pre v-else class="overflow-x-auto rounded bg-muted p-2 text-xs">{{ part.text }}</pre>
+                  <div v-if="part.html !== undefined" class="rounded-md border px-3" :class="prose" v-html="part.html" />
+                  <pre v-else class="overflow-x-auto rounded-md bg-muted p-2 text-xs">{{ part.text }}</pre>
                 </div>
               </template>
             </CollapsibleContent>
@@ -152,21 +157,21 @@
           </template>
         </li>
       </ul>
-    </section>
+    </GroupPanel>
 
-    <section v-if="knowledge.sources.length > 0" aria-labelledby="changed" class="flex flex-col gap-2">
-      <h2 id="changed" class="font-semibold tracking-wider uppercase">Changed sources</h2>
-      <ul class="border-y">
+    <GroupPanel v-if="knowledge.sources.length > 0" aria-labelledby="changed">
+      <template #head><h2 id="changed" class="px-4 pt-3 pb-2 text-[15px] font-semibold">Changed sources</h2></template>
+      <ul class="flex flex-col gap-2 px-2 pb-2">
         <li
           v-for="{ s, line, actions, blocked, diff } in sources"
           :key="s.id"
-          class="flex min-w-0 flex-col gap-1 border-b px-3 py-2 last:border-b-0"
+          class="flex min-w-0 flex-col gap-1.5 rounded-lg border bg-card px-4 py-3 text-card-foreground shadow-xs"
         >
-          <p class="font-semibold">{{ s.id }}</p>
+          <p class="font-mono text-[13px] font-medium">{{ s.id }}</p>
           <p :class="toneText[line.tone]">{{ line.text }}</p>
           <p v-if="s.lossy" :class="toneText.attention">{{ LOSSY_NAME }}</p>
           <Collapsible v-if="s.state === 'changed'" :open="s.id in diffs" @update:open="(open: boolean) => emit('toggle', s.id, open)">
-            <CollapsibleTrigger class="inline-flex items-center gap-1 underline-offset-2 hover:underline">
+            <CollapsibleTrigger class="inline-flex items-center gap-1 text-[13px] underline-offset-2 hover:underline">
               <ChevronDown v-if="s.id in diffs" class="size-3" />
               <ChevronRight v-else class="size-3" />
               Diff since approved
@@ -181,7 +186,7 @@
               <template v-else-if="diff?.kind === 'lines'">
                 <p v-if="diff.lossy" :class="toneText.attention">{{ LOSSY }}</p>
                 <pre
-                  class="overflow-x-auto rounded bg-muted p-2 text-xs"
+                  class="overflow-x-auto rounded-md bg-muted p-2 text-xs"
                 ><code><span v-for="(row, i) in diff.lines" :key="i" class="block" :class="row.tone && toneText[row.tone]">{{ row.text || ' ' }}</span></code></pre>
               </template>
             </CollapsibleContent>
@@ -211,6 +216,6 @@
           </template>
         </li>
       </ul>
-    </section>
+    </GroupPanel>
   </div>
 </template>

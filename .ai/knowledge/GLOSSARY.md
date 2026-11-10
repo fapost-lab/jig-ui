@@ -60,6 +60,14 @@ A board lane computed from a task's Jig state; never stored.
 Informal synonyms: status (wrong: status is one of Jig's fields the column is computed from).
 Use in: source code, documentation.
 
+## Lane
+
+One of the three groups a spec's phase shows its items in on the Specs view — To file, In work,
+Done — worked out from the item, never stored.
+
+Informal synonyms: column (wrong: a column is the board's).
+Use in: source code, documentation.
+
 ## Request
 
 A sticky ask from the page that Jig holds until it is honoured or cancelled — today a pause, which

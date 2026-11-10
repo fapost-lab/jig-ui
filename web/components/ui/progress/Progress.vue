@@ -23,7 +23,7 @@
   <ProgressRoot
     data-slot="progress"
     v-bind="delegatedProps"
-    :class="cn('relative flex h-1 w-full items-center overflow-x-hidden rounded-none bg-muted', props.class)"
+    :class="cn('relative flex h-1 w-full items-center overflow-x-hidden rounded-full bg-muted', props.class)"
   >
     <ProgressIndicator
       data-slot="progress-indicator"

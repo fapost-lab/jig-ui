@@ -38,6 +38,6 @@
         {{ finding ? 'Finding…' : 'Find projects' }}
       </Button>
     </div>
-    <p v-if="refusal" id="connect-refusal" role="alert" class="text-destructive">{{ refusal }}</p>
+    <p v-if="refusal" id="connect-refusal" role="alert" class="text-[13px] text-destructive">{{ refusal }}</p>
   </form>
 </template>

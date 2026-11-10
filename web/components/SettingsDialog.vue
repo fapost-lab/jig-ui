@@ -61,11 +61,11 @@
       </p>
       <template v-else>
         <section aria-labelledby="own-settings" class="flex flex-col gap-2">
-          <h3 id="own-settings" class="font-semibold tracking-wider uppercase">Yours, in this clone</h3>
+          <h3 id="own-settings" class="text-[15px] font-semibold">Yours, in this clone</h3>
           <ul class="divide-y border-y">
-            <li v-for="s in shown.own" :key="s.key" class="flex flex-col gap-1 py-2">
+            <li v-for="s in shown.own" :key="s.key" class="flex flex-col gap-1 py-2.5">
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <label :for="`setting-${s.key}`" class="font-mono font-semibold">{{ s.key }}</label>
+                <label :for="`setting-${s.key}`" class="font-mono text-[13px] font-medium">{{ s.key }}</label>
                 <Checkbox
                   v-if="control(s) === 'checkbox'"
                   :id="`setting-${s.key}`"
@@ -94,13 +94,13 @@
                     :model-value="draft(s)"
                     :disabled="busy"
                     :placeholder="s.default ?? 'not set'"
-                    class="h-7 w-48"
+                    class="h-8 w-48"
                     @update:model-value="(v) => (drafts[s.key] = String(v))"
                   />
                   <Button v-if="changed(s)" type="submit" variant="outline" size="xs" :disabled="busy">Save</Button>
                 </form>
                 <span v-else :id="`setting-${s.key}`">{{ shownValue(s) }}</span>
-                <span v-if="pending === s.key" class="text-muted-foreground">Saving…</span>
+                <span v-if="pending === s.key" class="text-[13px] text-muted-foreground">Saving…</span>
                 <Button
                   v-if="s.source === 'local'"
                   variant="ghost"
@@ -112,24 +112,24 @@
                   {{ s.secret ? 'Clear' : 'Unset' }}
                 </Button>
               </div>
-              <p class="text-muted-foreground">
+              <p class="text-[13px] text-muted-foreground">
                 {{ s.description }} <span class="whitespace-nowrap">· {{ sourceLine(s) }}</span>
               </p>
-              <p v-if="s.secret" class="text-muted-foreground">
+              <p v-if="s.secret" class="text-[13px] text-muted-foreground">
                 Set it with <code>jig notify setup</code> in a terminal in the project: Jig never takes it on a command line.
               </p>
             </li>
           </ul>
         </section>
         <section aria-labelledby="project-settings" class="flex flex-col gap-2">
-          <h3 id="project-settings" class="font-semibold tracking-wider uppercase">The project's, shared through git</h3>
+          <h3 id="project-settings" class="text-[15px] font-semibold">The project's, shared through git</h3>
           <ul class="divide-y border-y">
-            <li v-for="s in shown.project" :key="s.key" class="flex flex-col gap-1 py-2">
+            <li v-for="s in shown.project" :key="s.key" class="flex flex-col gap-1 py-2.5">
               <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span class="font-mono font-semibold">{{ s.key }}</span>
+                <span class="font-mono text-[13px] font-medium">{{ s.key }}</span>
                 <span>{{ shownValue(s) }}</span>
               </div>
-              <p class="text-muted-foreground">
+              <p class="text-[13px] text-muted-foreground">
                 {{ s.description }} <span class="whitespace-nowrap">· {{ sourceLine(s) }}</span>
               </p>
             </li>

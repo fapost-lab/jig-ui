@@ -17,7 +17,7 @@
 </script>
 
 <template>
-  <DialogTitle data-slot="dialog-title" v-bind="forwardedProps" :class="cn('cn-font-heading text-sm font-medium', props.class)">
+  <DialogTitle data-slot="dialog-title" v-bind="forwardedProps" :class="cn('cn-font-heading text-base font-semibold', props.class)">
     <slot />
   </DialogTitle>
 </template>

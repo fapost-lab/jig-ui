@@ -12,11 +12,17 @@
   <span
     v-if="project.state === 'ready' && project.attention.length > 0"
     :class="attentionFill"
-    class="px-1"
+    class="min-w-5 rounded-full px-1.5 text-center text-xs font-medium tabular-nums"
     :aria-label="`${project.attention.length} need you`"
   >
     {{ project.attention.length }}
   </span>
   <span v-else-if="project.state === 'reading'" class="px-1 text-muted-foreground" aria-label="being read">…</span>
-  <span v-else-if="project.state !== 'ready'" :class="badFill" class="px-1" aria-label="not readable">!</span>
+  <span
+    v-else-if="project.state !== 'ready'"
+    :class="badFill"
+    class="min-w-5 rounded-full px-1.5 text-center text-xs font-medium"
+    aria-label="not readable"
+    >!</span
+  >
 </template>

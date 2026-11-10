@@ -8,7 +8,7 @@
 </script>
 
 <template>
-  <div data-slot="card-title" :class="cn('cn-font-heading text-sm font-medium group-data-[size=sm]/card:text-sm', props.class)">
+  <div data-slot="card-title" :class="cn('cn-font-heading text-base font-semibold group-data-[size=sm]/card:text-sm', props.class)">
     <slot />
   </div>
 </template>

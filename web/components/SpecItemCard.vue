@@ -1,7 +1,7 @@
 <script setup lang="ts">
   import { computed } from 'vue';
   import type { SpecItem } from '@/api';
-  import { itemTitle, type Words } from '@/lib/specs';
+  import { itemTitle, itemWord, shownFog, type Words } from '@/lib/specs';
 
   /**
    * A roadmap item as a card of its phase's lane: a dot and its title, a line of what it names and where it stands, and
@@ -36,8 +36,8 @@
     <div class="flex items-start gap-1">
       <button type="button" class="flex min-w-0 flex-1 items-start gap-2 text-left" :aria-expanded="open" @click="$emit('toggle')">
         <span class="mt-1.5 size-2 shrink-0 rounded-full" :class="standing.dot" aria-hidden="true" />
-        <span class="sr-only">{{ item.checked ? 'Done:' : item.fog ? 'Fog:' : item.task ? 'In work:' : 'To file:' }}</span>
-        <span class="min-w-0 font-medium" :class="[!open && 'line-clamp-2', item.fog && !item.checked && 'italic']">
+        <span class="sr-only">{{ itemWord(item) }}:</span>
+        <span class="min-w-0 font-medium" :class="[!open && 'line-clamp-2', shownFog(item) && 'italic']">
           <template v-for="(run, i) in shown.title" :key="i"
             ><code v-if="run.code" class="rounded-sm bg-muted px-1 text-xs">{{ run.text }}</code
             ><template v-else>{{ run.text }}</template></template

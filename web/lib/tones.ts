@@ -1,3 +1,5 @@
+import type { Lane } from './specs';
+
 /** How loud a fact about a task is: it waits for the person, it went well, it went wrong, or neither. */
 export type Tone = 'attention' | 'good' | 'bad' | 'quiet';
 
@@ -26,18 +28,21 @@ export const badFill = 'bg-red-600 text-white';
 /** Done as a filled bar, a roadmap's progress. */
 export const doneFill = 'bg-emerald-500';
 
+/** In progress as a fill, its column's stripe and the In work lane's. */
+const inProgressFill = 'bg-sky-500';
+
 /** Each column's accent, by the column ids the board API sends; an id this page does not know gets none. */
 export const columnAccent: Record<string, string> = {
   'needs-you': 'bg-amber-500',
-  'in-progress': 'bg-sky-500',
+  'in-progress': inProgressFill,
   ready: 'bg-emerald-500',
   backlog: 'bg-slate-400',
   paused: 'bg-zinc-400',
 };
 
 /** Each lane's accent on a roadmap board: to file a grey that means nothing more, in work as In progress, done as done. */
-export const laneAccent: Record<string, string> = {
+export const laneAccent: Record<Lane, string> = {
   'to-file': 'bg-muted-foreground/40',
-  'in-work': 'bg-sky-500',
+  'in-work': inProgressFill,
   done: doneFill,
 };

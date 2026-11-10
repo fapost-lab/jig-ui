@@ -87,6 +87,12 @@ export type Lane = (typeof LANES)[number]['id'];
 /** An item's lane: done when checked, in work when it names a task, else to file — fog too, which has nothing to file yet. */
 export const laneOf = (item: SpecItem): Lane => (item.checked ? 'done' : item.task !== null ? 'in-work' : 'to-file');
 
+/** Fog as its card shows it, the title in italic: only while it is to file — filed or done, it is what its lane says. */
+export const shownFog = (item: SpecItem): boolean => item.fog && laneOf(item) === 'to-file';
+
+/** The word a screen reader hears before an item's title, where its dot stands: Fog, or its lane's title. */
+export const itemWord = (item: SpecItem): string => (shownFog(item) ? 'Fog' : LANES.find((lane) => lane.id === laneOf(item))!.title);
+
 /**
  * An item's words as its card shows them: the title, up to the first " — " or `(after: …)` outside a code run; the
  * dependencies, up to the parenthesis that closes them, wherever they stand; and the rest, opened under the title. No

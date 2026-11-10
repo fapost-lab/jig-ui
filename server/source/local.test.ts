@@ -1448,6 +1448,28 @@ describe('localSource, editing a roadmap', () => {
     });
   });
 
+  it("files a new task and names it in one write from Jig 0.41.0, against the person's revision", async () => {
+    const dir = project('item-one', '0.41.0', { tasks, specs: { specs: [shop()] }, item: answered });
+    await source.connect(dir);
+    expect(await source.fileItem('item-one', 'shop', a, 'search', 'Search by name', 5)).toEqual({ state: 'written', note });
+    expect(await source.fileItem('item-one', 'shop', a, 'filed', null, 5)).toEqual({ state: 'written', note });
+    expect(edits(dir)).toEqual([
+      `spec item file shop ${a} --new search --goal Search by name --revision 5 --json`,
+      `spec item file shop ${a} --task filed --revision 5 --json`,
+    ]);
+  });
+
+  it('carries the refusal of that one write as it is, since it filed nothing', async () => {
+    const dir = project('item-one-none', '0.41.0', { tasks, specs: { specs: [shop()] }, item: 'git-not-allowed' });
+    await source.connect(dir);
+    expect(await source.fileItem('item-one-none', 'shop', a, 'search', 'Search', 5)).toEqual({
+      state: 'refused',
+      code: 'git-not-allowed',
+      reasons: ['refused'],
+    });
+    expect(edits(dir)).toEqual([`spec item file shop ${a} --new search --goal Search --revision 5 --json`]);
+  });
+
   it('runs nothing for a checked item, one that names a task, a new task without its goal, or a Jig older than 0.40.0', async () => {
     const dir = project('item-refuser', '0.40.0', { tasks, specs: { specs: [shop()] }, settings: level('commit'), item: answered });
     await source.connect(dir);

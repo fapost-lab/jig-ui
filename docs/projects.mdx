@@ -368,12 +368,19 @@ roadmap is the default branch's again.
 Jig refuses edits when:
 
 - `agent.git` is `none` (Jig's default) in your clone: Jig commits nothing. Choose a level in the
-  project's **Settings**. Filing a new task is not even started then.
+  project's **Settings**. Filing a new task files no task then.
 - the spec's branch is checked out in a checkout of yours, as `jig spec new` and `jig spec resume`
   leave it: switch that checkout to another branch first.
 - the project changed since you saw the specs: they are read again; try again on them.
+- an earlier edit of the spec still waits where this one cannot follow — an epic was opened or
+  finished since, or edits that never reached the remote sit above a pull request closed unmerged
+  (Jig 0.41.0): Jig's line says what to do.
 
-Filing a new task is two Jig commands: `jig task new`, which carries no revision, then
+With Jig 0.41.0 or later, filing a new task is one Jig command, `jig spec item file --new`, with
+the revision of the specs you saw, as for every other edit: a change made in the project since then
+refuses it, and the specs are read again. When Jig refuses it, no task is filed.
+
+On Jig 0.40.0 it is two Jig commands: `jig task new`, which carries no revision, then
 `jig spec item file` with the revision Jig has right after it. So a change made in the project
 since you saw the specs does not refuse it: the item is found by Jig's own handle for it, and Jig
 refuses an item that names a task already. If Jig files the task but then refuses to name it on

@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-11-09
+reviewed_at: 2026-11-10
 ---
 # JigClient — the only module that knows Jig
 
@@ -31,7 +31,7 @@ first Jig with a queue (0.29.0 was the first that prints JSON). A write a later 
 does not raise it: it carries a version of its own, checked by the local adapter against the
 project's Jig before the page is offered the write — `RESUME_JIG_VERSION`, 0.35.0, for
 `resumeTask`, `ARTIFACTS_JIG_VERSION`, 0.39.0, for a task's documents, `ROADMAP_JIG_VERSION`, 0.40.0, for a
-roadmap's edits, `KNOWLEDGE_JIG_VERSION`, 0.40.0, for the knowledge waiting for a decision, and `KNOWLEDGE_TEXT_JIG_VERSION`, 0.41.0, for a proposed document's text and a dropped link — so a project on an older Jig is still read, and only that write is missing. `CLOSE_JIG_VERSION`, 0.40.0, is the other kind: the close is offered on any Jig, and the version picks how `closeTask` checks it. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
+roadmap's edits, `KNOWLEDGE_JIG_VERSION`, 0.40.0, for the knowledge waiting for a decision, `KNOWLEDGE_TEXT_JIG_VERSION`, 0.41.0, for a proposed document's text and a dropped link, and `FILE_NEW_JIG_VERSION`, 0.41.0, for filing an item's new task in one write — so a project on an older Jig is still read, and only that write is missing. `CLOSE_JIG_VERSION`, 0.40.0, is the other kind: the close is offered on any Jig, and the version picks how `closeTask` checks it. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
 found from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`), never a
 `bash` on PATH, which may be WSL's. It is asked once per process; a failed ask is not kept.
 
@@ -121,14 +121,15 @@ come back as codes, Jig's line as `reasons` with the command's name cut by `said
 reads the settings again.
 
 A roadmap's edits — `addItem`, `moveItem` and `fileItem` (`jig spec item add|move|file <spec> …
---revision <n> --json`) — have 60 s each (`ROADMAP_TIMEOUT_MS`): Jig fetches, may push and ask the
+--revision <n> --json`), and from Jig 0.41.0 `fileNewItem` (`jig spec item file <spec> <item> --new
+<task> --goal <text>`, which files the task in the same write) — have 60 s each (`ROADMAP_TIMEOUT_MS`): Jig fetches, may push and ask the
 forge. Of the answer only `write.note` is read — whose step is next, or a push that failed after the
 commit — through `withoutPaths`. Their refusals add `git-not-allowed` (`agent.git: none`),
 `not-linkable`, `epic-missing`, `write-busy`, `branch-checked-out` (its message names the checkout's
 absolute path), `branch-diverged`, `branch-has-other-commits`, `base-not-on-origin`,
-`tree-in-the-way` and `commit-refused`, Jig's line as `reasons`, its command cut by `said` — of one
-word, two or three (`spec item move: `)
-(adr-20261106-editing-a-roadmap-from-the-page).
+`tree-in-the-way`, `commit-refused` and, from Jig 0.41.0, `write-still-waits`, Jig's line as `reasons`,
+its command cut by `said` — of one word, two or three (`spec item move: `)
+(adr-20261106-editing-a-roadmap-from-the-page, adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41).
 
 The knowledge waiting for a decision — `readKnowledge` (`jig knowledge proposed --json` and
 `jig knowledge sources --json`, at the lower of their revisions; of the sources only `changed`,

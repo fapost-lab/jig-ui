@@ -44,14 +44,15 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   status consolidated` (a close: from Jig 0.40.0 with `--revision --json`, Jig checking it; before
   that text, checked against a revision read first), a project's settings
   `jig config keys` and the person's own `jig config set|unset --local` (from Jig 0.40.0, feature-settings), a roadmap's
-  edits `jig spec item add|move|file` (from Jig 0.40.0, adr-20261106-editing-a-roadmap-from-the-page), the
+  edits `jig spec item add|move|file` (from Jig 0.40.0, adr-20261106-editing-a-roadmap-from-the-page; `file --new` from
+  Jig 0.41.0, adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41), the
   knowledge waiting for a decision `jig knowledge proposed`, `jig knowledge sources` and its `--diff`, and the decisions
   `jig knowledge accept|reject|reviewed` (from Jig 0.40.0, feature-knowledge), a proposed document's text
   `jig knowledge read` (from Jig 0.41.0, adr-20261109-knowledge-text-and-drop-from-jig-0-41), and
   `jig upgrade`, its dry run and its run (from Jig 0.34.0), and `jig self-update` (its text line), each JSON answer checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
   fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue,
   0.39.0 for a task's documents, 0.40.0 for the settings, a roadmap's edits and the knowledge, 0.41.0 for the
-  knowledge's text, Drop and judged reads (convention-jig-client).
+  knowledge's text, Drop and judged reads and for filing an item's new task in one write (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, the connected ids
   (`connected`), one project as the workspace shows it (`project`), the Jig projects under a folder (`scan`, walked
   by `scan.ts`), a project's live tasks, its finished tasks on demand (`finished`), one task in full, a live task's documents (`artifacts`, `artifact`), the settings (`settings`), the knowledge waiting for a decision (`knowledge`, `knowledgeDiff`, `knowledgeText`), connect, disconnect, subscribe to changes, and the writes `move`,
@@ -134,8 +135,9 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   person confirms, its refusal shown in Jig's words (adr-20261029-close-a-ready-task-from-the-board). Filing a task is the one write with no revision: it
   names a new id, which Jig claims or refuses `already-exists`
   (adr-20261022-filing-a-task-carries-no-revision). A roadmap's edits are writes like the queue's,
-  with the specs' revision, committed by Jig on the spec's branch; filing an item's new task is that
-  filing and then naming it on the item, with a revision the adapter reads between the two
+  with the specs' revision, committed by Jig on the spec's branch; from Jig 0.41.0 filing an item's
+  new task is one of them too (adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41), and on Jig 0.40.0 it is that filing and then naming it on the
+  item, with a revision the adapter reads between the two
   (adr-20261106-editing-a-roadmap-from-the-page). A knowledge decision is a write like those, with the
 knowledge's revision, committed by Jig on `knowledge/decisions` and checked against a knowledge read made
 just before it (adr-20261106-knowledge-decisions-from-the-page). Upgrading a project's Jig is the one write that
@@ -189,7 +191,8 @@ The start flow, read-and-follow and change, with its conflict display, are built
   resumes the task at once (adr-20261026-a-drop-out-of-paused-resumes-at-once).
 - A hosted or self-hosted Jig UI stays possible: projects by id, access behind a replaceable
   guard, writes carrying a revision (adr-20261014-project-source-port-keeps-hosting-open) — all but
-  the upgrade (adr-20261027-upgrading-a-project-runs-in-the-background) and the naming of an item's
-  new task, which carries the revision read after its filing
-  (adr-20261106-editing-a-roadmap-from-the-page).
+  the upgrade (adr-20261027-upgrading-a-project-runs-in-the-background) and, on Jig 0.40.0, the
+  naming of an item's new task, which carries the revision read after its filing
+  (adr-20261106-editing-a-roadmap-from-the-page; from Jig 0.41.0 one write with the person's
+  revision, adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41).
 - Stack: adr-20261014-stack-vue-hono-sse-on-node.

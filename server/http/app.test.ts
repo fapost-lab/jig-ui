@@ -6,7 +6,7 @@ import type { Hono } from 'hono';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { localSource } from '../source/local.js';
 import { tilde } from '../source/scan.js';
-import type { Change, Knowledge, ProjectSource, Written } from '../source/project-source.js';
+import type { Change, Knowledge, ProjectFinished, ProjectSource, Written } from '../source/project-source.js';
 import { createApp, readPackageVersion } from './app.js';
 
 const PORT = 4870;
@@ -875,13 +875,14 @@ describe('/api/projects/:id/specs/items', () => {
 
   const noted: Written = { state: 'written', note: 'agent.git is commit: pushing spec/shop is yours' };
 
-  function faked(outcome: Written | undefined) {
+  function faked(outcome: Written | undefined, finished: ProjectFinished = { state: 'ready', tasks: [] }) {
     const sent: unknown[][] = [];
     const source: ProjectSource = {
       ...localSource(join(webRoot, 'items-config')),
       addItem: (...a) => (sent.push(['add', ...a]), Promise.resolve(outcome)),
       moveItem: (...a) => (sent.push(['move', ...a]), Promise.resolve(outcome)),
       fileItem: (...a) => (sent.push(['file', ...a]), Promise.resolve(outcome)),
+      finished: (...a) => (sent.push(['finished', ...a]), Promise.resolve(finished)),
     };
     return { app: createApp({ port: PORT, token: TOKEN, source, webRoot }), sent };
   }
@@ -960,6 +961,46 @@ describe('/api/projects/:id/specs/items', () => {
         },
       },
     ]);
+  });
+
+  it("says a new id Jig refused already-exists is a finished task's when Jig's list of them holds it", async () => {
+    const outcome: Written = { state: 'refused', code: 'already-exists', reasons: ['task already exists: search'] };
+    const search = { id: 'search', status: 'consolidated', goal: null, updatedAt: null, pullRequest: null } as const;
+    const { app, sent } = faked(outcome, { state: 'ready', tasks: [search] });
+    const res = await post(app, 'file', { spec: 'shop', item, task: 'search', goal: 'g', revision: 3 });
+    expect([res.status, await res.json()]).toEqual([
+      422,
+      {
+        error: {
+          code: 'already-exists',
+          message: 'The project has a finished task with this id.',
+          reasons: ['task already exists: search'],
+          taken: true,
+        },
+      },
+    ]);
+    expect(sent).toEqual([
+      ['file', 'x', 'shop', item, 'search', 'g', 3],
+      ['finished', 'x'],
+    ]);
+  });
+
+  it.each<[string, ProjectFinished]>([
+    ['no finished task of that id', { state: 'ready', tasks: [] }],
+    ['a list Jig did not give', { id: 'x', state: 'unreadable', code: 'failed' }],
+  ])("leaves Jig's line on already-exists with %s", async (_, finished) => {
+    const outcome: Written = { state: 'refused', code: 'already-exists', reasons: ['i-5d729342e61f already names task other'] };
+    const res = await post(faked(outcome, finished).app, 'file', { spec: 'shop', item, task: 'search', goal: 'g', revision: 3 });
+    expect([res.status, await res.json()]).toEqual([
+      422,
+      { error: { code: 'already-exists', message: 'Jig refused the change.', reasons: ['i-5d729342e61f already names task other'] } },
+    ]);
+  });
+
+  it('reads no finished tasks for a live task named on the item', async () => {
+    const { app, sent } = faked({ state: 'refused', code: 'already-exists', reasons: ['…'] });
+    await post(app, 'file', { spec: 'shop', item, task: 'filed', revision: 3 });
+    expect(sent).toEqual([['file', 'x', 'shop', item, 'filed', null, 3]]);
   });
 
   it('is refused without the token', async () => {

@@ -56,22 +56,23 @@ describe('unnamedRefusal', () => {
 describe('fileItemRefusal', () => {
   it.each([
     // Jig 0.40.0: the task was filed and Jig refused to name it.
-    ['branch-checked-out', ['spec/shop is checked out in …'], true, 'Filed search, but Jig did not name it on the item'],
-    // Jig 0.41.0's two `already-exists` of `--new`, told apart by Jig's own line only.
-    ['already-exists', ['task already exists: search'], false, 'Jig did not file search: task already exists: search'],
+    ['branch-checked-out', ['spec/shop is checked out in …'], true, false, 'Filed search, but Jig did not name it on the item'],
+    // An id the server found among the finished tasks, whatever Jig's line.
+    ['already-exists', ['task already exists: search'], false, true, 'The project has a finished task called search. Choose another id.'],
+    // Any other `already-exists` of `--new` (Jig 0.41.0) in Jig's own line.
     [
       'already-exists',
       ['i-aaaaaaaaaaaa already names task other'],
       false,
+      false,
       'Jig did not file search: i-aaaaaaaaaaaa already names task other',
     ],
-    ['already-exists', [], false, 'The project has a task called search already, maybe a finished one. Choose another id.'],
-    ['usage', [], false, 'Jig does not take this id or goal: one line of goal, not starting with #.'],
-  ])('says %s with %j', (code, reasons, filed, line) => {
-    expect(fileItemRefusal(code, reasons, 'search', filed)).toContain(line);
+    ['usage', [], false, false, 'Jig does not take this id or goal: one line of goal, not starting with #.'],
+  ])('says %s with %j', (code, reasons, filed, taken, line) => {
+    expect(fileItemRefusal(code, reasons, 'search', filed, taken)).toContain(line);
   });
 
   it('leaves any other refusal to roadmapRefusal', () => {
-    expect(fileItemRefusal('git-not-allowed', [], 'search', false)).toBeUndefined();
+    expect(fileItemRefusal('git-not-allowed', [], 'search', false, false)).toBeUndefined();
   });
 });

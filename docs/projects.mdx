@@ -372,9 +372,11 @@ Jig refuses edits when:
 - the spec's branch is checked out in a checkout of yours, as `jig spec new` and `jig spec resume`
   leave it: switch that checkout to another branch first.
 - the project changed since you saw the specs: they are read again; try again on them.
-- an earlier edit of the spec still waits where this one cannot follow — an epic was opened or
-  finished since, or edits that never reached the remote sit above a pull request closed unmerged
-  (Jig 0.41.0): Jig's line says what to do.
+- an earlier edit of the spec still waits where this one cannot follow (Jig 0.41.0): an epic was
+  opened or finished since, or edits that never reached the remote sit above a pull request closed
+  unmerged, or above edits the remote no longer has. Jig's line says what to do.
+- the id given to a new task is a finished task's: choose another id. When the item already names a
+  task on the spec's branch, for example one filed in another clone, Jig's line says so.
 
 With Jig 0.41.0 or later, filing a new task is one Jig command, `jig spec item file --new`, with
 the revision of the specs you saw, as for every other edit: a change made in the project since then

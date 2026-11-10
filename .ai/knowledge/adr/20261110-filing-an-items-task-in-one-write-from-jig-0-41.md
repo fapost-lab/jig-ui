@@ -43,7 +43,8 @@ tried on a scratch project on 2026-11-10):
 - `already-exists` on a filing is shown in Jig's own line (`fileItemRefusal`). From 0.41.0 it has
   two meanings: the id is taken, or the item already names a task on its branch, for example one
   filed in another clone and pushed but not fetched here. Jig's line says which one, and its
-  contract tells a program to act on the code, never on the words.
+  contract tells a program to act on the code, never on the words. (Amended by
+  adr-20261110-a-taken-id-is-told-by-the-finished-tasks: an id a finished task has is said so.)
 - `write-still-waits` reaches the page by its code, with Jig's line. Its code came in with
   adr-20261109-knowledge-text-and-drop-from-jig-0-41.
 

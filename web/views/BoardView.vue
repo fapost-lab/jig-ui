@@ -302,6 +302,7 @@
     | {
         code?: string;
         text: string | null;
+        taken?: boolean;
       }
     | undefined
   > {
@@ -321,14 +322,19 @@
     if (code === 'stale-revision')
       return { code, text: `The project changed while you were ${doing}. Try again on the specs as they are now.` };
     const filed = 'filed' in body.error && body.error.filed === true;
-    return { code, text: explain?.({ code, reasons, filed }) ?? roadmapRefusal(code, reasons, doing, spec) };
+    const taken = 'taken' in body.error && body.error.taken === true;
+    return { code, taken, text: explain?.({ code, reasons, filed, taken }) ?? roadmapRefusal(code, reasons, doing, spec) };
   }
 
-  /** A roadmap edit Jig refused: its code, its reasons, and for filing an item's task whether the task was filed. */
+  /**
+   * A roadmap edit Jig refused: its code, its reasons, and for filing an item's task whether the task was filed, and
+   * whether its id is a finished task's.
+   */
   type Refused = {
     code: string;
     reasons: string[];
     filed: boolean;
+    taken: boolean;
   };
 
   /** An edit made on the card: what came of it goes to the notice. */
@@ -363,8 +369,8 @@
     spec: string;
     item: SpecItem;
     refusal?: {
-      code: string;
       text: string;
+      taken: boolean;
     };
   }>();
 
@@ -377,14 +383,14 @@
       spec,
       `filing the task of an item of ${spec}`,
       (revision) => client.api.projects[':id'].specs.items.file.$post({ param, json: { spec, item: id, task, goal, revision } }),
-      ({ code, reasons, filed }) => fileItemRefusal(code, reasons, task, filed),
+      ({ code, reasons, filed, taken }) => fileItemRefusal(code, reasons, task, filed, taken),
     );
 
     if (!outcome || filingItem.value !== shown) return;
     if (outcome.code === undefined) {
       filingItem.value = undefined;
       if (outcome.text) notice.value = { text: outcome.text, changed: [] };
-    } else shown.refusal = { code: outcome.code, text: outcome.text ?? '' };
+    } else shown.refusal = { text: outcome.text ?? '', taken: outcome.taken === true };
   }
 
   /** The new-task form: open, its request on its way, and why the last one was refused. */
@@ -668,7 +674,7 @@
         :live="liveIds"
         :busy="pendingSpec !== undefined"
         :refusal="filingItem.refusal?.text"
-        :taken="filingItem.refusal?.code === 'already-exists'"
+        :taken="filingItem.refusal?.taken"
         @update:open="(open) => !open && (filingItem = undefined)"
         @file="fileItem"
       />

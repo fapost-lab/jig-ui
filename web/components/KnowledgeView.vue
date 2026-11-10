@@ -22,6 +22,7 @@
   import { prose, rendered } from '@/lib/markdown';
   import { waitingState } from '@/lib/specs';
   import { toneText } from '@/lib/tones';
+  import GroupPanel from './GroupPanel.vue';
 
   /**
    * What waits for a person's decision in a project's knowledge, and each open diff and document text — being read, read,
@@ -91,9 +92,9 @@
       >. The knowledge below is as it is here, with what waits there marked.
     </p>
 
-    <section v-if="knowledge.proposals.length > 0" aria-labelledby="proposed" class="flex flex-col gap-2">
-      <h2 id="proposed" class="text-[15px] font-semibold">Proposed</h2>
-      <ul class="flex flex-col gap-3">
+    <GroupPanel v-if="knowledge.proposals.length > 0" aria-labelledby="proposed">
+      <template #head><h2 id="proposed" class="px-4 pt-3 pb-2 text-[15px] font-semibold">Proposed</h2></template>
+      <ul class="flex flex-col gap-2 px-2 pb-2">
         <li
           v-for="{ p, blocked, text } in proposals"
           :key="p.id"
@@ -156,11 +157,11 @@
           </template>
         </li>
       </ul>
-    </section>
+    </GroupPanel>
 
-    <section v-if="knowledge.sources.length > 0" aria-labelledby="changed" class="flex flex-col gap-2">
-      <h2 id="changed" class="text-[15px] font-semibold">Changed sources</h2>
-      <ul class="flex flex-col gap-3">
+    <GroupPanel v-if="knowledge.sources.length > 0" aria-labelledby="changed">
+      <template #head><h2 id="changed" class="px-4 pt-3 pb-2 text-[15px] font-semibold">Changed sources</h2></template>
+      <ul class="flex flex-col gap-2 px-2 pb-2">
         <li
           v-for="{ s, line, actions, blocked, diff } in sources"
           :key="s.id"
@@ -215,6 +216,6 @@
           </template>
         </li>
       </ul>
-    </section>
+    </GroupPanel>
   </div>
 </template>

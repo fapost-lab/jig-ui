@@ -37,6 +37,13 @@ of both ADRs stands.
 - **Marks**: a plain muted count, a coloured dot for where an item stands, ✓ for a finished phase,
   and a dashed "nothing here" box for an empty column or lane. Selection is `bg-muted`, not
   inversion.
+- **Groups**: a board column, a List group, a spec's lane and a section of a page (the task's
+  facts, documents, attention and actions; Knowledge's proposed and changed sources; the project
+  list) are tinted panels (`web/components/GroupPanel.vue`, `bg-foreground/5`, `rounded-xl`), and
+  what they hold are white cards (`bg-card`). A column's or lane's accent is a stripe along its
+  panel's top (`columnAccent`, `laneAccent`), in place of a dot beside its title; Needs you on a
+  task's page takes its column's. The maintainer asked for this after the first cut, from a
+  screenshot of a board in that style, "for everything".
 - **Shape**: the theme's radius — `rounded-md` controls, `rounded-lg` cards. The primitives in
   `web/components/ui/` are edited in place to it; `components.json` keeps `reka-lyra`, so a
   component added later from the CLI arrives square and in 12px and gets the same two edits.
@@ -63,6 +70,8 @@ of both ADRs stands.
   plan in view.
 - **Up and Down over the whole phase, as before** — on a board the item would seem not to move, or to
   jump past cards of its own lane.
+- **Columns and sections as headings over the page's background, a dot beside a column's title** —
+  this task's first cut; the maintainer chose panels on seeing it, for the whole page.
 - **Hiding an empty List group**, as the prototype did — Paused would lose its drop.
 
 ## Consequences

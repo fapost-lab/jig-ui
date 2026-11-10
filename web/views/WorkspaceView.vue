@@ -14,6 +14,7 @@
   } from '@/api';
   import ConnectForm from '@/components/ConnectForm.vue';
   import FoundProjects from '@/components/FoundProjects.vue';
+  import GroupPanel from '@/components/GroupPanel.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProjectList from '@/components/ProjectList.vue';
   import SettingsDialog from '@/components/SettingsDialog.vue';
@@ -415,7 +416,7 @@
     </div>
     <!-- One column on a narrow screen: the list above the card. -->
     <div v-if="projects?.length" class="flex flex-col gap-4 md:flex-row md:items-start">
-      <ProjectList :projects="projects" :chosen="shown?.id" class="md:w-64 md:shrink-0" />
+      <GroupPanel class="md:w-64 md:shrink-0"><ProjectList :projects="projects" :chosen="shown?.id" class="p-2" /></GroupPanel>
       <p v-if="shown?.state === 'reading'" class="min-w-0 flex-1 text-muted-foreground">Reading {{ shown.id }}…</p>
       <ProjectCard
         v-else-if="shown"

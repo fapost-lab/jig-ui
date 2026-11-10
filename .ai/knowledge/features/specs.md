@@ -30,7 +30,7 @@ as a roadmap board (`web/components/SpecBoard.vue`). Its head holds the progress
 open or finished, read as of the last fetch, branch missing) and release level; a step for each
 phase says ✓ or done/total, and the board opens on the first phase with an item not done
 (`openingPhase`); the chosen phase's items stand in three lanes, To file, In work and Done (`laneOf`),
-each in the roadmap's order. An item is a card (`web/components/SpecItemCard.vue`): a dot and its
+each in the roadmap's order, a tinted panel with the lane's accent along its top (`laneAccent`). An item is a card (`web/components/SpecItemCard.vue`): a dot and its
 title, then the task it names — a link to its details when live —, where that task stands on the
 board, and its dependencies; a click shows the rest of its words (`itemTitle`, `itemStanding`;
 `web/lib/specs.ts` shapes an item's words) (adr-20261110-the-page-speaks-a-quiet-design-language). The specs

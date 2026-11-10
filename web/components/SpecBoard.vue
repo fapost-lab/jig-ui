@@ -7,8 +7,9 @@
   import { Input } from '@/components/ui/input';
   import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
   import { agentRequests, itemStanding, LANES, laneOf, openingPhase, shownRoadmap, waitingItems, waitingState } from '@/lib/specs';
-  import { toneText } from '@/lib/tones';
+  import { laneAccent, toneText } from '@/lib/tones';
   import CopyCommand from './CopyCommand.vue';
+  import GroupPanel from './GroupPanel.vue';
   import ProgressBar from './ProgressBar.vue';
   import SpecItemCard from './SpecItemCard.vue';
   import SpecItemMenu from './SpecItemMenu.vue';
@@ -139,16 +140,21 @@
       </TabsList>
 
       <TabsContent v-if="phase" :value="at" class="flex flex-col gap-4">
-        <div class="grid gap-4 md:grid-cols-3">
-          <section v-for="lane in lanes" :key="lane.id" class="flex flex-col gap-2" :aria-labelledby="`lane-${spec.id}-${lane.id}`">
-            <h3 :id="`lane-${spec.id}-${lane.id}`" class="flex items-center gap-2 px-1 text-[13px] font-semibold">
-              {{ lane.title }}
-              <span class="font-normal text-muted-foreground tabular-nums">{{ lane.cards.length }}</span>
-            </h3>
-            <p v-if="lane.cards.length === 0" class="rounded-lg border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">
+        <div class="grid gap-3 md:grid-cols-3">
+          <GroupPanel v-for="lane in lanes" :key="lane.id" :accent="laneAccent[lane.id]" :aria-labelledby="`lane-${spec.id}-${lane.id}`">
+            <template #head>
+              <h3 :id="`lane-${spec.id}-${lane.id}`" class="flex items-center gap-2 px-3 pt-2.5 pb-1 text-[13px] font-semibold">
+                {{ lane.title }}
+                <span class="font-normal text-muted-foreground tabular-nums">{{ lane.cards.length }}</span>
+              </h3>
+            </template>
+            <p
+              v-if="lane.cards.length === 0"
+              class="m-2 rounded-lg border border-dashed px-3 py-4 text-center text-xs text-muted-foreground"
+            >
               nothing here
             </p>
-            <ul v-else class="flex flex-col gap-2">
+            <ul v-else class="flex flex-col gap-2 p-2">
               <SpecItemCard
                 v-for="{ item, index } in lane.cards"
                 :key="keyOf(item, index)"
@@ -173,7 +179,7 @@
                 </template>
               </SpecItemCard>
             </ul>
-          </section>
+          </GroupPanel>
         </div>
 
         <template v-if="editable && phase.phase !== null">

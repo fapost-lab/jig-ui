@@ -31,9 +31,10 @@ keeps (`web/components/FinishedList.vue`, its words from `web/lib/finished.ts`).
 `web/views/BoardView.vue` reads the board and shows it two ways, switched by the person and
 remembered by the browser (`localStorage` `jig-ui.board-view`): Board (`BoardColumns`), the
 columns side by side, where a click expands a card into its details; List (`BoardList`), the
-columns as folding groups of one-line rows, a selected row's details in a pane on the right. An
-empty column is a dashed "nothing here" box, an empty group one muted header line; both still take a
-drop, so Paused does (adr-20261110-the-page-speaks-a-quiet-design-language). The
+columns as folding groups of one-line rows, a selected row's details in a pane on the right. Each
+column, and each List group, is a tinted panel with the column's accent as a stripe along its top;
+an empty column holds a dashed "nothing here" box, an empty group is its muted header alone; both
+still take a drop, so Paused does (adr-20261110-the-page-speaks-a-quiet-design-language). The
 two take the columns and the selected task as props and emit the choice; the view holds it. Both read the details on demand (feature-task-details).
 Specs (feature-specs) and Knowledge (feature-knowledge) are the third and fourth choices of the same switch; the sort
 and filters show for Board and List only. `?view=` in the address (the workspace card's link to Knowledge) opens that

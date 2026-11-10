@@ -42,6 +42,8 @@ MUST:     be the only callers of call(), client and onChange()
 - Text is the system's sans; `font-mono` (or `<code>`) only for ids, commands, code, branches,
   versions, settings keys and paths. 14px body, 13px secondary text and controls, 12px meta;
   headings in sentence case (adr-20261110-the-page-speaks-a-quiet-design-language).
+- A group of cards or a section of a page is a `GroupPanel`, its accent, if any, from `lib/tones.ts`;
+  what it holds is `bg-card`.
 - Variants go through class-variance-authority, as shadcn-vue's own do.
 - An interactive widget (a toggle, a disclosure, a menu) is a Reka UI primitive, for its keyboard
   and ARIA, not a `<div>` with handlers.

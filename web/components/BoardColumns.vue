@@ -1,7 +1,9 @@
 <script setup lang="ts">
   import type { Column, Place, ReadyDetails } from '@/api';
   import { useDrop } from '@/lib/drop';
+  import { columnAccent } from '@/lib/tones';
   import ColumnHeader from './ColumnHeader.vue';
+  import GroupPanel from './GroupPanel.vue';
   import TaskCard from './TaskCard.vue';
 
   /**
@@ -40,19 +42,22 @@
 </script>
 
 <template>
-  <div class="grid min-h-0 flex-1 grid-cols-[repeat(5,minmax(14rem,1fr))] gap-3 overflow-auto px-3">
-    <section
+  <div class="grid min-h-0 flex-1 grid-cols-[repeat(5,minmax(14rem,1fr))] gap-3 overflow-auto px-3 pt-3 pb-3">
+    <GroupPanel
       v-for="column in columns"
       :key="column.id"
+      :accent="columnAccent[column.id] ?? 'bg-border'"
+      sticky
       :aria-labelledby="`column-${column.id}`"
-      class="rounded-lg"
-      :class="gap?.list === column.id && gap.index < 0 && 'bg-muted'"
-      @dragover="(e) => drag.over(e, column.id, sorted ? undefined : column.cards)"
+      :class="gap?.list === column.id && gap.index < 0 && 'ring-2 ring-primary/40'"
+      @dragover="(e: DragEvent) => drag.over(e, column.id, sorted ? undefined : column.cards)"
       @drop.prevent="drag.drop(column.id)"
     >
-      <h2 :id="`column-${column.id}`" class="sticky top-0 z-10 bg-background px-3 pt-3 pb-1">
-        <ColumnHeader :id="column.id" :title="column.title" :count="column.cards.length" />
-      </h2>
+      <template #head>
+        <h2 :id="`column-${column.id}`" class="px-3 pt-2.5 pb-1">
+          <ColumnHeader :title="column.title" :count="column.cards.length" />
+        </h2>
+      </template>
       <ul class="relative flex flex-col gap-2 p-2">
         <li
           v-for="(task, i) in column.cards"
@@ -91,6 +96,6 @@
           nothing here
         </li>
       </ul>
-    </section>
+    </GroupPanel>
   </div>
 </template>

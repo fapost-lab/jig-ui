@@ -17,6 +17,7 @@
   import CopyButton from '@/components/CopyButton.vue';
   import StateLine from '@/components/StateLine.vue';
   import CopyCommand from '@/components/CopyCommand.vue';
+  import GroupPanel from '@/components/GroupPanel.vue';
   import ProjectCard from '@/components/ProjectCard.vue';
   import ProgressBar from '@/components/ProgressBar.vue';
   import ProjectList from '@/components/ProjectList.vue';
@@ -47,7 +48,7 @@
   import { Toggle } from '@/components/ui/toggle';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { itemStanding } from '@/lib/specs';
-  import { toneRule, toneText } from '@/lib/tones';
+  import { columnAccent, laneAccent, toneRule, toneText } from '@/lib/tones';
   import UpgradePanel from '@/components/UpgradePanel.vue';
   import CanvasSection from './CanvasSection.vue';
   import {
@@ -331,8 +332,30 @@
       <AttentionItem :item="knowledgeAttention" project="acme" />
     </CanvasSection>
 
-    <CanvasSection title="ColumnHeader" note="each column, and one this page does not know">
-      <ColumnHeader v-for="column in columns" :id="column.id" :key="column.id" :title="column.title" :count="column.count" />
+    <CanvasSection title="ColumnHeader" note="each column's title and count">
+      <ColumnHeader v-for="column in columns" :key="column.id" :title="column.title" :count="column.count" />
+    </CanvasSection>
+
+    <CanvasSection
+      title="GroupPanel"
+      note="each column's accent, one this page does not know, a lane's, and none — a card in one, an empty one"
+    >
+      <div class="grid grid-cols-4 gap-3">
+        <GroupPanel v-for="column in columns" :key="column.id" :accent="columnAccent[column.id] ?? 'bg-border'">
+          <template #head>
+            <h3 class="px-3 pt-2.5 pb-1"><ColumnHeader :title="column.title" :count="column.count" /></h3>
+          </template>
+          <p class="mx-2 mb-2 rounded-lg border bg-card px-3 py-2 text-[13px]">A card</p>
+        </GroupPanel>
+        <GroupPanel :accent="laneAccent['to-file']">
+          <template #head><h3 class="px-3 pt-2.5 pb-1 text-[13px] font-semibold">To file</h3></template>
+          <p class="mx-2 mb-2 rounded-lg border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">nothing here</p>
+        </GroupPanel>
+        <GroupPanel>
+          <template #head><h3 class="px-4 pt-3 pb-2 text-[15px] font-semibold">A section</h3></template>
+          <p class="px-4 pb-4 text-[13px]">No accent: a section of a page.</p>
+        </GroupPanel>
+      </div>
     </CanvasSection>
 
     <CanvasSection

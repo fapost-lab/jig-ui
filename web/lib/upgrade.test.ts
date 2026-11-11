@@ -34,6 +34,8 @@ const ready = (id: string, attention: Attention[] = []): Project => ({
   counts: { active: 0, paused: 0, ready: 0 },
   attention,
   housekeepingStale: false,
+  closable: [],
+  revision: 0,
   upgrade: null,
 });
 

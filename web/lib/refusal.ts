@@ -13,13 +13,15 @@ export function refusal(code: string, doing: string, task: string): string {
 }
 
 /**
- * The line for a close Jig refused: its own reasons, paths already cut out by the server, where it gave them — the pull
- * request not merged, the knowledge decision not recorded; a task no longer closable is said so; anything else as
- * `refusal` says it.
+ * The line for a close Jig refused: a stale revision as the project having changed since it was read — a project's card
+ * shows no conflict, as the board does —; Jig's own reasons, paths already cut out by the server, where it gave them —
+ * the pull request not merged, the knowledge decision not recorded; a task no longer closable is said so; anything else
+ * as `refusal` says it.
  */
 export function closeRefusal(code: string, reasons: string[], task: string): string {
+  if (code === 'stale-revision') return `The project changed while you were closing ${task}. Try again on it as it is now.`;
   if (reasons.length > 0) return `Jig did not close ${task}: ${reasons.join(' ')}`;
-  if (code === 'not-found') return `${task} cannot be closed from the board any more: read it again.`;
+  if (code === 'not-found') return `${task} cannot be closed from the page any more: read it again.`;
   return refusal(code, 'closing', task);
 }
 

@@ -17,7 +17,7 @@ import type {
   UpgradePlan,
 } from '@/api';
 import type { FinishedTask } from '@/lib/finished';
-import type { HousekeepingState } from '@/lib/projects';
+import type { ClosingState, HousekeepingState } from '@/lib/projects';
 import type { PlanState, UpgradeRun } from '@/lib/upgrade';
 
 const task = (id: string, more: Partial<Task>): Task => ({
@@ -262,6 +262,8 @@ const ready = (id: string, more: Partial<Extract<Project, { state: 'ready' }>> =
   counts: { active: 11, paused: 1, ready: 3 },
   attention: [],
   housekeepingStale: false,
+  closable: [],
+  revision: 0,
   upgrade: null,
   ...more,
 });
@@ -816,3 +818,28 @@ export const knowledgeAttention: Attention = {
   url: null,
   versions: null,
 };
+
+/** Jig's item for a merged task, which a project's card offers to close. */
+export const mergedAttention: Attention = {
+  kind: 'needs-consolidation',
+  subject: { type: 'task', id: 'close-from-attention' },
+  tasks: ['close-from-attention'],
+  title: 'Merged: the task can be closed',
+  detail: 'housekeeping at 2026-11-11 10:27 EET',
+  todo: 'Tell the agent to close this task (jig-consolidate).',
+  url: null,
+  versions: null,
+};
+
+/** A project with a merged task to close from its card. */
+export const closingProject: Project = ready('jig-ui', { attention: [mergedAttention], closable: ['close-from-attention'] });
+
+/** A close from a card: under way, and Jig's refusal. */
+export const closings: ClosingState[] = [
+  { task: 'close-from-attention', state: 'running' },
+  {
+    task: 'close-from-attention',
+    state: 'refused',
+    message: 'Jig did not close close-from-attention: its pull request has not merged (https://github.com/o/r/pull/12 is open).',
+  },
+];

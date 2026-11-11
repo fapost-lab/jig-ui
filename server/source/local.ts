@@ -278,6 +278,8 @@ async function readProject(project: Project): Promise<Read> {
       counts: count(live),
       attention: status.attention,
       housekeepingStale: status.housekeepingStale,
+      closable: live.filter(closable).map((t) => t.id),
+      revision,
     },
     tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id), resumes)), finishedCount: list.finished, revision },
     details: live.map((t) => details(t, queued.get(t.id), shownQueue, status.attention, resumes)),

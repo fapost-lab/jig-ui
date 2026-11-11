@@ -125,8 +125,8 @@ Use in: source code.
 ## Action
 
 Something a person may do next with a task, as Jig decides it from the task's state, with the Jig
-command that takes it; Jig UI shows the ones Jig offers, and from the board takes two of them
-itself — a pause request and a resume.
+command that takes it; Jig UI shows the ones Jig offers, and takes three of them itself — a pause
+request and a resume from the board, and a close from the board and from a project's card.
 
 Informal synonyms: legal move, button.
 Use in: source code, API, documentation.

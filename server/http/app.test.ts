@@ -212,7 +212,7 @@ describe('/api/projects and /api/workspace', () => {
   const ready = project('ready', '0.31.0');
   const old = project('old', '0.26.0');
   const broken = project('broken', '0.31.0', true);
-  const empty = { counts: { active: 0, paused: 0, ready: 0 }, attention: [], housekeepingStale: false };
+  const empty = { counts: { active: 0, paused: 0, ready: 0 }, attention: [], housekeepingStale: false, closable: [], revision: 1 };
 
   it('connects, lists and disconnects a project, by id only', async () => {
     const first = await call('POST', '/api/projects', { path: ready });

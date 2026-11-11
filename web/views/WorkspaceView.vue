@@ -20,7 +20,8 @@
   import { Button } from '@/components/ui/button';
   import { Progress } from '@/components/ui/progress';
   import { lastWins } from '@/lib/last-wins';
-  import { byName, chosen, type HousekeepingState, landed, type Listed, readOnes, readProgress } from '@/lib/projects';
+  import { byName, chosen, type ClosingState, type HousekeepingState, landed, type Listed, readOnes, readProgress } from '@/lib/projects';
+  import { closeRefusal } from '@/lib/refusal';
   import { withConnected } from '@/lib/scan';
   import { settingRefusal } from '@/lib/settings';
   import { toneRule, toneText } from '@/lib/tones';
@@ -53,6 +54,8 @@
   const plans = ref<Record<string, PlanState>>({});
   /** Housekeeping run from each card, until dismissed; a reload forgets it. */
   const housekept = ref<Record<string, HousekeepingState>>({});
+  /** A task closed from each card's items, while Jig closes it and, refused, until dismissed. */
+  const closing = ref<Record<string, ClosingState>>({});
   const upgrades = computed(() => projects.value && upgradeLine(read.value));
   /** Upgrade all's confirmation is open. */
   const confirmingAll = ref(false);
@@ -349,6 +352,26 @@
     await load();
   }
 
+  /**
+   * Closes a merged task from its item on the card, with the revision of the read the card shows, as its card on the
+   * board does; Jig's refusal — its pull request not merged, say — stays on the card in Jig's words.
+   */
+  async function closeTask(id: string, task: string): Promise<void> {
+    const project = projects.value?.find((p) => p.id === id);
+    if (project?.state !== 'ready' || closing.value[id]?.state === 'running') return;
+    closing.value[id] = { task, state: 'running' };
+    const res = await call(() =>
+      client.api.projects[':id'].tasks.close.$post({ ...param(id), json: { task, revision: project.revision } }),
+    );
+
+    const error = res && res.status !== 200 ? (await res.json()).error : undefined;
+    if (error !== undefined) {
+      const reasons = 'reasons' in error && Array.isArray(error.reasons) ? error.reasons.map(String) : [];
+      closing.value[id] = { task, state: 'refused', message: closeRefusal(error.code, reasons, task) };
+    } else delete closing.value[id];
+    await load();
+  }
+
   /** Opens the card's upgrade panel with Jig's dry run of the upgrade. */
   async function plan(id: string): Promise<void> {
     plans.value[id] = { state: 'reading' };
@@ -442,6 +465,7 @@
         :release="release"
         :reading="reading.has(shown.id)"
         :housekeeping="housekept[shown.id]"
+        :closing="closing[shown.id]"
         class="min-w-0 flex-1"
         @settings="openSettings(shown.id)"
         @disconnect="disconnect(shown.id)"
@@ -454,6 +478,8 @@
         @dismiss="dismiss(shown.id)"
         @housekeeping="housekeep(shown.id)"
         @dismiss-housekeeping="delete housekept[shown.id]"
+        @close-task="(task) => closeTask(shown!.id, task)"
+        @dismiss-close="delete closing[shown.id]"
       />
     </div>
     <SettingsDialog

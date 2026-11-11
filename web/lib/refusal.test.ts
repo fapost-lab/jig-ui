@@ -20,7 +20,8 @@ describe('closeRefusal', () => {
   it.each([
     ['failed', ['its pull request is open;', 'merge it'], 'Jig did not close a: its pull request is open; merge it'],
     ['failed', [], 'Jig refused closing a (failed).'],
-    ['not-found', [], 'a cannot be closed from the board any more: read it again.'],
+    ['not-found', [], 'a cannot be closed from the page any more: read it again.'],
+    ['stale-revision', ['written since'], 'The project changed while you were closing a. Try again on it as it is now.'],
     ['upgrading', [], 'Jig is being upgraded in this project: try closing a again once it has finished.'],
   ])('says %s with %j in its own words', (code, reasons, line) => {
     expect(closeRefusal(code, reasons, 'a')).toBe(line);

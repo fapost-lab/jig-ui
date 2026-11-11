@@ -1,11 +1,11 @@
 <script setup lang="ts">
-  import { computed } from 'vue';
+  import { computed, ref } from 'vue';
   import { Ellipsis, ExternalLink, Settings, Unplug } from '@lucide/vue';
   import { link, type Project } from '@/api';
   import { Button } from '@/components/ui/button';
   import { Card } from '@/components/ui/card';
   import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-  import type { HousekeepingState } from '@/lib/projects';
+  import { type ClosingState, closableBy, type HousekeepingState } from '@/lib/projects';
   import { toneRule, toneText } from '@/lib/tones';
   import { mergeWaitOf, needsUpgrade, type PlanState, upgradeMark } from '@/lib/upgrade';
   import AttentionItem from './AttentionItem.vue';
@@ -24,9 +24,13 @@
     reading?: boolean;
     /** Housekeeping from the card: under way, or what came of it until dismissed. */
     housekeeping?: HousekeepingState;
+    /** A task closed from one of the card's items: under way, or what Jig refused until dismissed. */
+    closing?: ClosingState;
   }>();
 
   const board = computed(() => `/projects/${encodeURIComponent(props.project.id)}`);
+  /** The task whose close question is open: held by its id, so a list that shifts under it never moves it to another. */
+  const asking = ref<string>();
   const mark = computed(() => upgradeMark(props.project));
   const merge = computed(() => mergeWaitOf(props.project));
   // Check merge while the upgrade waits and nothing runs on the card.
@@ -52,6 +56,9 @@
     /** Housekeeping on the card: the view runs `jig housekeeping` in the project. */
     housekeeping: [];
     dismissHousekeeping: [];
+    /** Close task on a merged task's item, confirmed: the view closes it as done. */
+    closeTask: [task: string];
+    dismissClose: [];
   }>();
 </script>
 
@@ -116,8 +123,22 @@
       <p>{{ project.counts.active }} active · {{ project.counts.paused }} paused · {{ project.counts.ready }} ready</p>
       <p v-if="project.attention.length === 0" class="text-[13px] text-muted-foreground">Nothing needs you here.</p>
       <ul v-else class="flex flex-col gap-3" :aria-label="`What needs you in ${project.id}`">
-        <li v-for="(item, i) in project.attention" :key="i"><AttentionItem :item="item" :project="project.id" /></li>
+        <li v-for="(item, i) in project.attention" :key="i">
+          <AttentionItem
+            :item="item"
+            :project="project.id"
+            :closable="closableBy(project, item) !== undefined"
+            :closing="closing?.state === 'running' && closing.task === item.subject.id"
+            :asking="asking !== undefined && asking === item.subject.id"
+            @update:asking="(open) => (asking = open ? (item.subject.id ?? undefined) : undefined)"
+            @close="item.subject.id && $emit('closeTask', item.subject.id)"
+          />
+        </li>
       </ul>
+      <div v-if="closing?.state === 'refused'" :class="toneRule.bad" class="flex flex-col gap-1 text-[13px]">
+        <p>{{ closing.message }}</p>
+        <Button variant="ghost" size="xs" class="self-start" @click="$emit('dismissClose')">Dismiss</Button>
+      </div>
       <p v-if="project.housekeepingStale" class="text-[13px] text-muted-foreground">
         Pull request facts may be out of date until Housekeeping runs.
       </p>

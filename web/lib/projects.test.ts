@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Attention, Project } from '../api';
-import { byName, chosen, landed, matching, readOnes, readProgress, type Reading } from './projects';
+import { byName, chosen, closableBy, landed, matching, readOnes, readProgress, type Reading } from './projects';
 
 const item: Attention = {
   kind: 'gate-waiting',
@@ -13,13 +13,15 @@ const item: Attention = {
   versions: null,
 };
 
-const ready = (id: string, attention: Attention[] = []): Project => ({
+const ready = (id: string, attention: Attention[] = [], closable: string[] = []): Project => ({
   id,
   state: 'ready',
   jigVersion: '0.37.0',
   counts: { active: 0, paused: 0, ready: 0 },
   attention,
   housekeepingStale: false,
+  closable,
+  revision: 0,
   upgrade: null,
 });
 
@@ -91,5 +93,21 @@ describe('while the projects are read', () => {
     expect(landed([quiet, slow, waiting], read)).toEqual([quiet, read, waiting]);
     expect(landed([quiet, read], { ...waiting, id: 'slow' })).toEqual([quiet, read]);
     expect(landed([quiet], read)).toEqual([quiet]);
+  });
+});
+
+describe('closableBy', () => {
+  const merged: Attention = { ...item, kind: 'needs-consolidation', title: 'Merged: the task can be closed' };
+  const closing = ready('p', [merged], ['a']);
+
+  it("names the task of Jig's merged item when the project lists it as closable", () => {
+    expect(closableBy(closing, merged)).toBe('a');
+  });
+
+  it('names none for a task the project does not list, another kind, an item about no task, or a project not read', () => {
+    expect(closableBy(ready('p', [merged], ['b']), merged)).toBeUndefined();
+    expect(closableBy(closing, item)).toBeUndefined();
+    expect(closableBy(closing, { ...merged, subject: { type: 'project', id: null } })).toBeUndefined();
+    expect(closableBy(moved, merged)).toBeUndefined();
   });
 });

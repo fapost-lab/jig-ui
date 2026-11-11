@@ -17,8 +17,9 @@ paths:
   - web/components/FoundProjects.vue
   - web/lib/scan.ts
   - web/components/ConnectForm.vue
+  - web/components/AttentionItem.vue
 summary: "The workspace page: a list of the connected projects with search and the chosen one's card — Jig's attention items, the mark and count of projects whose Jig is older than the machine's, their upgrade from the card — and Find projects, which lists the Jig projects in a folder not connected yet"
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-11
 ---
 # Workspace — every connected project on one page
 
@@ -31,7 +32,9 @@ that needs the person — not readable, or with an attention item — else the f
 (`web/lib/projects.ts`); a click in the list sets `?project=`, and a project just connected is
 shown. The card has its Jig version, its live tasks counted, what needs the person there — Jig's
 attention items as `jig status --json` lists them, `knowledge-proposed` and `sources-changed` with a link to the
-project's Knowledge view (`AttentionItem.vue`, feature-knowledge) — and the housekeeping note. **Housekeeping**, left
+project's Knowledge view (`AttentionItem.vue`, feature-knowledge), and `needs-consolidation` ("Merged: the task can be
+closed") with **Close task** for a task the board's card could close (`closableBy` in `web/lib/projects.ts`;
+adr-20261029-close-a-ready-task-from-the-board) — and the housekeeping note. **Housekeeping**, left
 of Board, runs `jig housekeeping` in the project and leaves Jig's report on the card until **Dismiss**
 (adr-20261110-housekeeping-runs-from-the-project-card). A readable project's
 name on its card opens its board, and so does **Board** in the card's corner, beside a ⋯ menu that
@@ -108,6 +111,15 @@ version in the header and one count are quicker to scan than an item inside each
   every page for the same reason: tabs stop fitting long before a list does.
 - A stopped upgrade is said on the card only, not as an attention item (the maintainer): Jig's
   item is the todo, the result says why it is still there.
+- **Close task** on a merged task's item (the maintainer, from a screenshot of the item with a button drawn
+  beside it, task `close-from-attention`): Jig's todo there sends the person to an agent for one command the
+  board already runs. It is the board's close — the same question, the same `POST …/tasks/close`, offered for
+  the same tasks: a ready project's read carries the ids its cards would offer (`closable`) and the board's
+  `revision`, from the one read, so the close carries the revision of what the card showed
+  (adr-20261022-writes-carry-the-revision-of-their-read). Rejected: reading the board at the press for a
+  revision — a revision of a read the person never saw; a link to the board — the drawing asked for a button.
+  A refusal stays on the card until Dismiss, as Housekeeping's does. The item on a task's own page has no
+  button yet.
 - The agent's road is a copied request (*Upgrade Jig in <project>*), never an agent started:
   Jig UI runs no agents (adr-20261014-jig-ui-is-an-optional-layer-over-jig). It matters when the
   release asks for steps by hand, which the `jig-upgrade` skill does.

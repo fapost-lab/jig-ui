@@ -65,8 +65,9 @@ readable project's card shows:
 - **Its live tasks counted** — `active`, `paused` and `ready` (finished tasks are not counted).
 - **What needs you** — the same items `jig status` lists under "Needs you", most urgent first: a
   design waiting at its gate, a stopped autopilot run, a pull request waiting for review, a task to
-  close. Each says what happened and what to do; a pull request comes with a link to it, and
-  knowledge waiting for your decision with **Decide on the page** ([Deciding knowledge](#deciding-knowledge)).
+  close. Each says what happened and what to do; a pull request comes with a link to it,
+  knowledge waiting for your decision with **Decide on the page** ([Deciding knowledge](#deciding-knowledge)),
+  and a merged task with **Close task** where its card in **Ready** could close it ([Closing a task](#closing-a-task)).
 - **A note when pull request facts may be out of date.** Jig reads pull requests only during
   `jig housekeeping`; when its last run is old or the forge did not answer, a waiting pull request
   may be missing until it runs.
@@ -302,6 +303,11 @@ project, checked against the board you saw: from Jig 0.40.0 Jig itself refuses t
 anything was written there since; with an older Jig, Jig UI reads the project just before. The card
 leaves the board and shows in the list of finished tasks.
 
+The same close is on a project's card on the Projects page: Jig's item *Merged: the task can be
+closed* carries **Close task** for a task the board would offer to close. Press it, then **Close task**
+in the question below it; the close is checked against the project as the card shows it, and a refusal
+stays on the card in Jig's words until you **Dismiss** it.
+
 Jig decides whether the task may close, not Jig UI. It closes a task only once its knowledge
 decision is recorded and its pull request has merged, and it asks the forge about the merge as it
 closes. When it refuses — the pull request is still open, say — the line above the board says why
@@ -311,8 +317,8 @@ The ✕ is shown on a ready task whose knowledge decision is recorded and whose 
 known to have closed unmerged. What Jig knows of pull requests between commands comes from
 `jig housekeeping`; in a project where it has not run since the merge, Jig itself does not offer
 to close the task yet, and the ✕ is there anyway, since closing asks the forge. A task without a
-recorded knowledge decision has no ✕: record it first (the `jig-consolidate` skill). Closing cannot
-be undone from the board.
+recorded knowledge decision has no ✕, and its item no **Close task**: record it first (the
+`jig-consolidate` skill). Closing cannot be undone from the page.
 
 ## Specs
 

@@ -1335,6 +1335,11 @@ describe('housekeeping', () => {
     expect(await housekeeping(dir)).toEqual(['removed (1): moved to … recoverable']);
   });
 
+  it('cuts the trash day it deletes, a path under .ai/runtime', async () => {
+    const dir = selfUpdating(`case-${cases++}`, 'delete trash/2026-11-01 (9 days old)\n');
+    expect(await housekeeping(dir)).toEqual(['delete … (9 days old)']);
+  });
+
   it("answers Jig's skipping line when another run holds the clone", async () => {
     const dir = selfUpdating(`case-${cases++}`, 'another housekeeping run holds this clone; skipping\n');
     expect(await housekeeping(dir)).toEqual(['another housekeeping run holds this clone; skipping']);

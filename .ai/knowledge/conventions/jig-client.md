@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-11
 ---
 # JigClient — the only module that knows Jig
 
@@ -91,11 +91,11 @@ They go in the environment as `JIG_UI_ARG_<n>`, and the fixed script
 every Jig run took about 1.6 times as long — a Windows CI timeout (task `conflict-display`).
 
 `housekeeping` (`jig housekeeping`, 2 minutes: a fetch, the forge, branch deletions) prints no JSON either: its report
-is answered a line each, as Jig printed it, through `withoutPaths` and with the project's `.ai/…` paths cut too, and a
-failure is `failed` with Jig's `jig: error:` lines as `reasons`. Exit 3 is no failure: Jig finished and flags work left
+is answered a line each, as Jig printed it, through `withoutPaths` and with the project's `.ai/…` paths cut too — and
+the trash day it deletes, which it names from `.ai/runtime/` (`delete trash/<date>`) —, and a failure is `failed` with Jig's `jig: error:` lines as `reasons`. Exit 3 is no failure: Jig finished and flags work left
 for a person (a task to consolidate, a wrong base, an archive refused), so its report is answered as any other. Its
 warnings on stderr (a task not archived, the queue not pruned) lead the report, which points up at them ("the reason is
-above"); `ran` gives both streams, `jig` only stdout. Its tests run a stand-in over
+above"); `ran` gives both streams (`Ran`), `jig` only stdout. Its tests run a stand-in over
 `server/jig/fixtures/housekeeping.txt` (adr-20261110-housekeeping-runs-from-the-project-card).
 
 `planUpgrade` (`jig upgrade --dry-run --json`, 60 s) and `runUpgrade` (`jig upgrade --json`, 30 minutes:

@@ -133,7 +133,9 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   marked (adr-20261022-writes-carry-the-revision-of-their-read, feature-board). Built for the
   queue: order, priority and pause requests; and for a resume
   (adr-20261026-a-drop-out-of-paused-resumes-at-once); and for closing a ready task as done, after the
-  person confirms, its refusal shown in Jig's words (adr-20261029-close-a-ready-task-from-the-board). Filing a task is a write with no revision: it
+  person confirms, its refusal shown in Jig's words (adr-20261029-close-a-ready-task-from-the-board) — from the
+  board, and from a merged task's item on the project's card, with the revision the workspace read carries for it
+  (feature-workspace), where a stale revision is said as the project having changed. Filing a task is a write with no revision: it
   names a new id, which Jig claims or refuses `already-exists`
   (adr-20261022-filing-a-task-carries-no-revision); housekeeping is the other, a sweep of the clone as it is, under
   Jig's own lock (adr-20261110-housekeeping-runs-from-the-project-card). A roadmap's edits are writes like the queue's,

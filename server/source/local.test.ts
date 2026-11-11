@@ -361,6 +361,8 @@ describe('localSource', () => {
         counts: { active: 2, paused: 1, ready: 1 },
         attention: [{ ...attention, versions: null }],
         housekeepingStale: true,
+        closable: [],
+        revision: 7,
         upgrade: null,
       },
       { id: 'old', state: 'unsupported', jigVersion: '0.26.0', minimum: '0.31.0', upgrade: null },
@@ -1189,6 +1191,13 @@ describe('localSource, writing the queue', () => {
         undecided: false,
         working: false,
       });
+    });
+
+    it('lists the same tasks on the project as the workspace shows it, with the revision a close carries', async () => {
+      await source.connect(project('closables-shown', '0.37.0', { tasks: ready }));
+      const [shown, board] = [await source.project('closables-shown'), await source.tasks('closables-shown')];
+      expect(shown?.state === 'ready' && shown.closable).toEqual(['offered', 'unheard', 'cached-open']);
+      expect(shown?.state === 'ready' && board?.state === 'ready' && shown.revision === board.revision).toBe(true);
     });
 
     it("runs the command of Jig's close action against the revision of the read, then reads the project again", async () => {

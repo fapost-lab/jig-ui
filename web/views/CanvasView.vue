@@ -61,12 +61,15 @@
     emptyBoard,
     epics,
     finished,
+    closingProject,
+    closings,
     housekeepingRuns,
     knowledge,
     knowledgeAttention,
     knowledgeDiffs,
     knowledgeLater,
     knowledgeTexts,
+    mergedAttention,
     openDocument,
     plans,
     projects,
@@ -260,10 +263,12 @@
 
     <CanvasSection
       title="ProjectCard"
-      note="ready with attention and stale housekeeping; nothing needs you; its Jig older than the machine's, Upgrade… offered; each state it cannot be read in; Housekeeping under way, its report, its refusal"
+      note="ready with attention and stale housekeeping; nothing needs you; its Jig older than the machine's, Upgrade… offered; each state it cannot be read in; Housekeeping under way, its report, its refusal; a merged task to close, its close under way, Jig's refusal"
     >
       <ProjectCard v-for="project in projects" :key="project.id" :project="project" />
       <ProjectCard v-for="(run, i) in housekeepingRuns" :key="`housekeeping-${i}`" :project="projects[1]!" :housekeeping="run" />
+      <ProjectCard :project="closingProject" />
+      <ProjectCard v-for="(run, i) in closings" :key="`closing-${i}`" :project="closingProject" :closing="run" />
     </CanvasSection>
 
     <CanvasSection
@@ -329,9 +334,15 @@
       <FoundProjects :result="{ folder: '~', found: [], connected: 2, skipped: ['Desktop', 'Documents', 'Downloads'], stopped: true }" />
     </CanvasSection>
 
-    <CanvasSection title="AttentionItem" note="no link; a pull request; another link; knowledge, on a project's card">
+    <CanvasSection
+      title="AttentionItem"
+      note="no link; a pull request; another link; knowledge, on a project's card; a merged task to close, asking, closing"
+    >
       <AttentionItem v-for="(item, i) in attention" :key="i" :item="item" />
       <AttentionItem :item="knowledgeAttention" project="acme" />
+      <AttentionItem :item="mergedAttention" project="acme" closable />
+      <AttentionItem :item="mergedAttention" project="acme" closable asking />
+      <AttentionItem :item="mergedAttention" project="acme" closable closing />
     </CanvasSection>
 
     <CanvasSection title="ColumnHeader" note="each column's title and count">
@@ -542,6 +553,8 @@
             counts: { active: 0, paused: 0, ready: 0 },
             attention: [],
             housekeepingStale: false,
+            closable: [],
+            revision: 0,
           }"
         />
         <StateLine :project="{ id: 'shop', state: 'unreadable', code: 'timeout' }" />

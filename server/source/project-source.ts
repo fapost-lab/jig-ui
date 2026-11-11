@@ -48,6 +48,10 @@ export type ProjectView =
       counts: TaskCounts;
       attention: Attention[];
       housekeepingStale: boolean;
+      /** The live tasks closable as done from the page, as their cards on the board say (`Task.closable`). */
+      closable: string[];
+      /** The revision a close from the card carries: the board's, from the same read. */
+      revision: number;
     }
   | {
       id: string;

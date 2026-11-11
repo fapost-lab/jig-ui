@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-11
 ---
 # ProjectSource — how the server reaches a project
 
@@ -95,7 +95,9 @@ finished after the last listener left (task `specs-and-epics`: the next listener
 A write runs Jig only when the task, and a move's anchor, are live in the last read the adapter
 showed — anything else is `refused: not-found` without Jig — and answers after the project is
 read again (adr-20261022-writes-carry-the-revision-of-their-read). A board's `revision` is the
-lowest of its reads' revisions (status, task list, queue). `fileTask` is the exception: its id is
+lowest of its reads' revisions (status, task list, queue); a ready project as the workspace shows it carries the
+same `revision` and the ids of the tasks its board would offer to close (`closable`), for a close from its card
+(task `close-from-attention`). `fileTask` is the exception: its id is
 new, so it names no live task and carries no revision; `http/` checks the id and the goal against
 Jig's grammar before the port sees them (adr-20261022-filing-a-task-carries-no-revision). `housekeeping` is the other:
 it names no task and acts on the clone as it is, under Jig's own lock

@@ -1,4 +1,4 @@
-import type { Project } from '../api';
+import type { Attention, Project } from '../api';
 
 /** A connected project whose read has not landed yet: the Projects page lists it at once. */
 export interface Reading {
@@ -10,6 +10,29 @@ export interface Reading {
 export type Listed = Project | Reading;
 
 const isRead = (p: Listed): p is Project => p.state !== 'reading';
+
+/** A task closed from a project's card: under way, or what Jig refused, until dismissed. */
+export type ClosingState =
+  | {
+      task: string;
+      state: 'running';
+    }
+  | {
+      task: string;
+      state: 'refused';
+      message: string;
+    };
+
+/**
+ * The task an attention item on a project's card offers to close as done: Jig's "Merged: the task can be closed"
+ * (`needs-consolidation`), for a task the project lists as closable, as its card on the board is.
+ */
+export function closableBy(project: Project, item: Attention): string | undefined {
+  const task = item.subject.id;
+  return project.state === 'ready' && item.kind === 'needs-consolidation' && task !== null && project.closable.includes(task)
+    ? task
+    : undefined;
+}
 
 /** Housekeeping run from a project's card: under way, Jig's report once it ran, or why it did not, with Jig's reasons. */
 export type HousekeepingState =

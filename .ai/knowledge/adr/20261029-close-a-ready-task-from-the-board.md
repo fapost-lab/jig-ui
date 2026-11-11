@@ -12,8 +12,9 @@ paths:
   - server/http/app.ts
   - web/lib/refusal.ts
   - web/views/BoardView.vue
+  - web/components/AttentionItem.vue
 summary: The Ready card's close runs jig task set status consolidated, offered when Jig offers close or only its forge cache is behind; from Jig 0.40.0 Jig claims it against the board's revision, before that a read checks it; refusal reasons shown
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-11
 ---
 # A ready task is closed from the board with Jig's close command, offered beyond Jig's cached offer and checked against the board's revision by a read
 

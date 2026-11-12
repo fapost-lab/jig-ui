@@ -75,6 +75,8 @@ each of those is a click on the page, or a line on it, and each write is a Jig c
 - [x] `newer-jig-ui` — a newer Jig UI — Jig UI asks npm's registry for its own latest version at most once a day, and the page's header says when a newer one is out, with the line that updates it for the way it was installed — through npx, or without Node.js; offline, or on any failure, it says nothing; a build of the development channel compares with that channel (after: install without Node.js — both ways to update are named)
 - [x] `knowledge-drop-and-text` — a proposed document's text — the Knowledge view shows each proposed document as written, as a task's documents are, instead of naming the file to read before deciding (after: knowledge decisions — the view it fills; Jig — a knowledge document's text as JSON, fapost-lab/jig#391)
 - [x] `knowledge-drop-and-text` — drop a changed source — Drop beside Keep on a linked source that changed, has no approved text or is gone, through Jig's command for it (after: knowledge decisions — the view it adds to; Jig — dropping an approved stub's link, fapost-lab/jig#392)
+- [ ] decisions in the background — on the Knowledge view a decision never holds the page: Accept, Reject, Keep and Drop each mark their item queued at once, and the person goes on to the next; the queue is sent as one `jig knowledge decide --accept <id>… --reject <id>… --reviewed <id>… --revision <n> --json`, one fetch, commit and push for any number of decisions, and what is decided while a write runs waits for the next; a refusal names the item Jig stopped at and gives every queued decision back to the person, since Jig wrote none of them; a queued item can be taken back until its write starts; below the Jig release that has `decide`, decisions go one at a time as now (after: knowledge decisions — the buttons it frees; Jig — several kinds of knowledge decision in one write, `jig knowledge decide`, fapost-lab/jig#482, in the Jig release after 0.43.0)
+- [ ] `jig` as the clone's account — Jig UI runs `jig` without the GitHub token variables of the shell it was started from (`GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN`, `GITHUB_ENTERPRISE_TOKEN`), so a write is pushed and its pull request opened as the account each clone names, not as the account of a token a direnv `.envrc` set in the folder Jig UI happened to be started in; a failed write shows Jig's message whole, which names the account it asked as and where that account came from (after: knowledge decisions — where it was met, 2026-11-12; Jig — the account named in a failed GitHub request, fapost-lab/jig#479, in the Jig release after 0.43.0)
 
 ## Waves
 
@@ -98,6 +100,7 @@ each of those is a click on the page, or a line on it, and each write is a Jig c
 18. sort and filter the board; project card actions; projects inside a project; projects by name; a newer Jig UI
 19. settings; knowledge decisions; a close checked by Jig
 20. a proposed document's text; drop a changed source
+21. decisions in the background; `jig` as the clone's account
 
 <!--
 Rules (jig-idea §8):

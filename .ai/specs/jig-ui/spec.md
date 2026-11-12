@@ -232,6 +232,18 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
   (adr-20261030-a-task-document-is-shown-as-written); the invariant naming what reaches `web/` gains
   knowledge documents in that item's task, by an ADR. A decision is Jig's command; Jig UI never edits
   a document's frontmatter.
+- A knowledge decision is queued, not waited for (the maintainer, 2026-11-12: each decision held the
+  page through a fetch, a commit, a push and a pull request, so deciding ten documents meant ten waits).
+  The page sends its queue as one `jig knowledge decide`, so ten decisions are one fetch, one commit and
+  one push; Jig refuses the whole call when any one decision is refused, so the page never has to work
+  out which part landed. Rejected: one `accept|reject|reviewed` per decision, run side by side — Jig
+  holds a lock on its own tree per clone, so they would still run one after another, each paying for
+  its own fetch, commit and push.
+- `jig` runs without the GitHub token variables of the environment Jig UI was started in. Jig puts a
+  token in the environment before `github.account` and the accounts `gh` holds, so a token a direnv
+  `.envrc` set in one project's folder decided the account for every connected project (the
+  maintainer, 2026-11-12: `must be a collaborator` on a knowledge decision). Rejected: keeping them —
+  Jig UI serves many projects, and the folder it was started in says nothing about any of them.
 - Closing a task from the page was proposed by the agent for Phase 4 and found built already: a ready
   card's ✕ (task `close-ready-task`, adr-20261029-close-a-ready-task-from-the-board), which checks the
   revision by a read before Jig's `task set`. The item narrows to passing the revision to Jig once

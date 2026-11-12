@@ -244,6 +244,14 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
   `.envrc` set in one project's folder decided the account for every connected project (the
   maintainer, 2026-11-12: `must be a collaborator` on a knowledge decision). Rejected: keeping them —
   Jig UI serves many projects, and the folder it was started in says nothing about any of them.
+- The page brings the clone up to origin through Jig, and says how old what it shows is (the
+  maintainer, 2026-11-12: fapost-lab/core#346 was merged, yet the page went on showing its decisions
+  as waiting, then offered to decide the same four sources again; the maintainer wants the page to
+  help, not to send them to a terminal). Jig's reads never touch the network, so whether a write has
+  landed is as of the last fetch; one Jig command fetches and fast-forwards the base without moving
+  the person's checkout, and refuses with a reason when that would touch their work. Rejected: Jig UI
+  running `git fetch` or `git pull` itself — RULES let it write nothing in a project but through
+  Jig; reads that fetch on their own — every page refresh would then reach the forge.
 - Closing a task from the page was proposed by the agent for Phase 4 and found built already: a ready
   card's ✕ (task `close-ready-task`, adr-20261029-close-a-ready-task-from-the-board), which checks the
   revision by a read before Jig's `task set`. The item narrows to passing the revision to Jig once

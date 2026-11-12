@@ -114,6 +114,11 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
 - Resume is not a request (Jig's `contract-queue` decision, 2026-10-19): while a task is paused no
   agent works on it, so a drop out of the paused column calls `jig task resume` directly, a legal
   action Jig already offers. Only a pause is written as a request.
+- A task nobody started is paused directly (Jig's `pause-not-started-directly`, 2026-11-12): a
+  request is honoured where a stage begins, and such a task enters none, so a request dropped on it
+  showed "requested" for good. Jig withholds `request-pause` from it and offers `pause`; the drop
+  follows the actions — a request when `request-pause` is offered, `jig task pause` when only
+  `pause` is.
 - The UI never runs agents; it reads and writes through Jig's commands (from research.md: running
   agents from the UI is aif-handoff's largest cost).
 - The repository is `fapost-lab/jig-ui` (maintainer, 2026-10-14).

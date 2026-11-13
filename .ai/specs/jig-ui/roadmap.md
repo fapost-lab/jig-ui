@@ -81,6 +81,8 @@ each of those is a click on the page, or a line on it, and each write is a Jig c
 - [ ] pause a task nobody started — a drop on the paused column pauses a task nobody started at once, through `jig task pause <id> --revision <n> --json`, instead of writing a request no stage of it would ever take; the card moves to Paused on the answer, a refusal reads by code (`already-paused`, `stale-revision`); which of the two a drop does comes from the task's actions: `request-pause` offered writes the request as now, withheld with `pause` offered pauses directly (after: pause and resume as a request — its drop; Jig — `request-pause` withheld from a task not started, and `jig task pause` with `--revision <n> --json`, task `pause-not-started-directly` in fapost-lab/jig, in the Jig release after 0.43.0)
 
 - [ ] `tasks-on-staging` — tasks on staging — in a project on Jig's staging flow (`git.flow: staging`), a task parked at the staging branch says why on its card and its row instead of "Pull request merged": its pull request into staging waits for a review, waits for the person to land it (Jig's `landing`), or its work is on staging waiting for "prepare for prod"; a task taken back whose fix is not on staging yet says so; a parked task is offered no close, since landing on staging does not finish a task; Take back for a fix, from the card's menu or a drop on In progress, runs `jig task resume <id> --revision <n> --json`, the action Jig offers a parked task, and a refusal `not-paused` reads as neither paused nor parked; landing and "prepare for prod" stay the agent's or CI's, since Jig offers `land` only at `agent.git: merge` and answers neither `task land` nor `task promote` as JSON (after: resume from the page — the write it reuses; Jig — the staging flow, `staging` and `parked` on each task, Jig 0.45.0)
+- [ ] your work on staging — a bell beside the project's name on its card, lit only while Jig reports staging work of the person's own that the base does not have and the person has not marked as known: commits of this clone's Jig tasks and commits by this clone's git user; other people's work on staging is never shown, since the page is the person's own and shares nothing with the team; a click opens the list — each commit with its subject, date and short sha — and one "Mark as known" for the whole list runs the command the item names, after which the bell stays dark until a new commit of the person's own arrives; the warning block for staging work on the card goes, the bell replaces it (after: tasks on staging — the same staging flow; Jig — `staging-unowned` narrowed to the person's own unacknowledged commits, with the list and the acknowledge command in the item, task `staging-drift-not-ours` in fapost-lab/jig)
+
 ## Waves
 
 1. package and release pipeline
@@ -105,6 +107,7 @@ each of those is a click on the page, or a line on it, and each write is a Jig c
 20. a proposed document's text; drop a changed source
 21. decisions in the background; `jig` as the clone's account; pause a task nobody started; tasks on staging
 22. the clone kept in step
+23. your work on staging
 
 <!--
 Rules (jig-idea §8):

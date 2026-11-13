@@ -20,6 +20,7 @@ const ready = (id: string, attention: Attention[] = [], closable: string[] = [])
   counts: { active: 0, paused: 0, ready: 0 },
   attention,
   housekeepingStale: false,
+  origin: null,
   closable,
   revision: 0,
   upgrade: null,

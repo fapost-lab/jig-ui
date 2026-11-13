@@ -5,7 +5,8 @@
   import { Button } from '@/components/ui/button';
   import { Card } from '@/components/ui/card';
   import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-  import { type ClosingState, closableBy, type HousekeepingState } from '@/lib/projects';
+  import { type ClosingState, closableBy, type HousekeepingState, type RefreshState } from '@/lib/projects';
+  import { staleFetch } from '@/lib/refresh';
   import { toneRule, toneText } from '@/lib/tones';
   import { mergeWaitOf, needsUpgrade, type PlanState, upgradeMark } from '@/lib/upgrade';
   import AttentionItem from './AttentionItem.vue';
@@ -26,12 +27,17 @@
     housekeeping?: HousekeepingState;
     /** A task closed from one of the card's items: under way, or what Jig refused until dismissed. */
     closing?: ClosingState;
+    /** Refresh from the card: under way, or what came of it until dismissed. */
+    refresh?: RefreshState;
   }>();
 
   const board = computed(() => `/projects/${encodeURIComponent(props.project.id)}`);
   /** The task whose close question is open: held by its id, so a list that shifts under it never moves it to another. */
   const asking = ref<string>();
   const mark = computed(() => upgradeMark(props.project));
+  /** The clone last fetched more than a day ago; its Refresh is beside it unless Jig's behind-origin item has one. */
+  const stale = computed(() => (props.project.state === 'ready' ? staleFetch(props.project.origin) : undefined));
+  const behind = computed(() => props.project.state === 'ready' && props.project.attention.some((a) => a.kind === 'base-behind-origin'));
   const merge = computed(() => mergeWaitOf(props.project));
   // Check merge while the upgrade waits and nothing runs on the card.
   const checkable = computed(() => merge.value !== undefined && props.project.upgrade?.state !== 'running' && !props.held);
@@ -56,6 +62,9 @@
     /** Housekeeping on the card: the view runs `jig housekeeping` in the project. */
     housekeeping: [];
     dismissHousekeeping: [];
+    /** Refresh on the card: the view runs `jig refresh` in the project. */
+    refresh: [];
+    dismissRefresh: [];
     /** Close task on a merged task's item, confirmed: the view closes it as done. */
     closeTask: [task: string];
     dismissClose: [];
@@ -130,8 +139,11 @@
             :closable="closableBy(project, item) !== undefined"
             :closing="closing?.state === 'running' && closing.task === item.subject.id"
             :asking="asking !== undefined && asking === item.subject.id"
+            :refreshable="project.upgrade?.state !== 'running'"
+            :refreshing="refresh?.state === 'running'"
             @update:asking="(open) => (asking = open ? (item.subject.id ?? undefined) : undefined)"
             @close="item.subject.id && $emit('closeTask', item.subject.id)"
+            @refresh="$emit('refresh')"
           />
         </li>
       </ul>
@@ -142,7 +154,28 @@
       <p v-if="project.housekeepingStale" class="text-[13px] text-muted-foreground">
         Pull request facts may be out of date until Housekeeping runs.
       </p>
+      <p v-if="stale" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-foreground">
+        {{ stale }}
+        <Button
+          v-if="!behind && project.upgrade?.state !== 'running'"
+          variant="outline"
+          size="xs"
+          class="text-foreground"
+          :disabled="refresh?.state === 'running'"
+          @click="$emit('refresh')"
+          >{{ refresh?.state === 'running' ? 'Refreshing…' : 'Refresh' }}</Button
+        >
+      </p>
     </template>
+    <section v-if="refresh" :aria-label="`Refresh of ${project.id}`" class="text-[13px]">
+      <p v-if="refresh.state === 'running'" :class="toneRule.quiet">
+        Running <code>jig refresh</code>… It fetches origin; a dialog for your git credentials may wait for you.
+      </p>
+      <div v-else :class="toneRule[refresh.state === 'done' ? refresh.tone : 'bad']" class="flex flex-col gap-1">
+        <p v-for="(line, i) in refresh.state === 'done' ? refresh.lines : [refresh.message]" :key="i">{{ line }}</p>
+        <Button variant="ghost" size="xs" class="self-start" @click="$emit('dismissRefresh')">Dismiss</Button>
+      </div>
+    </section>
     <section v-if="housekeeping" :aria-label="`Housekeeping in ${project.id}`" class="text-[13px]">
       <p v-if="housekeeping.state === 'running'" :class="toneRule.quiet">
         Running <code>jig housekeeping</code>… It fetches and asks the forge; a dialog for your git credentials may wait for you.

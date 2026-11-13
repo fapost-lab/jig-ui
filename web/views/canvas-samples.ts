@@ -17,7 +17,8 @@ import type {
   UpgradePlan,
 } from '@/api';
 import type { FinishedTask } from '@/lib/finished';
-import type { ClosingState, HousekeepingState } from '@/lib/projects';
+import type { ClosingState, HousekeepingState, RefreshState } from '@/lib/projects';
+import { refreshReport } from '@/lib/refresh';
 import type { PlanState, UpgradeRun } from '@/lib/upgrade';
 
 const task = (id: string, more: Partial<Task>): Task => ({
@@ -287,6 +288,7 @@ const ready = (id: string, more: Partial<Extract<Project, { state: 'ready' }>> =
   counts: { active: 11, paused: 1, ready: 3 },
   attention: [],
   housekeepingStale: false,
+  origin: null,
   closable: [],
   revision: 0,
   upgrade: null,
@@ -777,6 +779,20 @@ export const knowledgeLater: ReadyKnowledge = {
       lossy: false,
     },
     {
+      id: 'feature-search-index',
+      type: 'feature',
+      domains: [],
+      path: '.ai/knowledge/features/search-index.md',
+      paths: ['src/search/index/**'],
+      summary: 'How the search index is rebuilt',
+      source: null,
+      bytes: null,
+      waiting: null,
+      decidable: false,
+      reason: 'landed',
+      lossy: false,
+    },
+    {
       id: 'feature-billing',
       type: 'feature',
       domains: [],
@@ -882,6 +898,44 @@ export const mergedAttention: Attention = {
 
 /** A project with a merged task to close from its card. */
 export const closingProject: Project = ready('jig-ui', { attention: [mergedAttention], closable: ['close-from-attention'] });
+
+/** Jig 0.45.0's item for a clone behind origin, which a project's card offers to refresh. */
+export const behindAttention: Attention = {
+  kind: 'base-behind-origin',
+  subject: { type: 'project', id: null },
+  tasks: [],
+  title: 'This checkout is behind origin',
+  detail: 'main is 2 commit(s) behind origin/main, as of the fetch at 2026-11-13T08:40:55Z',
+  todo: 'jig refresh',
+  url: null,
+  versions: null,
+};
+
+/** A clone behind origin, its Refresh on Jig's item; one that last fetched days ago, its Refresh on that line. */
+export const behindProject: Project = ready('jig-ui', {
+  attention: [behindAttention],
+  origin: { fetchedAt: '2026-11-13T08:40:55Z', behind: 2 },
+});
+export const staleProject: Project = ready('nextjs-store', {
+  counts: { active: 0, paused: 0, ready: 1 },
+  origin: { fetchedAt: '2026-11-01T09:00:00Z', behind: 0 },
+});
+
+const refreshed = (outcome: 'fast-forwarded' | 'blocked-by-changes') =>
+  refreshReport({
+    fetch: 'done',
+    fetchedAt: '2026-11-13T08:40:56Z',
+    base: { name: 'main', outcome, from: '79ed4f712093', to: outcome === 'fast-forwarded' ? 'dbe9c989c721' : '79ed4f712093' },
+    writes: outcome === 'fast-forwarded' ? [{ target: 'knowledge', branch: 'knowledge/decisions', reason: 'merged' }] : [],
+  });
+
+/** Refresh from a card: under way, the base brought up with a write closed, changes in the way, and a refusal. */
+export const refreshRuns: RefreshState[] = [
+  { state: 'running' },
+  { state: 'done', ...refreshed('fast-forwarded') },
+  { state: 'done', ...refreshed('blocked-by-changes') },
+  { state: 'refused', message: 'Jig did not finish within two minutes.' },
+];
 
 /** A close from a card: under way, and Jig's refusal. */
 export const closings: ClosingState[] = [

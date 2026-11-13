@@ -256,7 +256,9 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
   landed is as of the last fetch; one Jig command fetches and fast-forwards the base without moving
   the person's checkout, and refuses with a reason when that would touch their work. Rejected: Jig UI
   running `git fetch` or `git pull` itself — RULES let it write nothing in a project but through
-  Jig; reads that fetch on their own — every page refresh would then reach the forge.
+  Jig; reads that fetch on their own — every page refresh would then reach the forge; running that command when the
+  page opens, once in a while (the maintainer, 2026-11-13: the fetch goes through `gh`'s token in the macOS keychain,
+  and a run nobody pressed could put up its dialog) — it runs only when the person presses Refresh.
 - A task parked at the staging branch is not finished (Jig 0.45.0's staging flow; the maintainer, 2026-11-13: "a new
   Jig release, a new flow"). Its pull request into staging, once merged, read on a card as a task done, and the close's
   fallback offered to close it on that merge; landing on staging does not close a task, so the page reads `parked`

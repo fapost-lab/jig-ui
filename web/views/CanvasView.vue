@@ -69,6 +69,7 @@
     knowledgeDiffs,
     knowledgeLater,
     knowledgeTexts,
+    manySpecIds,
     mergedAttention,
     openDocument,
     plans,
@@ -187,7 +188,10 @@
       </ToggleGroup>
     </CanvasSection>
 
-    <CanvasSection title="Tabs" note="the Specs view's specs, one chosen, one with its priority; a press chooses another">
+    <CanvasSection
+      title="Tabs"
+      note="the Specs view's specs, one chosen, one with its priority; a press chooses another; twenty wrap onto more rows"
+    >
       <Tabs default-value="jig-ui">
         <TabsList aria-label="Specs">
           <TabsTrigger v-for="spec in specs" :key="spec.id" :value="spec.id">
@@ -198,6 +202,11 @@
         <TabsContent v-for="spec in specs" :key="spec.id" :value="spec.id" class="text-muted-foreground">{{
           spec.title ?? spec.id
         }}</TabsContent>
+      </Tabs>
+      <Tabs default-value="first-contact-path">
+        <TabsList aria-label="Many specs" class="max-w-full flex-wrap">
+          <TabsTrigger v-for="spec in manySpecIds" :key="spec" :value="spec" class="shrink-0">{{ spec }}</TabsTrigger>
+        </TabsList>
       </Tabs>
     </CanvasSection>
 

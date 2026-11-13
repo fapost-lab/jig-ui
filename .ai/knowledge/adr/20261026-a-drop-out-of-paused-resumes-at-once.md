@@ -38,6 +38,8 @@ design gate and after the architecture review, 2026-10-26.
   `--revision` (0.35.0, `RESUME_JIG_VERSION`); elsewhere the card names `jig task resume <id>`.
 - The card still moves only when Jig's state does: the page reads the board again after the
   write, as for every other change. Only a pause is a request.
+  *(Amended by adr-20261113-a-task-nobody-started-is-paused-at-once, 2026-11-13: from Jig 0.45.0 the pause of a task nobody started is no request
+  either: Jig pauses it at once.)*
 - This amends adr-20261014-board-columns-are-derived-from-jig-state ("a drop on another column is a
   request") for a drop out of Paused; the rest of it stands.
 

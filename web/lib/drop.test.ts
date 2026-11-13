@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Task } from '../api';
 import { useDrop } from './drop';
 
-const task = (id: string, pauseRequestable: boolean, resumesTo: Task['resumesTo'] = null): Task => ({
+const task = (id: string, pauseRequestable: boolean, resumesTo: Task['resumesTo'] = null, pausable = false): Task => ({
   id,
   class: 'T2',
   status: 'active',
@@ -10,6 +10,7 @@ const task = (id: string, pauseRequestable: boolean, resumesTo: Task['resumesTo'
   paused: resumesTo !== null,
   pauseRequest: null,
   pauseRequestable,
+  pausable,
   resumable: resumesTo !== null,
   closable: false,
   staging: null,
@@ -27,14 +28,15 @@ const event = () => ({ preventDefault: vi.fn(), dataTransfer: null }) as unknown
 
 describe('useDrop onto another column', () => {
   it.each([
-    ['asks a pause on Paused when Jig offers it', 'paused', true, ['a']],
-    ['allows nothing on Paused when Jig does not offer it', 'paused', false, []],
-    ['allows nothing on any other column', 'backlog', true, []],
-  ])('%s', (_, list, offered, paused) => {
+    ['asks a pause on Paused when Jig offers it', 'paused', true, false, ['a']],
+    ['pauses on Paused a task nobody started, which Jig pauses at once', 'paused', false, true, ['a']],
+    ['allows nothing on Paused when Jig offers neither', 'paused', false, false, []],
+    ['allows nothing on any other column', 'backlog', true, true, []],
+  ])('%s', (_, list, requestable, pausable, paused) => {
     const onMove = vi.fn();
     const onPause = vi.fn();
     const drag = useDrop(onMove, onPause, vi.fn());
-    drag.start(event(), 'in-progress', task('a', offered));
+    drag.start(event(), 'in-progress', task('a', requestable, null, pausable));
     const over = event();
     drag.over(over, list, []);
     expect(over.preventDefault).toHaveBeenCalledTimes(paused.length);

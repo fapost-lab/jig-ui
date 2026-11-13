@@ -31,7 +31,7 @@
   const emit = defineEmits<{
     move: [place: Place];
     prioritise: [priority: number | null];
-    /** Asks a pause (`true`) or takes the request back (`false`). */
+    /** Asks a pause (`true`) — made at once for a task nobody started — or takes the request back (`false`). */
     pause: [ask: boolean];
     resume: [];
   }>();
@@ -73,9 +73,13 @@
       <DropdownMenuItem v-if="task.parked && !task.paused" :disabled="!task.resumable" @select="emit('resume')">
         <Wrench />Take back for a fix
       </DropdownMenuItem>
+      <!-- Beside a request nobody will take, as a drop on Paused does: Jig's pause takes the request out. -->
+      <DropdownMenuItem v-if="task.pausable" @select="emit('pause', true)"><Pause />Pause</DropdownMenuItem>
       <DropdownMenuItem v-if="task.pauseRequest" @select="emit('pause', false)"><Undo2 />Cancel pause request</DropdownMenuItem>
       <DropdownMenuItem v-else-if="task.paused" :disabled="!task.resumable" @select="emit('resume')"><Play />Resume</DropdownMenuItem>
-      <DropdownMenuItem v-else :disabled="!task.pauseRequestable" @select="emit('pause', true)"><Pause />Request pause</DropdownMenuItem>
+      <DropdownMenuItem v-else-if="!task.pausable" :disabled="!task.pauseRequestable" @select="emit('pause', true)">
+        <Pause />Request pause
+      </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
 </template>

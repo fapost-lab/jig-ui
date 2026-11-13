@@ -29,6 +29,7 @@ const task = (id: string, more: Partial<Task>): Task => ({
   paused: false,
   pauseRequest: null,
   pauseRequestable: true,
+  pausable: false,
   resumable: false,
   closable: false,
   staging: null,
@@ -102,7 +103,14 @@ export const tasks: Task[] = [
     pauseRequestable: false,
     goal: 'Register a project in an installed Jig UI from jig init.',
   }),
-  task('file-backlog-task', { class: null, started: false, goal: 'File a minimal backlog task from the page through jig task new.' }),
+  // Nobody started it: Jig 0.45.0 takes no pause request for it, and pauses it at once.
+  task('file-backlog-task', {
+    class: null,
+    started: false,
+    pauseRequestable: false,
+    pausable: true,
+    goal: 'File a minimal backlog task from the page through jig task new.',
+  }),
   task('a-task-with-a-rather-long-identifier-that-wraps', { goal: null }),
   task('conflict-display', {
     pauseRequest: { requestedAt: '2026-10-22T09:00:00Z' },

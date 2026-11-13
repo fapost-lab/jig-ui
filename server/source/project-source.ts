@@ -226,6 +226,11 @@ export interface Task {
   /** Jig offers to ask it to pause (its `request-pause` action); a request is taken back while there is one. */
   pauseRequestable: boolean;
   /**
+   * Nobody started it, and a drop on Paused pauses it at once (`task pause --revision`, Jig 0.45.0): Jig withholds
+   * `request-pause`, since no stage would take a request, and offers `pause`.
+   */
+  pausable: boolean;
+  /**
    * Paused or parked at the staging branch, and resumable from the page: Jig offers its `resume` action and takes
    * `task resume --revision` (0.35.0).
    */
@@ -565,6 +570,8 @@ export interface ProjectSource {
   prioritise(id: string, taskId: string, priority: number | null, revision: number): Promise<Written | undefined>;
   /** Asks a live task to pause at its next stage boundary, as `move` writes. */
   requestPause(id: string, taskId: string, revision: number): Promise<Written | undefined>;
+  /** Pauses a pausable live task at once, as `move` writes; any other is refused `not-found` without running Jig. */
+  pause(id: string, taskId: string, revision: number): Promise<Written | undefined>;
   /** Takes back the pause asked of a live task, as `move` writes. */
   cancelPause(id: string, taskId: string, revision: number): Promise<Written | undefined>;
   /** Resumes a paused live task in the project's main checkout, as `move` writes; a stash its pause kept is applied there. */

@@ -251,12 +251,15 @@
   const move = (task: string, place: Place) =>
     write(task, 'moving', (revision) => client.api.projects[':id'].queue.move.$post({ param, json: { task, place, revision } }));
 
+  /** A pause asked of the task, or taken back; a task nobody started, which no stage would take a request at, is paused at once. */
   const pause = (task: string, ask: boolean) =>
-    ask
-      ? write(task, 'asking to pause', (revision) => client.api.projects[':id'].queue.pause.$post({ param, json: { task, revision } }))
-      : write(task, 'taking back the pause request of', (revision) =>
+    !ask
+      ? write(task, 'taking back the pause request of', (revision) =>
           client.api.projects[':id'].queue.pause.cancel.$post({ param, json: { task, revision } }),
-        );
+        )
+      : cards.value.find((t) => t.id === task)?.pausable
+        ? write(task, 'pausing', (revision) => client.api.projects[':id'].tasks.pause.$post({ param, json: { task, revision } }))
+        : write(task, 'asking to pause', (revision) => client.api.projects[':id'].queue.pause.$post({ param, json: { task, revision } }));
 
   const resume = (task: string) =>
     write(task, 'resuming', (revision) => client.api.projects[':id'].tasks.resume.$post({ param, json: { task, revision } }));

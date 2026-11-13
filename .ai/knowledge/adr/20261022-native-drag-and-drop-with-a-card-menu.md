@@ -34,7 +34,9 @@ single-pointer alternative to every drag. Decided at the design gate, 2026-10-22
   nothing. *(This sentence amended by task `resume-from-page`, 2026-10-26, the maintainer's choice;
   it read "A drop on another column does nothing until pause requests are built.")* *(Amended by
   adr-20261113-a-task-parked-at-staging-is-not-done, 2026-11-13: a task parked at a staging branch is resumed too, by a drop
-  on the one column it will be in, or **Take back for a fix** in its menu.)*
+  on the one column it will be in, or **Take back for a fix** in its menu.)* *(Amended by
+  adr-20261113-a-task-nobody-started-is-paused-at-once, 2026-11-13: from Jig 0.45.0 a drop on Paused, or **Pause** in the menu, pauses a task nobody
+  started at once, `jig task pause`.)*
 - Every card has a "⋯" menu (Reka `DropdownMenu`): To top, Up, Down, To bottom, and the priority
   P0–P5 or none. Up and Down are computed by the same placement rule. The menu also asks or
   takes back a pause, and resumes a paused task (tasks `pause-request`, `resume-from-page`).

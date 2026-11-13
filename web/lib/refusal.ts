@@ -9,6 +9,7 @@ export function refusal(code: string, doing: string, task: string): string {
   }
   // Jig 0.45.0: neither paused nor parked at the staging branch any more.
   if (code === 'not-paused') return `Somebody resumed ${task} first.`;
+  if (code === 'already-paused') return `Somebody paused ${task} first.`;
   if (code === 'upgrading') return `Jig is being upgraded in this project: try ${doing} ${task} again once it has finished.`;
   return `Jig refused ${doing} ${task} (${code}).`;
 }

@@ -67,6 +67,10 @@ done, or moving.
   (`jig queue cancel`) until Jig pauses it — the drop as a request of
   adr-20261014-board-columns-are-derived-from-jig-state. The age moves on with a clock of the
   page (`web/lib/clock.ts`), once a minute, not with reads: an idle project is not read again.
+- A task nobody started takes no request from Jig 0.45.0, which offers it `pause` instead: the card
+  is `pausable`, and a drop on Paused, or **Pause** in the menu, runs `jig task pause` at once
+  (adr-20261113-a-task-nobody-started-is-paused-at-once). **Pause** sits beside the cancel where a request nobody
+  will take is there; a started task keeps the request. `already-paused` reads "Somebody paused <id> first."
 - A paused card leaves Paused by a drop on the one column it will be in, or **Resume** in its
   menu: the page runs `jig task resume` at once — no request (adr-20261026-a-drop-out-of-paused-resumes-at-once).
   Offered only where Jig offers the `resume` action and the project's Jig is 0.35.0 or later; below

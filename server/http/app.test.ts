@@ -576,6 +576,24 @@ describe('/api/projects/:id/queue', () => {
     expect((await post(app, '/api/projects/queued/tasks/resume', { task: 'a', revision: 1 }, {})).status).toBe(401);
   });
 
+  it('pauses a task at once through the port, the revision required', async () => {
+    const asked: unknown[][] = [];
+    const source: ProjectSource = {
+      ...localSource(join(webRoot, 'fake-config')),
+      pause: (...args) => {
+        asked.push(args);
+        return Promise.resolve({ state: 'written' });
+      },
+    };
+    const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
+    const res = await post(fake, '/api/projects/x/tasks/pause', { task: 'idea', revision: 3 });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ written: true });
+    expect((await post(fake, '/api/projects/x/tasks/pause', { task: 'idea' })).status).toBe(422);
+    expect((await post(fake, '/api/projects/x/tasks/pause', { task: 'idea', revision: 3 }, {})).status).toBe(401);
+    expect(asked).toEqual([['x', 'idea', 3]]);
+  });
+
   it.each([
     ['move', { place: 'top', revision: 1 }],
     ['move', { task: '', place: 'top', revision: 1 }],
@@ -606,6 +624,7 @@ describe('/api/projects/:id/queue', () => {
     ["another refusal of Jig's", { state: 'refused', code: 'usage' }, 422, 'usage'],
     ['a pause already asked', { state: 'refused', code: 'already-exists' }, 422, 'already-exists'],
     ['a stash that did not apply', { state: 'refused', code: 'stash-conflict' }, 422, 'stash-conflict'],
+    ['a task paused already', { state: 'refused', code: 'already-paused' }, 422, 'already-paused'],
     ['a project not connected', undefined, 404, 'not-connected'],
   ] as const)('answers %s', async (_, outcome, status, code) => {
     const source: ProjectSource = {
@@ -617,6 +636,7 @@ describe('/api/projects/:id/queue', () => {
       requestPause: () => Promise.resolve(outcome),
       cancelPause: () => Promise.resolve(outcome),
       resume: () => Promise.resolve(outcome),
+      pause: () => Promise.resolve(outcome),
       close: () => Promise.resolve(outcome),
     };
     const fake = createApp({ port: PORT, token: TOKEN, source, webRoot });
@@ -632,7 +652,7 @@ describe('/api/projects/:id/queue', () => {
       expect(res.status).toBe(status);
       expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);
     }
-    for (const kind of ['resume', 'close']) {
+    for (const kind of ['resume', 'pause', 'close']) {
       const res = await post(fake, `/api/projects/x/tasks/${kind}`, { task: 'a', revision: 1 });
       expect(res.status).toBe(status);
       expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);

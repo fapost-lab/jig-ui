@@ -34,6 +34,7 @@ import {
   refresh,
   releaseNamed,
   requestPause,
+  pauseTask,
   resumeTask,
   runUpgrade,
   selfUpdate,
@@ -1106,6 +1107,40 @@ describe('resuming a task', () => {
     ['queue-stale.json', 'stale-revision'],
   ])('carries the refusal in %s as %s', async (json, code) => {
     await expect(resumeTask(answering(`case-${cases++}`, json, 1), 'beta', 1)).rejects.toEqual(refusal(code));
+  });
+});
+
+// task-pause*.json and task-list-pause.json are what Jig 0.45.0 printed in a scratch repository, its worktree's path
+// renamed: a task nobody started (later-idea), one started (other-work), one started with a pause asked (busy-task) and
+// one paused (parked-idea).
+describe('pausing a task at once', () => {
+  it('pauses it against the revision it was read at, named by its bare id', async () => {
+    const dir = logging(`case-${cases++}`, 'task-pause.json');
+    await pauseTask(dir, 'parked-idea', 1794587926);
+    expect(args(dir)).toEqual(['task', 'pause', 'parked-idea', '--revision', '1794587926', '--json']);
+  });
+
+  it.each([
+    ['task-pause-already.json', 'already-paused'],
+    ['task-pause-stale.json', 'stale-revision'],
+  ])('carries the refusal in %s as %s', async (json, code) => {
+    await expect(pauseTask(answering(`case-${cases++}`, json, 1), 'parked-idea', 1)).rejects.toEqual(refusal(code));
+  });
+
+  it('reads which tasks Jig pauses at once and which it takes a request for', async () => {
+    const { tasks } = await readTasks(answering(`case-${cases++}`, 'task-list-pause.json'));
+    const offered = (id: string) =>
+      Object.fromEntries(
+        tasks
+          .find((t) => t.id === id)!
+          .actions.filter((a) => a.id.includes('pause'))
+          .map((a) => [a.id, a.offered]),
+      );
+    expect(offered('later-idea')).toMatchObject({ pause: true, 'request-pause': false });
+    expect(offered('other-work')).toMatchObject({ pause: true, 'request-pause': true });
+    expect(offered('busy-task')).toMatchObject({ pause: true, 'request-pause': false });
+    expect(offered('parked-idea')).toMatchObject({ pause: false, 'request-pause': false });
+    expect(tasks.find((t) => t.id === 'later-idea')!.branch).toBeNull();
   });
 });
 

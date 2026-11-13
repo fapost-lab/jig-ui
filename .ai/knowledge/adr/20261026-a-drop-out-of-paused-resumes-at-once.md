@@ -8,7 +8,7 @@ paths:
   - web/lib/drop.ts
   - server/board/columns.ts
   - web/components/QueueMenu.vue
-reviewed_at: 2026-10-26
+reviewed_at: 2026-11-13
 summary: A drop out of Paused, or Resume in the menu, runs jig task resume at once on the one column the task lands in; no request; Jig 0.35.0 or later
 ---
 # A drop out of Paused resumes the task at once, onto the column it will be in
@@ -32,6 +32,8 @@ design gate and after the architecture review, 2026-10-26.
 - The drop is offered on one column only: the one the task will be in once resumed. The board names
   it on the card (`resumesTo`), worked out by the board's own `columnOf` on the task with `paused`
   false — a resume changes nothing else Jig reports. A paused task Jig UI cannot resume has none.
+  *(Amended by adr-20261113-a-task-parked-at-staging-is-not-done, 2026-11-13: Jig 0.45.0 also resumes a task parked at a
+  staging branch, making it `active`; its `resumesTo` is worked out with that status.)*
 - It is offered only where Jig offers the `resume` action and the project's Jig takes
   `--revision` (0.35.0, `RESUME_JIG_VERSION`); elsewhere the card names `jig task resume <id>`.
 - The card still moves only when Jig's state does: the page reads the board again after the
@@ -59,3 +61,5 @@ design gate and after the architecture review, 2026-10-26.
   (`paused_days`, `overlap`) — is not shown: the page reads the board again, not the answer.
 - The page copies a third rule of Jig's: a resume changes only `paused`. A Jig that changes more on
   resume makes `resumesTo` name the wrong column until `server/board/columns.ts` follows.
+  *(Amended by adr-20261113-a-task-parked-at-staging-is-not-done, 2026-11-13: Jig 0.45.0's resume of a
+  task parked at a staging branch makes it `active`, and `resumesTo` follows.)*

@@ -14,7 +14,7 @@ paths:
   - web/lib/refusal.ts
   - web/lib/sift.ts
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-13
 ---
 # Board
 
@@ -80,6 +80,14 @@ done, or moving.
   Unlike the other refusals, a refused close is said in Jig's own words — its `jig: error:` lines with
   the paths cut out (`closeRefusal` in `web/lib/refusal.ts`) — because the reason (pull request not
   merged, knowledge decision not recorded) is what the person needs, and only Jig knows it.
+- On Jig's staging flow (0.45.0) a task's pull request goes into a staging branch and the task waits
+  there, parked, while it is tested (adr-20261113-a-task-parked-at-staging-is-not-done). A parked card
+  stays in Ready and says why it waits instead of what its pull request did — a review, the person's
+  landing, "prepare for prod" — and a task on staging that is not parked says whether its fix is there
+  yet, or its promotion's state and CI. **Take back for a fix** in its menu, or a drop on In progress, is the resume above. The ✕ waits
+  for housekeeping's `needs-consolidation`, the merge into the base: Jig 0.45.0's close command closes
+  a task once its pull request into staging merged (fapost-lab/jig#509). Landing and "prepare for
+  prod" have no button; Jig answers neither as JSON.
 - A change Jig refuses as `stale-revision` shows the conflict: the page compares the board the
   change was made on with the read the change itself started (`web/lib/conflict.ts`), marks each
   card that is new, in another column, moved within its own, or shows other facts — "Changed while

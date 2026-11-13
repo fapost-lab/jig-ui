@@ -67,7 +67,8 @@ readable project's card shows:
   design waiting at its gate, a stopped autopilot run, a pull request waiting for review, a task to
   close. Each says what happened and what to do; a pull request comes with a link to it,
   knowledge waiting for your decision with **Decide on the page** ([Deciding knowledge](#deciding-knowledge)),
-  and a merged task with **Close task** where its card in **Ready** could close it ([Closing a task](#closing-a-task)).
+  a merged task with **Close task** where its card in **Ready** could close it ([Closing a task](#closing-a-task)),
+  and *This checkout is behind origin* with **Refresh** ([Bringing the clone up to origin](#bringing-the-clone-up-to-origin)).
 - **A note when pull request facts may be out of date.** Jig reads pull requests only during
   `jig housekeeping`; when its last run is old or the forge did not answer, a waiting pull request
   may be missing until it runs.
@@ -183,7 +184,7 @@ fits wins:
 | Paused | it is paused (`jig task pause`) |
 | Backlog | it is filed but not started (`jig task start` not run yet) |
 | Needs you | its design waits at its gate, or changed after approval, or its autopilot run stopped with a question |
-| Ready | its work is done (`status ready`); the card says whether a pull request is open, its CI, or merged |
+| Ready | its work is done (`status ready`); the card says whether a pull request is open, its CI, or merged — on Jig's staging flow, why it waits at the staging branch ([Tasks on staging](#tasks-on-staging)) |
 | In progress | anything else that is live |
 
 A card shows the task's id, class and goal, its priority (`P0`, the most urgent, to `P5`) when it
@@ -278,7 +279,8 @@ only where Jig offers the request: not for a task already paused, and not twice.
 
 ## Resuming a task
 
-**Drag a paused card out of Paused**, or choose **Resume** in its ⋯ menu, to resume it. Jig UI
+**Drag a paused card out of Paused**, or choose **Resume** in its ⋯ menu, to resume it. (A task
+parked at a staging branch is taken back the same way: [Tasks on staging](#tasks-on-staging).) Jig UI
 runs `jig task resume <id>` in the project's main checkout, with the revision of the board you saw,
 and the card moves to the column the task is in once resumed: that column is the only one the
 drop is offered on.
@@ -320,11 +322,39 @@ to close the task yet, and the ✕ is there anyway, since closing asks the forge
 recorded knowledge decision has no ✕, and its item no **Close task**: record it first (the
 `jig-consolidate` skill). Closing cannot be undone from the page.
 
+## Tasks on staging
+
+A project on Jig's staging flow (`git.flow: staging`, from Jig 0.45.0) ships each task's pull request
+into a staging branch first. The task waits there, *parked*, while it is tested, and reaches the main
+branch through a second pull request once someone says "prepare for prod"
+([Test on staging first](https://jig.fapost.in/staging-flow)). A parked task stays in **Ready**, and
+its card says why it waits instead of what its pull request did:
+
+| The card says | The task |
+| --- | --- |
+| Pull request into staging waits for review | its pull request into the staging branch is open and waits for a review |
+| Pull request into staging — yours to land | the same, and landing it is yours: your `agent.git` is below `merge`, so merge it on the forge or run `jig task land <id>` |
+| On staging, waits for prepare for prod | its work is on the staging branch; once it passed its test there, tell your agent "prepare for prod" |
+| Fix not on staging yet | you took it back for a fix, and the fix has commits the staging branch does not have yet |
+| Promotion open, CI green | its promotion, the pull request into the main branch, is open; the note follows its state and CI |
+| On staging | its work is on the staging branch, it does not wait there, and it has no promotion yet |
+
+**Take back for a fix** in a parked card's ⋯ menu, or a drag of the card onto **In progress**, runs
+`jig task resume <id>` with the revision of the board you saw: the task is active again, and once it
+ships again its fix lands on the staging branch as the first change did. Landing and "prepare for
+prod" have no button: Jig answers neither as data the page can read, so they stay with your agent,
+or your CI.
+
+A task on the staging flow has no ✕ until its work is in the main branch. Landing on staging does not
+finish a task, yet Jig 0.45.0 offers to close one as soon as its pull request into staging merged.
+On this flow Jig UI offers the close only once `jig housekeeping` saw the work in the main branch: the
+task's item *Merged: the task can be closed*. **Housekeeping** on the project's card runs it.
+
 ## Specs
 
 **Specs** — the third choice beside Board and List — shows the project's specs as Jig's
 `jig spec list` reports them, one at a time: with more than one, a tab for each, in the order
-below, chooses which, and the page's address keeps the choice. A spec shows its title, how many
+below and on as many rows as they need, chooses which, and the page's address keeps the choice. A spec shows its title, how many
 roadmap items are done out of all of them, and its fog. An epic shows its branch, whether it is open or finished, and whether its
 roadmap was read from the remote branch as it was at the last fetch, or the branch is nowhere;
 the version level its release raises is shown when the roadmap records one.
@@ -438,6 +468,12 @@ A decided document stays in the list, marked *Accepted, waiting*, *Rejected, wai
 waiting* or *Dropped, waiting*, until that branch's pull request is merged; a line above the lists
 says where the decisions wait.
 
+On Jig 0.45.0, a document that origin's default branch already decided says *Decided on origin
+already* and has no buttons: no decision is owed. It leaves the list once your checkout has origin's
+default branch — on that branch, **Refresh** on the project's card brings it
+([Bringing the clone up to origin](#bringing-the-clone-up-to-origin)); on another, once that branch
+takes the default branch in.
+
 On Jig 0.41.0, a document Jig cannot decide yet says why above its buttons: it is committed only in
 your clone — push it first, then decide —, or it reached the default branch after the decisions
 waiting were started — decide it once they have landed. Jig fetches before it decides, so a decision
@@ -483,6 +519,30 @@ page of their own, with an address you can keep, and with what Jig offers. The d
   event handler, a form — is taken out. Needs Jig 0.39.0 or later in the project.
 
 A finished task has no details page; its link says so.
+
+## Bringing the clone up to origin
+
+Jig reads only this clone, never origin, so what the page shows is as of the clone's last fetch: a
+pull request merged on the forge since — a task's, a knowledge decision's — is not in it yet. On Jig
+0.45.0 a project's card says so: Jig's item *This checkout is behind origin* when the main branch here
+is behind origin's, and, when the clone last fetched more than a day ago, how long ago that was.
+
+**Refresh**, on that item or beside that line, runs `jig refresh` in the project. Jig fetches origin
+and brings the main branch up to it without moving your checkout: you stay on the branch you are on,
+and your files are not touched. It also closes Jig's own roadmap edits and knowledge decisions whose
+pull request merged or was closed. The card then says what came of it until you **Dismiss** it. When
+the main branch could not move, it says why, and nothing was changed:
+
+| The card says | What to do |
+| --- | --- |
+| main is checked out here, and moving it would overwrite changes in this checkout | commit them or set them aside, then **Refresh** again |
+| main is checked out in another worktree of this clone | bring it up from that worktree |
+| main here has commits origin's does not | push them, or drop them, with your agent |
+| Jig could not reach origin | try again once you are online |
+
+Jig fetches as the clone's own account, so a dialog for your git credentials, such as the macOS
+keychain's, may ask you to allow it. Jig UI never runs **Refresh** on its own, so that dialog only
+comes when you press it.
 
 ## Staying current
 

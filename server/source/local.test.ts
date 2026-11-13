@@ -114,6 +114,8 @@ function project(
       text?: unknown;
       decision?: unknown;
     };
+    /** What `refresh --json` prints: an envelope's `data`, or a refusal's code. */
+    refresh?: unknown;
     /** What `housekeeping` prints on stdout and stderr, and its exit code. */
     housekeeping?: {
       out?: string;
@@ -165,6 +167,7 @@ function project(
   writeFileSync(join(dir, 'plan.json'), typeof answers.plan === 'string' ? answers.plan : envelope(answers.plan ?? {}));
   writeFileSync(join(dir, 'upgrade.json'), typeof answers.upgrade === 'string' ? answers.upgrade : envelope(answers.upgrade ?? {}));
   writeFileSync(join(dir, 'land.json'), typeof answers.land === 'string' ? answers.land : envelope(answers.land ?? {}));
+  writeFileSync(join(dir, 'refresh.json'), answer(answers.refresh ?? {}));
   const self = answers.selfUpdate ?? {};
   writeFileSync(join(dir, 'self.out'), self.out ?? 'self-update: already current');
   writeFileSync(join(dir, 'self.err'), self.err ?? '');
@@ -195,6 +198,7 @@ case "$*" in
   "knowledge accept "*|"knowledge reject "*|"knowledge reviewed "*) while [ -f hold ]; do sleep 0.05; done; cat decision.json; if grep -q '"error"' decision.json; then exit 1; fi ;;
   "task artifact read "*) cat artifact.json; if grep -q '"error"' artifact.json; then exit 1; fi ;;
   "task set "*) cat set.err >&2; exit ${answers.set?.code ?? 0} ;;
+  "refresh --json") cat refresh.json; if grep -q '"error"' refresh.json; then exit 1; fi ;;
   housekeeping) cat housekeeping.out; cat housekeeping.err >&2; exit ${answers.housekeeping?.code ?? 0} ;;
   "upgrade --dry-run --json") cat plan.json ;;
   "self-update") while [ -f hold-self ]; do sleep 0.05; done; cat self.out; echo; cat self.err >&2; if [ -f status-after.json ] && [ ${self.code ?? 0} -eq 0 ]; then cp status-after.json status.json; fi; exit ${self.code ?? 0} ;;
@@ -361,6 +365,7 @@ describe('localSource', () => {
         counts: { active: 2, paused: 1, ready: 1 },
         attention: [{ ...attention, versions: null }],
         housekeepingStale: true,
+        origin: null,
         closable: [],
         revision: 7,
         upgrade: null,
@@ -586,6 +591,8 @@ describe('localSource', () => {
           pauseRequestable: true,
           resumable: false,
           closable: false,
+          staging: null,
+          parked: null,
           started: true,
           gate: null,
           autopilot: null,
@@ -828,6 +835,34 @@ describe('localSource, writing the queue', () => {
     const ran = since(dir, from);
     expect(ran.slice(ran.indexOf('housekeeping') + 1)).toEqual(expect.arrayContaining(['status --json', 'task list --json']));
     expect(await source.housekeeping('nobody')).toBeUndefined();
+  });
+
+  it('brings the clone up to origin on Jig 0.45.0, answers what it did without a path, and reads the project again', async () => {
+    const refreshed = JSON.parse(readFileSync(new URL('../jig/fixtures/refresh-elsewhere.json', import.meta.url), 'utf8')).data;
+    const dir = project('refreshing', '0.45.0', { tasks, refresh: refreshed });
+    await source.connect(dir);
+    const from = calls(dir).length;
+    const written = await source.refresh('refreshing');
+    expect(written).toEqual({
+      state: 'written',
+      refreshed: {
+        fetch: 'done',
+        fetchedAt: '2026-11-13T08:40:59Z',
+        base: { name: 'main', outcome: 'checked-out-elsewhere', from: refreshed.base.from, to: refreshed.base.to },
+        writes: [],
+      },
+    });
+    expect(JSON.stringify(written)).not.toContain('/Users/me');
+    const ran = since(dir, from);
+    expect(ran.slice(ran.indexOf('refresh --json') + 1)).toEqual(expect.arrayContaining(['status --json', 'task list --json']));
+    expect(await source.refresh('nobody')).toBeUndefined();
+  });
+
+  it('refuses a refresh below Jig 0.45.0 without running it', async () => {
+    const dir = project('no-refresh', '0.44.0', { tasks });
+    await source.connect(dir);
+    expect(await source.refresh('no-refresh')).toEqual({ state: 'refused', code: 'unsupported' });
+    expect(calls(dir)).not.toContain('refresh --json');
   });
 
   it('answers the report of a run that left a task to consolidate, which Jig ends with 3', async () => {
@@ -1191,6 +1226,33 @@ describe('localSource, writing the queue', () => {
         undecided: false,
         working: false,
       });
+    });
+
+    // Jig 0.45.0 offers `close` once the pull request into staging merged, before the work reached the base.
+    it('is offered on the staging flow only once housekeeping found the work in the base', async () => {
+      const parked = { reason: 'signal', hint: null };
+      const merged = ['needs-consolidation'];
+      const staged = (id: string, more: Record<string, unknown>) =>
+        task(id, 'ready', false, {
+          knowledge_consolidated: true,
+          actions: [close],
+          pull_request: pr('merged'),
+          staging: 'on',
+          parked: null,
+          ...more,
+        });
+      const tasks = [
+        staged('on-staging', { parked }),
+        staged('promoted', {}),
+        staged('in-base', { housekeeping_flags: merged }),
+        staged('parked-flagged', { parked, housekeeping_flags: merged }),
+        staged('undecided', { knowledge_consolidated: false, housekeeping_flags: merged }),
+      ];
+      await source.connect(project('staging-closables', '0.45.0', { tasks: { tasks, hidden: 0, housekeeping: null } }));
+      const shown = await source.tasks('staging-closables');
+      const closable = shown?.state === 'ready' ? Object.fromEntries(shown.tasks.map((t) => [t.id, t.closable])) : {};
+      expect(closable).toEqual({ 'on-staging': false, promoted: false, 'in-base': true, 'parked-flagged': false, undecided: false });
+      expect(shown?.state === 'ready' && shown.tasks.map((t) => [t.staging, t.parked])[0]).toEqual(['on', parked]);
     });
 
     it('lists the same tasks on the project as the workspace shows it, with the revision a close carries', async () => {

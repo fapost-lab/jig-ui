@@ -12,6 +12,8 @@ const task = (more: Partial<Task> = {}): Task => ({
   pauseRequestable: true,
   resumable: false,
   closable: false,
+  staging: null,
+  parked: null,
   started: true,
   gate: null,
   autopilot: null,
@@ -72,6 +74,9 @@ describe('columns', () => {
       task({ id: 'gated', paused: true, resumable: true, gate: 'waiting' }),
       task({ id: 'old-jig', paused: true }),
       task({ id: 'live' }),
+      // Parked at the staging branch: Jig 0.45.0's resume takes it back for a fix, as an active task.
+      task({ id: 'parked', status: 'ready', resumable: true, parked: { reason: 'signal', hint: null } }),
+      task({ id: 'parked-paused', status: 'ready', paused: true, resumable: true, parked: { reason: 'signal', hint: null } }),
     ];
     const cards = columns(tasks).flatMap((c) => c.cards);
     expect(Object.fromEntries(cards.map((t) => [t.id, t.resumesTo]))).toEqual({
@@ -80,6 +85,8 @@ describe('columns', () => {
       gated: 'needs-you',
       'old-jig': null,
       live: null,
+      parked: 'in-progress',
+      'parked-paused': 'ready',
     });
   });
 });

@@ -5,7 +5,9 @@ import type {
   ItemPlace,
   Knowledge,
   KnowledgeDecision,
+  Origin,
   Place,
+  Refreshed,
   Setting,
   Spec,
   SpecItem,
@@ -21,7 +23,9 @@ export type {
   ItemPlace,
   Knowledge,
   KnowledgeDecision,
+  Origin,
   Place,
+  Refreshed,
   Setting,
   Spec,
   SpecItem,
@@ -48,6 +52,8 @@ export type ProjectView =
       counts: TaskCounts;
       attention: Attention[];
       housekeepingStale: boolean;
+      /** How the clone stands against origin as of its last fetch (Jig 0.45.0); `null` from an older Jig. */
+      origin: Origin;
       /** The live tasks closable as done from the page, as their cards on the board say (`Task.closable`). */
       closable: string[];
       /** The revision a close from the card carries: the board's, from the same read. */
@@ -219,14 +225,27 @@ export interface Task {
   } | null;
   /** Jig offers to ask it to pause (its `request-pause` action); a request is taken back while there is one. */
   pauseRequestable: boolean;
-  /** Paused, and resumable from the page: Jig offers its `resume` action and takes `task resume --revision` (0.35.0). */
+  /**
+   * Paused or parked at the staging branch, and resumable from the page: Jig offers its `resume` action and takes
+   * `task resume --revision` (0.35.0).
+   */
   resumable: boolean;
   /**
    * Ready, and closable as done from the page: Jig offers its `close` action, or withholds it only because its forge
    * cache has not heard of a merge — the knowledge decision is recorded and the pull request is not closed unmerged.
-   * Jig itself asks the forge when it closes.
+   * Jig itself asks the forge when it closes. On the staging flow, only once housekeeping found its work in the base.
    */
   closable: boolean;
+  /** On Jig's staging flow, whether the task's own work is on the staging branch (`on`) or has commits after it (`behind`); `null` elsewhere. */
+  staging: 'on' | 'behind' | null;
+  /**
+   * Why the task waits at the staging branch, `null` when it does not: its pull request into staging waits for a review
+   * (`review`, with `landing` when the person lands it), or its work is there, waiting for "prepare for prod" (`signal`).
+   */
+  parked: {
+    reason: 'review' | 'signal';
+    hint: 'landing' | null;
+  } | null;
   started: boolean;
   gate: string | null;
   autopilot: string | null;
@@ -453,6 +472,8 @@ export type Written =
       note?: string;
       /** Jig's report as it printed it, a line each, without a path (housekeeping). */
       report?: string[];
+      /** What a refresh did, without git's messages or a path. */
+      refreshed?: Refreshed;
     }
   | {
       state: 'refused';
@@ -565,6 +586,13 @@ export interface ProjectSource {
    * `undefined` when no project has that id.
    */
   housekeeping(id: string): Promise<Written | undefined>;
+  /**
+   * Brings the clone up to origin through Jig (`jig refresh`, Jig 0.45.0): a fetch, a fast-forward of the base that never
+   * moves the person's checkout, and Jig's own writes that are over closed; then reads it again, answering what it did.
+   * No revision and no live id, as housekeeping: it changes nothing the person decided. Refused `unsupported` below
+   * 0.45.0 and `upgrading` while the project's upgrade runs. `undefined` when no project has that id.
+   */
+  refresh(id: string): Promise<Written | undefined>;
   /** A connected project's settings, read through its Jig at each call; `undefined` when no project has that id. */
   settings(id: string): Promise<ProjectSettings | undefined>;
   /**

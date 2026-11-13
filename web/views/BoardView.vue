@@ -664,7 +664,7 @@
         No specs in this project. A spec is written with the <code>jig-idea</code> skill and kept in <code>.ai/specs/</code>.
       </p>
       <Tabs v-else-if="chosenSpec" :model-value="chosenSpec.id" class="gap-5 px-6 py-5" @update:model-value="chooseSpec">
-        <TabsList v-if="specs.specs.length > 1" aria-label="Specs" class="max-w-full overflow-x-auto">
+        <TabsList v-if="specs.specs.length > 1" aria-label="Specs" class="max-w-full flex-wrap">
           <TabsTrigger v-for="spec in specs.specs" :key="spec.id" :value="spec.id" :title="spec.title ?? spec.id" class="shrink-0">
             {{ spec.id }}
             <Badge v-if="spec.queue?.priority != null" variant="secondary">P{{ spec.queue.priority }}</Badge>

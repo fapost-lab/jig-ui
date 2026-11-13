@@ -9,17 +9,22 @@
   /**
    * `project`: the project the item is about, given where the item can link to its page — the workspace card.
    * `closable`: the item's task can be closed as done from here; `closing`: that close is on its way to Jig.
+   * `refreshable`: a clone behind origin can be brought up from here; `refreshing`: that refresh is on its way to Jig.
    */
   const props = defineProps<{
     item: Attention;
     project?: string;
     closable?: boolean;
     closing?: boolean;
+    refreshable?: boolean;
+    refreshing?: boolean;
   }>();
 
   defineEmits<{
     /** Close task, confirmed: the view closes the item's task. */
     close: [];
+    /** Refresh on a clone behind origin: the view runs `jig refresh` in the project. */
+    refresh: [];
   }>();
 
   /** Knowledge waiting for the person is decided on the project's page, in its Knowledge view. */
@@ -58,6 +63,16 @@
           <RouterLink v-if="decide" :to="decide" class="underline underline-offset-2">Decide on the page</RouterLink>
         </p>
       </div>
+      <Button
+        v-if="refreshable && item.kind === 'base-behind-origin'"
+        variant="outline"
+        size="xs"
+        class="shrink-0 text-foreground"
+        :disabled="refreshing"
+        @click="$emit('refresh')"
+      >
+        {{ refreshing ? 'Refreshing…' : 'Refresh' }}
+      </Button>
       <Button
         v-if="closable && !asking"
         variant="outline"

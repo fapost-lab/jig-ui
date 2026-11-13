@@ -31,6 +31,7 @@ import {
   readStatus,
   readFinishedTasks,
   readTasks,
+  refresh,
   releaseNamed,
   requestPause,
   resumeTask,
@@ -179,7 +180,30 @@ describe('readStatus', () => {
   });
 
   it('reads a project where nothing needs the person and housekeeping never ran', async () => {
-    expect(await readStatus(answering('status-empty', 'status.json'))).toMatchObject({ attention: [], housekeepingStale: false });
+    expect(await readStatus(answering('status-empty', 'status.json'))).toMatchObject({
+      attention: [],
+      housekeepingStale: false,
+      origin: null,
+    });
+  });
+
+  // status-origin.json is what Jig 0.45.0 printed in a scratch repository whose origin, a local bare one, was two commits ahead.
+  it('reads how the clone stands against origin, and the item asking for a refresh', async () => {
+    const read = await readStatus(answering('status-origin', 'status-origin.json'));
+    expect(read.origin).toEqual({ fetchedAt: '2026-11-13T08:40:55Z', behind: 2 });
+    expect(read.attention).toEqual([
+      expect.objectContaining({ kind: 'base-behind-origin', subject: { type: 'project', id: null }, todo: 'jig refresh' }),
+    ]);
+  });
+
+  it('reads an origin with no base branch on either side as not knowing how far behind', async () => {
+    const read = await readStatus(
+      answering(
+        `case-${cases++}`,
+        changed('status-origin.json', (d) => (d.origin = { base: 'main', fetched_at: null, behind: null, ahead: null })),
+      ),
+    );
+    expect(read.origin).toEqual({ fetchedAt: null, behind: null });
   });
 
   it.each([
@@ -190,6 +214,11 @@ describe('readStatus', () => {
     ['versions without the machine’s', (d: Record<string, any>) => (d.attention[0].versions = { from: '0.33.0' })],
   ])('refuses %s', async (_, change) => {
     await expect(readStatus(answering(`case-${cases++}`, changed('status-attention.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+
+  it('refuses an origin whose behind is not a count', async () => {
+    const answer = changed('status-origin.json', (d) => (d.origin.behind = '2'));
+    await expect(readStatus(answering(`case-${cases++}`, answer))).rejects.toBeInstanceOf(JigShapeError);
   });
 
   it('refuses an upgrade item without its versions', async () => {
@@ -293,6 +322,29 @@ describe('readTasks', () => {
       ['request-pause', false],
       ['cancel-pause-request', true],
     ]);
+  });
+
+  // task-list-staging.json is what Jig 0.45.0 printed in a scratch repository on the staging flow, with a local origin:
+  // `tested` merged into origin's staging branch, `fixing` merged and taken back with a fix, `waiting` pushed only.
+  it('reads where a task stands on the staging flow, and nothing of it on any other flow', async () => {
+    const read = await readTasks(answering('tasks-staging', 'task-list-staging.json'));
+    expect(read.tasks.map((t) => [t.id, t.staging, t.parked])).toEqual([
+      ['fixing', 'behind', null],
+      ['tested', 'on', { reason: 'signal', hint: null }],
+      ['waiting', null, null],
+    ]);
+    // A pull request into staging waits for its review, which the person lands (their agent.git below merge).
+    const review = changed('task-list-staging.json', (d) => (d.tasks[2].parked = { reason: 'review', hint: 'landing' }));
+    expect((await readTasks(answering(`case-${cases++}`, review))).tasks[2]?.parked).toEqual({ reason: 'review', hint: 'landing' });
+    const direct = await readTasks(answering('tasks-direct', 'task-list.json'));
+    expect(direct.tasks.map((t) => [t.staging, t.parked])).toEqual(direct.tasks.map(() => [undefined, undefined]));
+  });
+
+  it.each([
+    ['a staging state this Jig UI does not know', (d: Record<string, any>) => (d.tasks[0].staging = 'ahead')],
+    ['a parked task without its reason', (d: Record<string, any>) => (d.tasks[1].parked = { hint: null })],
+  ])('refuses %s', async (_, change) => {
+    await expect(readTasks(answering(`case-${cases++}`, changed('task-list-staging.json', change)))).rejects.toBeInstanceOf(JigShapeError);
   });
 
   it('ignores an action id this Jig UI does not know, as Jig asks of a consumer', async () => {
@@ -1299,6 +1351,61 @@ describe('settings', () => {
       code: 'invalid-value',
       reasons: ["agent.git: invalid value 'sometimes': not a level: none, commit, push, pr or merge"],
     });
+  });
+});
+
+// The refresh-*.json fixtures are what Jig 0.45.0 printed in a scratch repository with a local bare origin, one per way
+// the base went, the worktree's path renamed.
+describe('refresh', () => {
+  it.each([
+    ['refresh-fast-forwarded.json', 'done', 'fast-forwarded'],
+    ['refresh-up-to-date.json', 'done', 'up-to-date'],
+    ['refresh-blocked.json', 'done', 'blocked-by-changes'],
+    ['refresh-diverged.json', 'done', 'diverged'],
+    ['refresh-elsewhere.json', 'done', 'checked-out-elsewhere'],
+    ['refresh-failed.json', 'failed', 'checked-out-elsewhere'],
+  ])('reads %s', async (name, fetched, outcome) => {
+    const read = await refresh(answering(`refresh-${cases++}`, name));
+    expect(read.fetch).toBe(fetched);
+    expect(read.base.outcome).toBe(outcome);
+    expect(read.writes).toEqual([]);
+  });
+
+  it("answers neither git's messages nor a worktree's path", async () => {
+    const read = await refresh(answering(`refresh-${cases++}`, 'refresh-elsewhere.json'));
+    expect(read).toEqual({
+      fetch: 'done',
+      fetchedAt: '2026-11-13T08:40:59Z',
+      base: {
+        name: 'main',
+        outcome: 'checked-out-elsewhere',
+        from: '6c9d5513bc3e76e50c49d8de6af5cf1e8eeecacf',
+        to: '6c9d5513bc3e76e50c49d8de6af5cf1e8eeecacf',
+      },
+      writes: [],
+    });
+    expect(JSON.stringify(await refresh(answering(`refresh-${cases++}`, 'refresh-failed.json')))).not.toMatch(/fatal|\/Users/);
+  });
+
+  it('reads the writes it closed', async () => {
+    const answer = changed(
+      'refresh-up-to-date.json',
+      (d) => (d.writes = [{ target: 'knowledge', branch: 'knowledge/decisions', reason: 'merged' }]),
+    );
+    expect((await refresh(answering(`refresh-${cases++}`, answer))).writes).toEqual([
+      { target: 'knowledge', branch: 'knowledge/decisions', reason: 'merged' },
+    ]);
+  });
+
+  it.each([
+    ['a base outcome Jig UI does not know', (d: Record<string, any>) => (d.base.outcome = 'rebased')],
+    ['a fetch without its outcome', (d: Record<string, any>) => delete d.fetch.outcome],
+    [
+      'a write closed for a reason Jig UI does not know',
+      (d: Record<string, any>) => (d.writes = [{ target: 'knowledge', branch: 'b', reason: 'gone' }]),
+    ],
+  ])('refuses %s', async (_, change) => {
+    await expect(refresh(answering(`case-${cases++}`, changed('refresh-up-to-date.json', change)))).rejects.toBeInstanceOf(JigShapeError);
   });
 });
 

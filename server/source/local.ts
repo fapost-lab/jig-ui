@@ -34,6 +34,8 @@ import {
   readSourceDiff,
   readSpecs,
   readStatus,
+  refresh as refreshClone,
+  REFRESH_JIG_VERSION,
   readFinishedTasks,
   readTasks,
   releaseNamed,
@@ -67,6 +69,7 @@ import type {
   ProjectSpecs,
   ProjectTasks,
   ProjectView,
+  Refreshed,
   Refusal,
   SelfUpdateRun,
   ShownSpec,
@@ -147,9 +150,14 @@ const gone = (t: Finished): FinishedTask => ({
  * decision is recorded and the pull request is not known to be closed unmerged. The cache is written only by
  * `jig housekeeping`, so a project that has not run it lately offers no close for a merged task; the command asks the
  * forge itself and refuses one that has not merged.
+ *
+ * On the staging flow (`staging` is there) the pull request is the one into staging, and Jig 0.45.0 offers and runs
+ * the close once that one merged, before the work reached the base. There only housekeeping's `needs-consolidation`,
+ * a merge into the base, makes a task closable.
  */
 function closable(t: Live): boolean {
   if (t.status !== 'ready') return false;
+  if (t.staging !== undefined) return t.knowledgeConsolidated && t.parked === null && t.housekeepingFlags.includes('needs-consolidation');
   if (t.actions.some((a) => a.id === 'close' && a.offered)) return true;
   return t.knowledgeConsolidated && t.pullRequest !== null && t.pullRequest.state !== 'closed';
 }
@@ -168,6 +176,8 @@ const card = (t: Live, q: QueueItem | undefined, resumes: boolean): Task => ({
   pauseRequestable: t.actions.some((a) => a.id === 'request-pause' && a.offered),
   resumable: resumes && t.actions.some((a) => a.id === 'resume' && a.offered),
   closable: closable(t),
+  staging: t.staging ?? null,
+  parked: t.parked ?? null,
   started: t.branch !== null,
   gate: t.gate?.state ?? null,
   autopilot: t.autopilot?.state ?? null,
@@ -278,6 +288,7 @@ async function readProject(project: Project): Promise<Read> {
       counts: count(live),
       attention: status.attention,
       housekeepingStale: status.housekeepingStale,
+      origin: status.origin,
       closable: live.filter(closable).map((t) => t.id),
       revision,
     },
@@ -748,7 +759,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
   async function writing(
     id: string,
     taskIds: string[],
-    write: (root: string, jigVersion: string, read: Read) => Promise<string | string[] | null | void>,
+    write: (root: string, jigVersion: string, read: Read) => Promise<string | string[] | Refreshed | null | void>,
     specIds: string[] = [],
     allowed: (task: Task) => boolean = () => true,
   ): Promise<Written | undefined> {
@@ -771,6 +782,7 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     try {
       const note = await run;
       if (Array.isArray(note)) written = { state: 'written', report: note };
+      else if (typeof note === 'object' && note) written = { state: 'written', refreshed: note };
       else if (note) written = { state: 'written', note };
     } catch (error) {
       // Only the code goes on, and reasons Jig UI cut the paths out of: Jig's message may name a path.
@@ -979,6 +991,11 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     },
     housekeeping(id) {
       return writing(id, [], (root) => housekeeping(root));
+    },
+    refresh(id) {
+      return writing(id, [], (root, jigVersion) =>
+        supports(jigVersion, REFRESH_JIG_VERSION) ? refreshClone(root) : Promise.reject(new JigRefusal('unsupported')),
+      );
     },
     addItem(id, specId, phase, text, revision) {
       return roadmapWriting(

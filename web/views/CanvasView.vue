@@ -69,6 +69,11 @@
     knowledgeDiffs,
     knowledgeLater,
     knowledgeTexts,
+    behindAttention,
+    behindProject,
+    refreshRuns,
+    staleProject,
+    manySpecIds,
     mergedAttention,
     openDocument,
     plans,
@@ -187,7 +192,10 @@
       </ToggleGroup>
     </CanvasSection>
 
-    <CanvasSection title="Tabs" note="the Specs view's specs, one chosen, one with its priority; a press chooses another">
+    <CanvasSection
+      title="Tabs"
+      note="the Specs view's specs, one chosen, one with its priority; a press chooses another; twenty wrap onto more rows"
+    >
       <Tabs default-value="jig-ui">
         <TabsList aria-label="Specs">
           <TabsTrigger v-for="spec in specs" :key="spec.id" :value="spec.id">
@@ -198,6 +206,11 @@
         <TabsContent v-for="spec in specs" :key="spec.id" :value="spec.id" class="text-muted-foreground">{{
           spec.title ?? spec.id
         }}</TabsContent>
+      </Tabs>
+      <Tabs default-value="first-contact-path">
+        <TabsList aria-label="Many specs" class="max-w-full flex-wrap">
+          <TabsTrigger v-for="spec in manySpecIds" :key="spec" :value="spec" class="shrink-0">{{ spec }}</TabsTrigger>
+        </TabsList>
       </Tabs>
     </CanvasSection>
 
@@ -263,12 +276,15 @@
 
     <CanvasSection
       title="ProjectCard"
-      note="ready with attention and stale housekeeping; nothing needs you; its Jig older than the machine's, Upgrade… offered; each state it cannot be read in; Housekeeping under way, its report, its refusal; a merged task to close, its close under way, Jig's refusal"
+      note="ready with attention and stale housekeeping; nothing needs you; its Jig older than the machine's, Upgrade… offered; each state it cannot be read in; Housekeeping under way, its report, its refusal; a merged task to close, its close under way, Jig's refusal; a clone behind origin, one last fetched days ago, Refresh under way, the base brought up, changes in the way, a refusal"
     >
       <ProjectCard v-for="project in projects" :key="project.id" :project="project" />
       <ProjectCard v-for="(run, i) in housekeepingRuns" :key="`housekeeping-${i}`" :project="projects[1]!" :housekeeping="run" />
       <ProjectCard :project="closingProject" />
       <ProjectCard v-for="(run, i) in closings" :key="`closing-${i}`" :project="closingProject" :closing="run" />
+      <ProjectCard :project="behindProject" />
+      <ProjectCard :project="staleProject" />
+      <ProjectCard v-for="(run, i) in refreshRuns" :key="`refresh-${i}`" :project="behindProject" :refresh="run" />
     </CanvasSection>
 
     <CanvasSection
@@ -336,13 +352,15 @@
 
     <CanvasSection
       title="AttentionItem"
-      note="no link; a pull request; another link; knowledge, on a project's card; a merged task to close, asking, closing"
+      note="no link; a pull request; another link; knowledge, on a project's card; a merged task to close, asking, closing; a clone behind origin, Refresh, refreshing"
     >
       <AttentionItem v-for="(item, i) in attention" :key="i" :item="item" />
       <AttentionItem :item="knowledgeAttention" project="acme" />
       <AttentionItem :item="mergedAttention" project="acme" closable />
       <AttentionItem :item="mergedAttention" project="acme" closable asking />
       <AttentionItem :item="mergedAttention" project="acme" closable closing />
+      <AttentionItem :item="behindAttention" project="acme" refreshable />
+      <AttentionItem :item="behindAttention" project="acme" refreshable refreshing />
     </CanvasSection>
 
     <CanvasSection title="ColumnHeader" note="each column's title and count">
@@ -373,11 +391,11 @@
 
     <CanvasSection
       title="QueueMenu"
-      note="press to open: To top, Up, Down, To bottom, Priority, the pause — first queued, in the middle, not queued, last, paused under a Jig that cannot resume it (no pause to ask, Resume off), paused and resumable, a pause asked, while its change is on its way, on a sorted board (no move), on a filtered board (To top and To bottom at either end of the cards shown)"
+      note="press to open: To top, Up, Down, To bottom, Priority, the pause — first queued, in the middle, not queued, last, paused under a Jig that cannot resume it (no pause to ask, Resume off), paused and resumable, a pause asked, parked at the staging branch (Take back for a fix), while its change is on its way, on a sorted board (no move), on a filtered board (To top and To bottom at either end of the cards shown)"
     >
       <div class="flex flex-wrap items-center gap-6">
         <span
-          v-for="t in [tasks[0]!, tasks[1]!, tasks[3]!, tasks[11]!, tasks[9]!, tasks[13]!, tasks[12]!]"
+          v-for="t in [tasks[0]!, tasks[1]!, tasks[3]!, tasks[11]!, tasks[9]!, tasks[13]!, tasks[12]!, tasks[16]!]"
           :key="t.id"
           class="flex items-center gap-1"
         >
@@ -553,6 +571,7 @@
             counts: { active: 0, paused: 0, ready: 0 },
             attention: [],
             housekeepingStale: false,
+            origin: null,
             closable: [],
             revision: 0,
           }"

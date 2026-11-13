@@ -147,9 +147,14 @@ const gone = (t: Finished): FinishedTask => ({
  * decision is recorded and the pull request is not known to be closed unmerged. The cache is written only by
  * `jig housekeeping`, so a project that has not run it lately offers no close for a merged task; the command asks the
  * forge itself and refuses one that has not merged.
+ *
+ * On the staging flow (`staging` is there) the pull request is the one into staging, and Jig 0.45.0 offers and runs
+ * the close once that one merged, before the work reached the base. There only housekeeping's `needs-consolidation`,
+ * a merge into the base, makes a task closable.
  */
 function closable(t: Live): boolean {
   if (t.status !== 'ready') return false;
+  if (t.staging !== undefined) return t.knowledgeConsolidated && t.parked === null && t.housekeepingFlags.includes('needs-consolidation');
   if (t.actions.some((a) => a.id === 'close' && a.offered)) return true;
   return t.knowledgeConsolidated && t.pullRequest !== null && t.pullRequest.state !== 'closed';
 }
@@ -168,6 +173,8 @@ const card = (t: Live, q: QueueItem | undefined, resumes: boolean): Task => ({
   pauseRequestable: t.actions.some((a) => a.id === 'request-pause' && a.offered),
   resumable: resumes && t.actions.some((a) => a.id === 'resume' && a.offered),
   closable: closable(t),
+  staging: t.staging ?? null,
+  parked: t.parked ?? null,
   started: t.branch !== null,
   gate: t.gate?.state ?? null,
   autopilot: t.autopilot?.state ?? null,

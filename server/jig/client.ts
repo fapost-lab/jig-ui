@@ -477,6 +477,16 @@ const TaskRow = z
     pull_request: z.object({ url: text, state: maybe, ci: maybe, fetched_at: maybe }).nullable(),
     housekeeping_flags: z.array(text),
     actions: z.array(TaskAction),
+    /**
+     * Only on Jig's staging flow (0.45.0), absent on any other: whether the task's own work is on origin's staging
+     * branch (`on`), has commits after it (`behind`), or is not there.
+     */
+    staging: z.enum(['on', 'behind']).nullable().optional(),
+    /** Beside `staging`: why the task waits at the staging branch — a pull request into it (`review`), or "prepare for prod". */
+    parked: z
+      .object({ reason: z.enum(['review', 'signal']), hint: z.enum(['landing']).nullable() })
+      .nullable()
+      .optional(),
   })
   .transform(({ autopilot: run, pull_request: pr, ...t }) => ({
     id: t.id,
@@ -505,6 +515,8 @@ const TaskRow = z
     pullRequest: pr && { url: pr.url, state: pr.state, ci: pr.ci, fetchedAt: pr.fetched_at },
     housekeepingFlags: t.housekeeping_flags,
     actions: t.actions.filter((a) => ACTIONS.has(a.id)),
+    staging: t.staging,
+    parked: t.parked,
   }));
 export type TaskSummary = z.output<typeof TaskRow>;
 

@@ -183,7 +183,7 @@ fits wins:
 | Paused | it is paused (`jig task pause`) |
 | Backlog | it is filed but not started (`jig task start` not run yet) |
 | Needs you | its design waits at its gate, or changed after approval, or its autopilot run stopped with a question |
-| Ready | its work is done (`status ready`); the card says whether a pull request is open, its CI, or merged |
+| Ready | its work is done (`status ready`); the card says whether a pull request is open, its CI, or merged — on Jig's staging flow, why it waits at the staging branch ([Tasks on staging](#tasks-on-staging)) |
 | In progress | anything else that is live |
 
 A card shows the task's id, class and goal, its priority (`P0`, the most urgent, to `P5`) when it
@@ -278,7 +278,8 @@ only where Jig offers the request: not for a task already paused, and not twice.
 
 ## Resuming a task
 
-**Drag a paused card out of Paused**, or choose **Resume** in its ⋯ menu, to resume it. Jig UI
+**Drag a paused card out of Paused**, or choose **Resume** in its ⋯ menu, to resume it. (A task
+parked at a staging branch is taken back the same way: [Tasks on staging](#tasks-on-staging).) Jig UI
 runs `jig task resume <id>` in the project's main checkout, with the revision of the board you saw,
 and the card moves to the column the task is in once resumed: that column is the only one the
 drop is offered on.
@@ -319,6 +320,34 @@ known to have closed unmerged. What Jig knows of pull requests between commands 
 to close the task yet, and the ✕ is there anyway, since closing asks the forge. A task without a
 recorded knowledge decision has no ✕, and its item no **Close task**: record it first (the
 `jig-consolidate` skill). Closing cannot be undone from the page.
+
+## Tasks on staging
+
+A project on Jig's staging flow (`git.flow: staging`, from Jig 0.45.0) ships each task's pull request
+into a staging branch first. The task waits there, *parked*, while it is tested, and reaches the main
+branch through a second pull request once someone says "prepare for prod"
+([Test on staging first](https://jig.fapost.in/staging-flow)). A parked task stays in **Ready**, and
+its card says why it waits instead of what its pull request did:
+
+| The card says | The task |
+| --- | --- |
+| Pull request into staging waits for review | its pull request into the staging branch is open and waits for a review |
+| Pull request into staging — yours to land | the same, and landing it is yours: your `agent.git` is below `merge`, so merge it on the forge or run `jig task land <id>` |
+| On staging, waits for prepare for prod | its work is on the staging branch; once it passed its test there, tell your agent "prepare for prod" |
+| Fix not on staging yet | you took it back for a fix, and the fix has commits the staging branch does not have yet |
+| Promotion open, CI green | its promotion, the pull request into the main branch, is open; the note follows its state and CI |
+| On staging | its work is on the staging branch, it does not wait there, and it has no promotion yet |
+
+**Take back for a fix** in a parked card's ⋯ menu, or a drag of the card onto **In progress**, runs
+`jig task resume <id>` with the revision of the board you saw: the task is active again, and once it
+ships again its fix lands on the staging branch as the first change did. Landing and "prepare for
+prod" have no button: Jig answers neither as data the page can read, so they stay with your agent,
+or your CI.
+
+A task on the staging flow has no ✕ until its work is in the main branch. Landing on staging does not
+finish a task, yet Jig 0.45.0 offers to close one as soon as its pull request into staging merged.
+On this flow Jig UI offers the close only once `jig housekeeping` saw the work in the main branch: the
+task's item *Merged: the task can be closed*. **Housekeeping** on the project's card runs it.
 
 ## Specs
 

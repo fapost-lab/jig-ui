@@ -30,6 +30,8 @@ const task = (id: string, more: Partial<Task>): Task => ({
   pauseRequestable: true,
   resumable: false,
   closable: false,
+  staging: null,
+  parked: null,
   resumesTo: null,
   started: true,
   gate: null,
@@ -114,13 +116,36 @@ export const tasks: Task[] = [
     resumesTo: 'in-progress',
     goal: 'A drop out of Paused, or the card menu, resumes the task through jig task resume.',
   }),
+  // Jig's staging flow (0.45.0): parked at the staging branch for each of its reasons, and a fix taken back.
+  task('staging-review', {
+    status: 'ready',
+    parked: { reason: 'review', hint: null },
+    pullRequest: pr('open', 'green'),
+    goal: 'Its pull request into staging waits for a review.',
+  }),
+  task('staging-landing', {
+    status: 'ready',
+    parked: { reason: 'review', hint: 'landing' },
+    pullRequest: pr('open', 'green'),
+    goal: 'Its pull request into staging waits for the person to land it.',
+  }),
+  task('staging-signal', {
+    status: 'ready',
+    staging: 'on',
+    parked: { reason: 'signal', hint: null },
+    resumable: true,
+    resumesTo: 'in-progress',
+    pullRequest: pr('merged', 'none'),
+    goal: 'On staging, tested there, waiting for prepare for prod.',
+  }),
+  task('staging-fix', { staging: 'behind', pullRequest: pr('merged', 'none'), goal: 'Taken back from staging; the fix is not there yet.' }),
 ];
 
 /** The samples placed as the board places them: every column with cards. */
 export const board: Column[] = [
   { id: 'needs-you', title: 'Needs you', cards: tasks.slice(0, 3) },
-  { id: 'in-progress', title: 'In progress', cards: [tasks[3]!, tasks[12]!, tasks[11]!] },
-  { id: 'ready', title: 'Ready', cards: tasks.slice(4, 9) },
+  { id: 'in-progress', title: 'In progress', cards: [tasks[3]!, tasks[12]!, tasks[11]!, tasks[17]!] },
+  { id: 'ready', title: 'Ready', cards: [...tasks.slice(4, 9), ...tasks.slice(14, 17)] },
   { id: 'backlog', title: 'Backlog', cards: [tasks[10]!] },
   { id: 'paused', title: 'Paused', cards: [tasks[9]!, tasks[13]!] },
 ];

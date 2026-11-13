@@ -8,6 +8,11 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+- A project on Jig 0.45.0's staging flow shows why a task waits at the staging branch — its pull
+  request into staging waiting for a review, or for you to land it, or its work on staging waiting
+  for "prepare for prod" — instead of a merged pull request that looks done. **Take back for a fix**
+  resumes a parked task, and a parked task has no ✕: Jig UI offers the close only once housekeeping
+  saw the task's work in the main branch. See [Tasks on staging](/projects#tasks-on-staging).
 - **Close task** on a merged task's item on a project's card closes it as done, as the board's
   close does, without opening the board or asking an agent. See
   [Closing a task](/projects#closing-a-task).

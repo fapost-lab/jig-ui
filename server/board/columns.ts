@@ -51,8 +51,13 @@ function byQueue(a: Task, b: Task): number {
   return a.queue.position - b.queue.position;
 }
 
-/** After a resume only `paused` changes, so the rules say where the task lands. */
-const card = (task: Task): Card => ({ ...task, resumesTo: task.resumable ? columnOf({ ...task, paused: false }) : null });
+/**
+ * What a resume changes, so the rules say where the task lands: a paused task's `paused` only; a task parked at the
+ * staging branch is taken back for a fix, and Jig makes it `active` (0.45.0).
+ */
+const resumed = (task: Task): Task => (task.paused ? { ...task, paused: false } : { ...task, status: 'active' });
+
+const card = (task: Task): Card => ({ ...task, resumesTo: task.resumable ? columnOf(resumed(task)) : null });
 
 /**
  * The board: every column, in a fixed order, its cards in Jig's queue order and the tasks not queued after them in the

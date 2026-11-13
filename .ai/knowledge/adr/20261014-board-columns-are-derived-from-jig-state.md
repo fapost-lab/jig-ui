@@ -8,6 +8,7 @@ paths:
   - "server/board/**"
   - "web/**"
 summary: Board columns are computed from Jig's state; a drop is a sticky request shown with its age
+reviewed_at: 2026-11-13
 ---
 # Board columns are derived from Jig's state and a drop on another column is a request
 
@@ -22,6 +23,8 @@ page is open. Spec `jig-ui`, decided with the maintainer on 2026-10-14.
 - A card's column is computed from Jig's state on every read and never stored.
 - A drop on another column is a request, not a state change: the card stays where Jig says it is,
   shows "requested" with its age and a cancel, and moves only when Jig's state changes.
+  *(Amended twice: a drop out of Paused resumes at once, adr-20261026-a-drop-out-of-paused-resumes-at-once;
+  so does a drop of a task parked at a staging branch on the column it resumes to, adr-20261113-a-task-parked-at-staging-is-not-done, 2026-11-13.)*
 - A request is sticky: it holds until honoured or cancelled, whatever stage the task reached in
   between.
 - Which drops are offered comes from the legal actions Jig reports for the state; the UI keeps no

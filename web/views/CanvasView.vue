@@ -373,11 +373,11 @@
 
     <CanvasSection
       title="QueueMenu"
-      note="press to open: To top, Up, Down, To bottom, Priority, the pause — first queued, in the middle, not queued, last, paused under a Jig that cannot resume it (no pause to ask, Resume off), paused and resumable, a pause asked, while its change is on its way, on a sorted board (no move), on a filtered board (To top and To bottom at either end of the cards shown)"
+      note="press to open: To top, Up, Down, To bottom, Priority, the pause — first queued, in the middle, not queued, last, paused under a Jig that cannot resume it (no pause to ask, Resume off), paused and resumable, a pause asked, parked at the staging branch (Take back for a fix), while its change is on its way, on a sorted board (no move), on a filtered board (To top and To bottom at either end of the cards shown)"
     >
       <div class="flex flex-wrap items-center gap-6">
         <span
-          v-for="t in [tasks[0]!, tasks[1]!, tasks[3]!, tasks[11]!, tasks[9]!, tasks[13]!, tasks[12]!]"
+          v-for="t in [tasks[0]!, tasks[1]!, tasks[3]!, tasks[11]!, tasks[9]!, tasks[13]!, tasks[12]!, tasks[16]!]"
           :key="t.id"
           class="flex items-center gap-1"
         >

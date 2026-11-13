@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-11-11
+reviewed_at: 2026-11-13
 ---
 # JigClient — the only module that knows Jig
 
@@ -40,13 +40,15 @@ camelCase by its `.transform`; the exported types are its `z.output`
 (adr-20261018-jig-answers-checked-by-zod-schemas). Keys Jig adds without raising `schema` are
 dropped by `z.object`, so nothing Jig UI does not read gets past `server/jig/`.
 
-Every field a schema reads is in Jig's output, `null` where Jig has nothing — except three: an
+Every field a schema reads is in Jig's output, `null` where Jig has nothing — except a few: an
 attention item's `versions` (`{from, to}`, the project's Jig as its manifest says and the
 machine's), which only `upgrade-available` carries, from Jig 0.34.0, and older Jig never printed on
 any item. It reads as `null` when absent, and an `upgrade-available` item without it fails the read,
 as a field Jig dropped does (task `projects-to-upgrade`). A roadmap item's `id` (Jig's handle) and a
 spec's `waiting` (the edits on its write branch, with the roadmap there) are printed from Jig 0.40.0
-only, and read as `null` when absent (task `roadmap-from-page`).
+only, and read as `null` when absent (task `roadmap-from-page`). A task's `staging` and `parked` are
+printed on Jig 0.45.0's staging flow only, absent on any other; the schema reads them as `undefined`
+when absent, and that absence is how the adapter tells the flow (task `tasks-on-staging`).
 
 A test that runs real processes — a stand-in `jig` script that starts a child, leaves its process
 group, or waits — waits for a marker file the process writes once it is where the test needs it,

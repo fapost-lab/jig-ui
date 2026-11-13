@@ -83,6 +83,18 @@ async function bash(platform: NodeJS.Platform): Promise<string> {
   return gitBash;
 }
 
+/** The variables through which a token, not the clone's account, would choose who Jig asks GitHub as. */
+const TOKENS = new Set(['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']);
+
+/**
+ * Jig UI's environment for a Jig run, without the GitHub token variables of the shell it was started from. Jig puts such
+ * a token before `github.account` and the accounts `gh` holds, so a token a direnv `.envrc` set in the folder Jig UI
+ * was started in chose the account for every connected project (the maintainer, 2026-11-12: `must be a collaborator` on
+ * a knowledge decision). Windows names a variable in any case.
+ */
+const withoutTokens = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
+  Object.fromEntries(Object.entries(env).filter(([name]) => !TOKENS.has(name.toUpperCase())));
+
 /** A Jig run's standard output, as `ran` makes the run. */
 async function jig(root: string, args: string[], platform: NodeJS.Platform, timeout = TIMEOUT_MS): Promise<string> {
   return (await ran(root, args, platform, timeout)).stdout;
@@ -106,15 +118,16 @@ interface Ran {
 async function ran(root: string, args: string[], platform: NodeJS.Platform, timeout: number): Promise<Ran> {
   if (stopping) throw new Error('Jig UI is stopping');
   const argv = [SCRIPT, ...args];
+  const env = withoutTokens(process.env);
   // Elsewhere each run leads a process group of its own, so that stopping Jig UI can stop all of it (`stopJig`).
   const running =
     platform === 'win32'
       ? run(await bash(platform), ['-c', `. ${argv.map((_, i) => `"$JIG_UI_ARG_${i}"`).join(' ')}`], {
           cwd: root,
           timeout,
-          env: { ...process.env, ...Object.fromEntries(argv.map((arg, i) => [`JIG_UI_ARG_${i}`, arg])) },
+          env: { ...env, ...Object.fromEntries(argv.map((arg, i) => [`JIG_UI_ARG_${i}`, arg])) },
         })
-      : leading(await bash(platform), argv, root, timeout);
+      : leading(await bash(platform), argv, root, env, timeout);
   runs.set(running.child, running);
   try {
     return await running;
@@ -129,8 +142,14 @@ async function ran(root: string, args: string[], platform: NodeJS.Platform, time
  * 0; otherwise an error carrying `stdout`, `stderr` and, past `timeout`, `killed`. Unlike `execFile`, its output has no
  * size limit. The group has no controlling terminal: a prompt on `/dev/tty` fails instead of waiting in Jig UI's.
  */
-function leading(file: string, args: string[], cwd: string, timeout: number): Promise<Ran> & { child: ChildProcess } {
-  const child = spawn(file, args, { cwd, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+function leading(
+  file: string,
+  args: string[],
+  cwd: string,
+  env: NodeJS.ProcessEnv,
+  timeout: number,
+): Promise<Ran> & { child: ChildProcess } {
+  const child = spawn(file, args, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let [stdout, stderr, killed] = ['', '', false];
   child.stdout.setEncoding('utf8').on('data', (chunk: string) => (stdout += chunk));
   child.stderr.setEncoding('utf8').on('data', (chunk: string) => (stderr += chunk));

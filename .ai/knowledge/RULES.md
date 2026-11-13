@@ -63,6 +63,10 @@ are added as sections of this file.
 - `jig` is spawned without a shell: with `spawn` leading a process group of its own, so that stopping Jig UI stops
   the whole run (task `stop-ends-upgrade`); on Windows with `execFile` through Git's bash.
   (adr-20261014-stack-vue-hono-sse-on-node. Checked in review.)
+- A Jig run gets Jig UI's environment without `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN` and
+  `GITHUB_ENTERPRISE_TOKEN`, so Jig asks GitHub as each clone's own account, never as a token of the shell Jig UI was
+  started from. (spec `jig-ui`, the maintainer 2026-11-12; convention-jig-client. Checked by a test in
+  `server/jig/client.test.ts`.)
 - The published package has no native runtime dependencies and carries the page already built;
   development tools (the TypeScript compiler, Vitest's bundler) may be native.
   (adr-20261014-stack-vue-hono-sse-on-node. Checked in review of `package.json` `dependencies`.)

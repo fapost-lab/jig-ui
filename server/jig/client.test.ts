@@ -2,7 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import {
   addItem,
   fileItem,
@@ -69,6 +69,22 @@ describe('jigVersion', () => {
 
   it('throws when Jig names no version', async () => {
     await expect(jigVersion(checkout('odd', 'usage: jig'))).rejects.toThrow();
+  });
+});
+
+describe('the environment of a Jig run', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('leaves out the GitHub token variables of the shell Jig UI was started from, and keeps the rest', async () => {
+    for (const name of ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN']) vi.stubEnv(name, 'from-an-envrc');
+    vi.stubEnv('JIG_UI_KEPT', 'kept');
+    const dir = join(root, 'env');
+    mkdirSync(join(dir, '.ai', 'scripts'), { recursive: true });
+    writeFileSync(
+      join(dir, '.ai', 'scripts', 'jig'),
+      `#!/usr/bin/env bash\n[ -z "\${GH_TOKEN+x}\${GITHUB_TOKEN+x}\${GH_ENTERPRISE_TOKEN+x}\${GITHUB_ENTERPRISE_TOKEN+x}" ] || exit 1\n[ "$JIG_UI_KEPT" = kept ] || exit 1\necho "jig 0.45.0"\n`,
+    );
+    expect(await jigVersion(dir)).toBe('0.45.0');
   });
 });
 
@@ -927,6 +943,19 @@ describe('decideKnowledge', () => {
       });
     },
   );
+
+  it("answers Jig's note whole when the pull request was refused, naming the account it asked as (Jig 0.45.0)", async () => {
+    // The note Jig's own-tree write gives for a failed `gh pr create`: gh's output, then `jig_gh_asked_as`.
+    const note = [
+      'knowledge accept: gh pr create failed:',
+      'pull request create failed: GraphQL: must be a collaborator (createPullRequest)',
+      'It asked GitHub as octo-me (github.account).',
+    ].join('\n');
+    const json = changed('knowledge-accept.json', (data) => {
+      data.write.note = note;
+    });
+    expect(await decideKnowledge(answering(`case-${cases++}`, json), 'accept', 'feature-checkout', 1)).toBe(note);
+  });
 
   it('refuses an answer without its write', async () => {
     const json = changed('knowledge-accept.json', (data) => {

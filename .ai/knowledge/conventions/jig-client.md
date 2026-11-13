@@ -18,7 +18,8 @@ JigClient (server/jig/)
 MAY:      run `jig` in a project's main checkout; parse and validate its JSON; check the
           project's Jig version
 MUST:     use execFile without a shell — on Windows Git's bash running .ai/scripts/jig, never
-          jig.cmd, with the arguments in the environment, never on its command line; validate every response against the shape its contract test pins; turn a
+          jig.cmd, with the arguments in the environment, never on its command line; run it without
+          the GitHub token variables of Jig UI's environment; validate every response against the shape its contract test pins; turn a
           refusal into Jig's failure code
 MUST NOT: read or write Jig's files directly (`state`, roadmaps, the queue file); call the
           network; let a shape of Jig's output leak past its own types
@@ -55,6 +56,16 @@ group, or waits — waits for a marker file the process writes once it is where 
 never for a fixed delay: CI runners and a machine running several sessions are loaded enough that a
 fixed 300 ms lost the race to `perl`'s `setsid` (task `stopjig-test-race`, Release run on `main`
 after #80). The `stopJig` tests write `waiter.pid` and `left` for this.
+
+Every Jig run gets Jig UI's environment without `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN` and
+`GITHUB_ENTERPRISE_TOKEN` (`withoutTokens` in `ran()`, on both paths; any case, for Windows). Jig puts such a token
+before `github.account` and the accounts `gh` holds, so a token a direnv `.envrc` set in the folder Jig UI was started
+in chose the account for every connected project: the maintainer met `must be a collaborator` on a knowledge decision,
+2026-11-12 (spec `jig-ui`; task `clone-account`). Rejected: removing them from `process.env` at start-up — the
+decision belongs where Jig is run, and Jig UI's own `git` runs need no account; removing every variable with `TOKEN`
+in it — `GH_HOST`, `GH_CONFIG_DIR` and the like are the person's `gh` set-up, not an account. A refused pull request
+comes back as Jig's `write.note` (or its refusal's lines), which ends with the sentence naming the account Jig asked
+as and where it came from; it reaches the page whole, paths cut.
 
 ## Example
 

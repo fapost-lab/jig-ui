@@ -8,6 +8,11 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+- Jig UI runs `jig` without the GitHub token variables of the shell it was started from
+  (`GH_TOKEN`, `GITHUB_TOKEN` and the enterprise ones), so each project's pull requests are opened,
+  and its changes pushed over HTTPS, as the account its clone names, not as a token's that a direnv
+  `.envrc` set in the folder Jig UI was started in.
+  ([Which GitHub account a change goes as](/installation#which-github-account-a-change-goes-as))
 - **Refresh** on a project's card brings the clone up to origin through Jig 0.45.0's `jig refresh`:
   a fetch, and the main branch fast-forwarded without moving your checkout. It sits on *This checkout
   is behind origin*, and beside a line saying how long ago the clone last fetched once that is more

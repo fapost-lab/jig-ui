@@ -48,15 +48,17 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   Jig 0.41.0, adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41), the
   knowledge waiting for a decision `jig knowledge proposed`, `jig knowledge sources` and its `--diff`, and the decisions
   `jig knowledge accept|reject|reviewed` (from Jig 0.40.0, feature-knowledge), a proposed document's text
-  `jig knowledge read` (from Jig 0.41.0, adr-20261109-knowledge-text-and-drop-from-jig-0-41), and
+  `jig knowledge read` (from Jig 0.41.0, adr-20261109-knowledge-text-and-drop-from-jig-0-41), `jig refresh` (from Jig
+  0.45.0, adr-20261113-refresh-brings-the-clone-up-from-the-card), and
   `jig upgrade`, its dry run and its run (from Jig 0.34.0), and `jig self-update` (its text line), each JSON answer checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against
   fixtures in `server/jig/fixtures/` — Jig 0.29.0 for the reads it had, 0.31.0 for the queue,
   0.39.0 for a task's documents, 0.40.0 for the settings, a roadmap's edits and the knowledge, 0.41.0 for the
-  knowledge's text, Drop and judged reads and for filing an item's new task in one write (convention-jig-client).
+  knowledge's text, Drop and judged reads and for filing an item's new task in one write, 0.45.0 for a task
+  list on the staging flow, `jig refresh` and the clone against origin (convention-jig-client).
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, the connected ids
   (`connected`), one project as the workspace shows it (`project`), the Jig projects under a folder (`scan`, walked
   by `scan.ts`), a project's live tasks, its finished tasks on demand (`finished`), one task in full, a live task's documents (`artifacts`, `artifact`), the settings (`settings`), the knowledge waiting for a decision (`knowledge`, `knowledgeDiff`, `knowledgeText`), connect, disconnect, subscribe to changes, and the writes `move`,
-  `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `setSetting` and `unsetSetting`, `addItem`, `moveItem` and `fileItem`, `decideKnowledge`, `planUpgrade`, `upgrade` and
+  `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `housekeeping` and `refresh`, `setSetting` and `unsetSetting`, `addItem`, `moveItem` and `fileItem`, `decideKnowledge`, `planUpgrade`, `upgrade` and
   `dismissUpgrade`, `land` and `landAll`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
@@ -77,6 +79,7 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `/tasks/close` (adr-20261029-close-a-ready-task-from-the-board),
   `POST /api/projects/:id/tasks` (adr-20261022-filing-a-task-carries-no-revision),
   `POST /api/projects/:id/housekeeping` (adr-20261110-housekeeping-runs-from-the-project-card),
+  `POST /api/projects/:id/refresh` (adr-20261113-refresh-brings-the-clone-up-from-the-card),
   `POST /api/projects/:id/specs/items/add`, `/move` and `/file` (adr-20261106-editing-a-roadmap-from-the-page),
   `GET` and `POST /api/projects/:id/settings` and `POST /api/projects/:id/settings/unset` (feature-settings),
   `GET /api/projects/:id/knowledge`, `/knowledge/:doc/diff`, `/knowledge/:doc/text` and
@@ -132,13 +135,15 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   the conflict: what changed between the board the write was made on and that read, its cards
   marked (adr-20261022-writes-carry-the-revision-of-their-read, feature-board). Built for the
   queue: order, priority and pause requests; and for a resume
-  (adr-20261026-a-drop-out-of-paused-resumes-at-once); and for closing a ready task as done, after the
+  (adr-20261026-a-drop-out-of-paused-resumes-at-once), a parked task's taken back for a fix included
+  (adr-20261113-a-task-parked-at-staging-is-not-done); and for closing a ready task as done, after the
   person confirms, its refusal shown in Jig's words (adr-20261029-close-a-ready-task-from-the-board) — from the
   board, and from a merged task's item on the project's card, with the revision the workspace read carries for it
   (feature-workspace), where a stale revision is said as the project having changed. Filing a task is a write with no revision: it
   names a new id, which Jig claims or refuses `already-exists`
-  (adr-20261022-filing-a-task-carries-no-revision); housekeeping is the other, a sweep of the clone as it is, under
-  Jig's own lock (adr-20261110-housekeeping-runs-from-the-project-card). A roadmap's edits are writes like the queue's,
+  (adr-20261022-filing-a-task-carries-no-revision); housekeeping is another, a sweep of the clone as it is, under
+  Jig's own lock (adr-20261110-housekeeping-runs-from-the-project-card), and a refresh the third, a fetch and a
+  fast-forward of the base that touch nothing the person decided (adr-20261113-refresh-brings-the-clone-up-from-the-card). A roadmap's edits are writes like the queue's,
   with the specs' revision, committed by Jig on the spec's branch; from Jig 0.41.0 filing an item's
   new task is one of them too (adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41), and on Jig 0.40.0 it is that filing and then naming it on the
   item, with a revision the adapter reads between the two
@@ -192,7 +197,9 @@ The start flow, read-and-follow and change, with its conflict display, are built
 - Jig's files are the source of truth; Jig UI keeps only its registry and interface settings.
 - Board columns are derived, never stored; a drop on another column is a sticky request
   (adr-20261014-board-columns-are-derived-from-jig-state), except a drop out of Paused, which
-  resumes the task at once (adr-20261026-a-drop-out-of-paused-resumes-at-once).
+  resumes the task at once (adr-20261026-a-drop-out-of-paused-resumes-at-once), and a drop of a task
+  parked at a staging branch on the column it resumes to, which takes it back for a fix
+  (adr-20261113-a-task-parked-at-staging-is-not-done).
 - A hosted or self-hosted Jig UI stays possible: projects by id, access behind a replaceable
   guard, writes carrying a revision (adr-20261014-project-source-port-keeps-hosting-open) — all but
   the upgrade (adr-20261027-upgrading-a-project-runs-in-the-background), filing a task

@@ -20,8 +20,13 @@ export function undecidable(record: Proposal | LinkedSource): string | undefined
   if (record.reason === 'not-on-branch') {
     return "It reached origin's default branch after knowledge/decisions was cut: decide it once the decisions waiting there have landed.";
   }
+  if (landed(record))
+    return "Decided on origin already, so no decision is owed: it leaves this list once this checkout has origin's default branch.";
   return 'Jig cannot decide it yet.';
 }
+
+/** Jig 0.45.0: origin's base decided the record already and this checkout is only behind — no decision is owed, none is offered. */
+export const landed = (record: Proposal | LinkedSource): boolean => record.decidable === false && record.reason === 'landed';
 
 /** A record whose file name lost bytes that are not UTF-8: the name shown may be another file's. */
 export const LOSSY_NAME = "Jig dropped bytes of a file's name here that are not UTF-8: the name shown may be another file's.";

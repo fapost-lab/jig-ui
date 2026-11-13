@@ -6,7 +6,7 @@ domains: []
 paths:
   - "server/jig/**"
 summary: JigClient alone runs jig (execFile, bash on Windows) and validates its JSON; never reads Jig's files
-reviewed_at: 2026-11-11
+reviewed_at: 2026-11-13
 ---
 # JigClient — the only module that knows Jig
 
@@ -31,7 +31,7 @@ first Jig with a queue (0.29.0 was the first that prints JSON). A write a later 
 does not raise it: it carries a version of its own, checked by the local adapter against the
 project's Jig before the page is offered the write — `RESUME_JIG_VERSION`, 0.35.0, for
 `resumeTask`, `ARTIFACTS_JIG_VERSION`, 0.39.0, for a task's documents, `ROADMAP_JIG_VERSION`, 0.40.0, for a
-roadmap's edits, `KNOWLEDGE_JIG_VERSION`, 0.40.0, for the knowledge waiting for a decision, `KNOWLEDGE_TEXT_JIG_VERSION`, 0.41.0, for a proposed document's text and a dropped link, and `FILE_NEW_JIG_VERSION`, 0.41.0, for filing an item's new task in one write — so a project on an older Jig is still read, and only that write is missing. `CLOSE_JIG_VERSION`, 0.40.0, is the other kind: the close is offered on any Jig, and the version picks how `closeTask` checks it. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
+roadmap's edits, `KNOWLEDGE_JIG_VERSION`, 0.40.0, for the knowledge waiting for a decision, `KNOWLEDGE_TEXT_JIG_VERSION`, 0.41.0, for a proposed document's text and a dropped link, `FILE_NEW_JIG_VERSION`, 0.41.0, for filing an item's new task in one write, and `REFRESH_JIG_VERSION`, 0.45.0, for bringing the clone up to origin — so a project on an older Jig is still read, and only that write is missing. `CLOSE_JIG_VERSION`, 0.40.0, is the other kind: the close is offered on any Jig, and the version picks how `closeTask` checks it. `jig` runs as `bash .ai/scripts/jig`; on Windows the bash is Git's,
 found from `git --exec-path` (`<git>/mingw64/libexec/git-core` → `<git>/bin/bash.exe`), never a
 `bash` on PATH, which may be WSL's. It is asked once per process; a failed ask is not kept.
 
@@ -40,13 +40,15 @@ camelCase by its `.transform`; the exported types are its `z.output`
 (adr-20261018-jig-answers-checked-by-zod-schemas). Keys Jig adds without raising `schema` are
 dropped by `z.object`, so nothing Jig UI does not read gets past `server/jig/`.
 
-Every field a schema reads is in Jig's output, `null` where Jig has nothing — except three: an
+Every field a schema reads is in Jig's output, `null` where Jig has nothing — except a few: an
 attention item's `versions` (`{from, to}`, the project's Jig as its manifest says and the
 machine's), which only `upgrade-available` carries, from Jig 0.34.0, and older Jig never printed on
 any item. It reads as `null` when absent, and an `upgrade-available` item without it fails the read,
 as a field Jig dropped does (task `projects-to-upgrade`). A roadmap item's `id` (Jig's handle) and a
 spec's `waiting` (the edits on its write branch, with the roadmap there) are printed from Jig 0.40.0
-only, and read as `null` when absent (task `roadmap-from-page`).
+only, and read as `null` when absent (task `roadmap-from-page`). A task's `staging` and `parked` are
+printed on Jig 0.45.0's staging flow only, absent on any other; the schema reads them as `undefined`
+when absent, and that absence is how the adapter tells the flow (task `tasks-on-staging`).
 
 A test that runs real processes — a stand-in `jig` script that starts a child, leaves its process
 group, or waits — waits for a marker file the process writes once it is where the test needs it,
@@ -97,6 +99,11 @@ for a person (a task to consolidate, a wrong base, an archive refused), so its r
 warnings on stderr (a task not archived, the queue not pruned) lead the report, which points up at them ("the reason is
 above"); `ran` gives both streams (`Ran`), `jig` only stdout. Its tests run a stand-in over
 `server/jig/fixtures/housekeeping.txt` (adr-20261110-housekeeping-runs-from-the-project-card).
+
+`refresh` (`jig refresh --json`, Jig 0.45.0, 2 minutes: a fetch) answers JSON, but not all of it: `base.message` and
+`fetch.message` are git's own lines and `checked_out_in` a worktree's path, so the schema keeps the outcomes, the base's
+name and commits and the writes closed, and drops the rest. Its fixtures are one per way the base went, from a scratch
+repository with a local bare origin, the worktree's path renamed (adr-20261113-refresh-brings-the-clone-up-from-the-card).
 
 `planUpgrade` (`jig upgrade --dry-run --json`, 60 s) and `runUpgrade` (`jig upgrade --json`, 30 minutes:
 at `agent.git: merge` Jig waits for CI) read one `Upgrade` schema; its `files` are not read. Jig's

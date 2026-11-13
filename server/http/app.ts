@@ -591,6 +591,22 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
         return unwritten(c, w);
       })
 
+      // Answered once Jig has fetched, moved the base if it could and the project was read again: the card words the outcome.
+      .post('/api/projects/:id/refresh', async (c) => {
+        const w = await source.refresh(c.req.param('id'));
+        if (w?.state === 'written' && w.refreshed) return c.json({ refreshed: w.refreshed }, 200);
+        if (w?.state === 'refused' && w.code === 'timeout') {
+          return refuse(c, 422, w.code, 'Jig did not finish within two minutes.');
+        }
+        if (w?.state === 'refused' && w.code === 'upgrading') {
+          return refuse(c, 409, w.code, "The project's Jig is being upgraded; try again once that ends.");
+        }
+        if (w?.state === 'refused' && w.code === 'unsupported') {
+          return refuse(c, 422, w.code, 'Bringing the clone up to origin needs Jig 0.45.0 or later.');
+        }
+        return unwritten(c, w?.state === 'written' ? { state: 'refused', code: 'failed' } : w);
+      })
+
       // A dry run: what upgrading the project's Jig would do, changing nothing.
       .post('/api/projects/:id/upgrade/plan', async (c) => {
         const planned = await source.planUpgrade(c.req.param('id'));

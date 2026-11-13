@@ -20,7 +20,18 @@
   import { Button } from '@/components/ui/button';
   import { Progress } from '@/components/ui/progress';
   import { lastWins } from '@/lib/last-wins';
-  import { byName, chosen, type ClosingState, type HousekeepingState, landed, type Listed, readOnes, readProgress } from '@/lib/projects';
+  import {
+    byName,
+    chosen,
+    type ClosingState,
+    type HousekeepingState,
+    landed,
+    type Listed,
+    readOnes,
+    readProgress,
+    type RefreshState,
+  } from '@/lib/projects';
+  import { refreshReport } from '@/lib/refresh';
   import { closeRefusal } from '@/lib/refusal';
   import { withConnected } from '@/lib/scan';
   import { settingRefusal } from '@/lib/settings';
@@ -52,6 +63,8 @@
   const busy = ref(false);
   /** Each card's open upgrade panel, by project id, until the upgrade starts or the panel closes. */
   const plans = ref<Record<string, PlanState>>({});
+  /** Refresh run from each card, until dismissed; a reload forgets it. */
+  const refreshes = ref<Record<string, RefreshState>>({});
   /** Housekeeping run from each card, until dismissed; a reload forgets it. */
   const housekept = ref<Record<string, HousekeepingState>>({});
   /** A task closed from each card's items, while Jig closes it and, refused, until dismissed. */
@@ -352,6 +365,18 @@
     await load();
   }
 
+  /** Refresh on a card: Jig brings the clone up to origin, and the card says what came of it until dismissed. */
+  async function refreshClone(id: string): Promise<void> {
+    refreshes.value[id] = { state: 'running' };
+    const res = await call(() => client.api.projects[':id'].refresh.$post(param(id)));
+    if (!res) return void delete refreshes.value[id];
+    const body = await res.json();
+    if ('refreshed' in body) refreshes.value[id] = { state: 'done', ...refreshReport(body.refreshed) };
+    else if ('error' in body) refreshes.value[id] = { state: 'refused', message: body.error.message };
+    else delete refreshes.value[id]; // the project cannot be read now: its card says why
+    await load();
+  }
+
   /**
    * Closes a merged task from its item on the card, with the revision of the read the card shows, as its card on the
    * board does; Jig's refusal — its pull request not merged, say — stays on the card in Jig's words.
@@ -465,6 +490,7 @@
         :release="release"
         :reading="reading.has(shown.id)"
         :housekeeping="housekept[shown.id]"
+        :refresh="refreshes[shown.id]"
         :closing="closing[shown.id]"
         class="min-w-0 flex-1"
         @settings="openSettings(shown.id)"
@@ -478,6 +504,8 @@
         @dismiss="dismiss(shown.id)"
         @housekeeping="housekeep(shown.id)"
         @dismiss-housekeeping="delete housekept[shown.id]"
+        @refresh="refreshClone(shown.id)"
+        @dismiss-refresh="delete refreshes[shown.id]"
         @close-task="(task) => closeTask(shown!.id, task)"
         @dismiss-close="delete closing[shown.id]"
       />

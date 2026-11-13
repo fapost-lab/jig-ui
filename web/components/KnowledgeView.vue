@@ -15,6 +15,7 @@
     shownText,
     sourceActions,
     sourceLine,
+    landed,
     stubLine,
     undecidable,
     waitingWord,
@@ -146,9 +147,9 @@
             /></a>
           </p>
           <template v-else>
-            <p v-if="blocked" :class="toneText.attention">{{ blocked }}</p>
-            <p v-if="!knowledge.canRead" class="text-muted-foreground">{{ readFirst(p) }}</p>
-            <p class="flex flex-wrap items-center gap-2">
+            <p v-if="blocked" :class="landed(p) ? 'text-muted-foreground' : toneText.attention">{{ blocked }}</p>
+            <p v-if="!knowledge.canRead && !landed(p)" class="text-muted-foreground">{{ readFirst(p) }}</p>
+            <p v-if="!landed(p)" class="flex flex-wrap items-center gap-2">
               <Button size="xs" :disabled="disabled" @click="emit('decide', p.id, 'accept')">
                 {{ busy === p.id ? 'Sending…' : 'Accept' }}
               </Button>
@@ -203,8 +204,8 @@
             /></a>
           </p>
           <template v-else>
-            <p v-if="blocked" :class="toneText.attention">{{ blocked }}</p>
-            <p v-if="actions.keep || actions.drop" class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p v-if="blocked" :class="landed(s) ? 'text-muted-foreground' : toneText.attention">{{ blocked }}</p>
+            <p v-if="(actions.keep || actions.drop) && !landed(s)" class="flex flex-wrap items-center gap-x-3 gap-y-1">
               <Button v-if="actions.keep" size="xs" :disabled="disabled" @click="emit('decide', s.id, 'reviewed')">{{
                 busy === s.id ? 'Sending…' : 'Keep'
               }}</Button>

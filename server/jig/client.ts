@@ -37,6 +37,8 @@ export const KNOWLEDGE_JIG_VERSION = '0.40.0';
 export const KNOWLEDGE_TEXT_JIG_VERSION = '0.41.0';
 /** The first Jig that files an item's new task and names it on the item in one write (`spec item file --new`, fapost-lab/jig#390). */
 export const FILE_NEW_JIG_VERSION = '0.41.0';
+/** The first Jig that brings the clone up to origin (`jig refresh`) and says how it stands against origin (`jig status`'s `origin`). */
+export const REFRESH_JIG_VERSION = '0.45.0';
 
 const SCRIPT = '.ai/scripts/jig';
 /** A read's limit: 10 s ran out with several projects read at once, each four Jig runs (task `read-timeout`). */
@@ -407,7 +409,15 @@ export function releaseNamed(item: Attention): string | undefined {
 const Status = z.object({
   attention: z.array(Attention),
   housekeeping: z.object({ stale: z.boolean() }).nullable(),
+  /** Jig 0.45.0: the clone against origin as of its last fetch — when it fetched, and how far the base is behind. */
+  origin: z.object({ fetched_at: maybe, behind: z.number().int().nonnegative().nullable() }).optional(),
 });
+
+/** How the clone stands against origin as of its last fetch, read offline; `null` from a Jig before 0.45.0. */
+export type Origin = {
+  fetchedAt: string | null;
+  behind: number | null;
+} | null;
 
 /** What needs the person in a project, most urgent first, and whether the pull request facts behind it may be missing. */
 export async function readStatus(
@@ -418,10 +428,16 @@ export async function readStatus(
   revision: number;
   attention: Attention[];
   housekeepingStale: boolean;
+  origin: Origin;
 }> {
   const { revision, data } = await readJson(root, ['status'], platform, timeout);
-  const { attention, housekeeping } = parsed(Status, data);
-  return { revision, attention, housekeepingStale: housekeeping?.stale === true };
+  const { attention, housekeeping, origin } = parsed(Status, data);
+  return {
+    revision,
+    attention,
+    housekeepingStale: housekeeping?.stale === true,
+    origin: origin ? { fetchedAt: origin.fetched_at, behind: origin.behind } : null,
+  };
 }
 
 /** Jig's action ids this Jig UI knows; Jig may add ids without raising `schema`, and a consumer ignores those. */
@@ -477,6 +493,16 @@ const TaskRow = z
     pull_request: z.object({ url: text, state: maybe, ci: maybe, fetched_at: maybe }).nullable(),
     housekeeping_flags: z.array(text),
     actions: z.array(TaskAction),
+    /**
+     * Only on Jig's staging flow (0.45.0), absent on any other: whether the task's own work is on origin's staging
+     * branch (`on`), has commits after it (`behind`), or is not there.
+     */
+    staging: z.enum(['on', 'behind']).nullable().optional(),
+    /** Beside `staging`: why the task waits at the staging branch — a pull request into it (`review`), or "prepare for prod". */
+    parked: z
+      .object({ reason: z.enum(['review', 'signal']), hint: z.enum(['landing']).nullable() })
+      .nullable()
+      .optional(),
   })
   .transform(({ autopilot: run, pull_request: pr, ...t }) => ({
     id: t.id,
@@ -505,6 +531,8 @@ const TaskRow = z
     pullRequest: pr && { url: pr.url, state: pr.state, ci: pr.ci, fetchedAt: pr.fetched_at },
     housekeepingFlags: t.housekeeping_flags,
     actions: t.actions.filter((a) => ACTIONS.has(a.id)),
+    staging: t.staging,
+    parked: t.parked,
   }));
 export type TaskSummary = z.output<typeof TaskRow>;
 
@@ -1281,6 +1309,40 @@ export async function housekeeping(
       .filter((line) => line.trim() !== '')
       .map((line) => withoutPaths(line).replace(PROJECT_PATH, '…'));
   return [...lines(out.stderr), ...lines(out.stdout)];
+}
+
+/** `jig refresh` fetches origin as the clone's own account: a network round trip Jig bounds, never a prompt. */
+const REFRESH_TIMEOUT_MS = 2 * 60_000;
+
+/**
+ * What `jig refresh` did, without git's messages or a path: `base.message` is git's own text, naming files, and
+ * `checked_out_in` a worktree's path; the page says each outcome in its own words.
+ */
+const Refreshed = z
+  .object({
+    fetch: z.object({ outcome: z.enum(['done', 'failed', 'skipped']), fetched_at: maybe }),
+    base: z.object({
+      name: text,
+      outcome: z.enum(['fast-forwarded', 'up-to-date', 'blocked-by-changes', 'checked-out-elsewhere', 'diverged', 'missing']),
+      from: maybe,
+      to: maybe,
+    }),
+    writes: z.array(z.object({ target: text, branch: text, reason: z.enum(['merged', 'landed', 'closed', 'dropped']) })),
+  })
+  .transform(({ fetch, base, writes }) => ({
+    fetch: fetch.outcome,
+    fetchedAt: fetch.fetched_at,
+    base: { name: base.name, outcome: base.outcome, from: base.from, to: base.to },
+    writes,
+  }));
+export type Refreshed = z.output<typeof Refreshed>;
+
+/**
+ * Brings the clone up to origin (`jig refresh`, Jig 0.45.0): fetches, then fast-forwards the base without moving the
+ * person's checkout, and closes Jig's own writes that are over. A base that cannot move is an answer, not a refusal.
+ */
+export async function refresh(root: string, platform: NodeJS.Platform = process.platform): Promise<Refreshed> {
+  return parsed(Refreshed, (await readJson(root, ['refresh'], platform, REFRESH_TIMEOUT_MS)).data);
 }
 
 /** `jig self-update` pulls the framework source's git remote: a network round trip, never a prompt (Jig sets it so). */

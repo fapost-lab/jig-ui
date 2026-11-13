@@ -8,7 +8,7 @@ paths:
   - web/lib/knowledge.ts
   - "server/jig/fixtures/knowledge-*.json"
 summary: "The Knowledge view of a project's page: proposals to accept or reject after reading their text, and changed linked files to keep or drop after their diff, read on demand from Jig 0.40.0 (text and Drop from 0.41.0), decisions waiting on knowledge/decisions marked; linked from the workspace card's attention items"
-reviewed_at: 2026-11-09
+reviewed_at: 2026-11-13
 ---
 # Deciding knowledge
 
@@ -27,7 +27,10 @@ lists it (`readKnowledge` in `server/jig/client.ts`: `jig knowledge proposed --j
   stub the file it links as it is now: Markdown through `rendered()`, any other file in a `<pre>`.
   Below 0.41.0 the proposal names the file to read before deciding. A record Jig reads as not
   decidable as of the last fetch (`decidable: false`) says why above its buttons: push the commit,
-  or decide once the decisions waiting have landed.
+  or decide once the decisions waiting have landed. One origin decided already (Jig 0.45.0's `landed`) says so and has
+  no buttons: no decision is owed. Jig judges it on this checkout's HEAD against `origin/<base>`, so it leaves the list
+  once the checkout has origin's base — Refresh does that only on the base itself
+  (adr-20261113-refresh-brings-the-clone-up-from-the-card).
 - **Changed sources** — each approved stub whose linked file is `changed`, `unrecorded` (no approved
   text kept) or `missing`. A changed one's **Diff since approved** opens Jig's unified diff
   (`GET /api/projects/:id/knowledge/:doc/diff`, `jig knowledge sources --diff`), plain text in a

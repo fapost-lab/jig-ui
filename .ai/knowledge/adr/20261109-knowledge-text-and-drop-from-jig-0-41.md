@@ -11,7 +11,7 @@ paths:
   - web/components/KnowledgeView.vue
   - web/lib/knowledge.ts
   - web/lib/markdown.ts
-reviewed_at: 2026-11-09
+reviewed_at: 2026-11-13
 summary: From Jig 0.41.0 the Knowledge view shows a proposed document's text and drops a linked file's link; Jig's decidable is said above the buttons, Jig judges what is sent, and rendered() shows raw HTML and relative links as text
 ---
 # From Jig 0.41.0 the Knowledge view shows a proposal's text and drops a changed link, and Jig judges what can be decided
@@ -54,7 +54,8 @@ origin, 2026-11-09):
 - **Drop** beside Keep, and alone on a missing file: `reject` on a source the read lists with no
   decision waiting. It reads "Dropped, waiting" until `knowledge/decisions` lands.
 - **`decidable: false` is said above the buttons, which stay**: push the commit, or decide once the
-  decisions waiting have landed. Nothing on the page fetches, and the read's `decidable` is as of
+  decisions waiting have landed. *(Amended by adr-20261113-refresh-brings-the-clone-up-from-the-card, 2026-11-13: Jig
+  0.45.0's `landed` — origin decided it already — has no buttons.)* Nothing on the page fetches, and the read's `decidable` is as of
   the last fetch; Jig's write fetches first, so a decision sent after the push goes through. The
   adapter does not refuse such a decision itself either: Jig judges what is sent, and a refusal
   comes back with Jig's code and line.

@@ -586,6 +586,8 @@ describe('localSource', () => {
           pauseRequestable: true,
           resumable: false,
           closable: false,
+          staging: null,
+          parked: null,
           started: true,
           gate: null,
           autopilot: null,
@@ -1191,6 +1193,33 @@ describe('localSource, writing the queue', () => {
         undecided: false,
         working: false,
       });
+    });
+
+    // Jig 0.45.0 offers `close` once the pull request into staging merged, before the work reached the base.
+    it('is offered on the staging flow only once housekeeping found the work in the base', async () => {
+      const parked = { reason: 'signal', hint: null };
+      const merged = ['needs-consolidation'];
+      const staged = (id: string, more: Record<string, unknown>) =>
+        task(id, 'ready', false, {
+          knowledge_consolidated: true,
+          actions: [close],
+          pull_request: pr('merged'),
+          staging: 'on',
+          parked: null,
+          ...more,
+        });
+      const tasks = [
+        staged('on-staging', { parked }),
+        staged('promoted', {}),
+        staged('in-base', { housekeeping_flags: merged }),
+        staged('parked-flagged', { parked, housekeeping_flags: merged }),
+        staged('undecided', { knowledge_consolidated: false, housekeeping_flags: merged }),
+      ];
+      await source.connect(project('staging-closables', '0.45.0', { tasks: { tasks, hidden: 0, housekeeping: null } }));
+      const shown = await source.tasks('staging-closables');
+      const closable = shown?.state === 'ready' ? Object.fromEntries(shown.tasks.map((t) => [t.id, t.closable])) : {};
+      expect(closable).toEqual({ 'on-staging': false, promoted: false, 'in-base': true, 'parked-flagged': false, undecided: false });
+      expect(shown?.state === 'ready' && shown.tasks.map((t) => [t.staging, t.parked])[0]).toEqual(['on', parked]);
     });
 
     it('lists the same tasks on the project as the workspace shows it, with the revision a close carries', async () => {

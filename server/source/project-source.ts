@@ -219,14 +219,27 @@ export interface Task {
   } | null;
   /** Jig offers to ask it to pause (its `request-pause` action); a request is taken back while there is one. */
   pauseRequestable: boolean;
-  /** Paused, and resumable from the page: Jig offers its `resume` action and takes `task resume --revision` (0.35.0). */
+  /**
+   * Paused or parked at the staging branch, and resumable from the page: Jig offers its `resume` action and takes
+   * `task resume --revision` (0.35.0).
+   */
   resumable: boolean;
   /**
    * Ready, and closable as done from the page: Jig offers its `close` action, or withholds it only because its forge
    * cache has not heard of a merge — the knowledge decision is recorded and the pull request is not closed unmerged.
-   * Jig itself asks the forge when it closes.
+   * Jig itself asks the forge when it closes. On the staging flow, only once housekeeping found its work in the base.
    */
   closable: boolean;
+  /** On Jig's staging flow, whether the task's own work is on the staging branch (`on`) or has commits after it (`behind`); `null` elsewhere. */
+  staging: 'on' | 'behind' | null;
+  /**
+   * Why the task waits at the staging branch, `null` when it does not: its pull request into staging waits for a review
+   * (`review`, with `landing` when the person lands it), or its work is there, waiting for "prepare for prod" (`signal`).
+   */
+  parked: {
+    reason: 'review' | 'signal';
+    hint: 'landing' | null;
+  } | null;
   started: boolean;
   gate: string | null;
   autopilot: string | null;

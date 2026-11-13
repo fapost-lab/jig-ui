@@ -295,6 +295,29 @@ describe('readTasks', () => {
     ]);
   });
 
+  // task-list-staging.json is what Jig 0.45.0 printed in a scratch repository on the staging flow, with a local origin:
+  // `tested` merged into origin's staging branch, `fixing` merged and taken back with a fix, `waiting` pushed only.
+  it('reads where a task stands on the staging flow, and nothing of it on any other flow', async () => {
+    const read = await readTasks(answering('tasks-staging', 'task-list-staging.json'));
+    expect(read.tasks.map((t) => [t.id, t.staging, t.parked])).toEqual([
+      ['fixing', 'behind', null],
+      ['tested', 'on', { reason: 'signal', hint: null }],
+      ['waiting', null, null],
+    ]);
+    // A pull request into staging waits for its review, which the person lands (their agent.git below merge).
+    const review = changed('task-list-staging.json', (d) => (d.tasks[2].parked = { reason: 'review', hint: 'landing' }));
+    expect((await readTasks(answering(`case-${cases++}`, review))).tasks[2]?.parked).toEqual({ reason: 'review', hint: 'landing' });
+    const direct = await readTasks(answering('tasks-direct', 'task-list.json'));
+    expect(direct.tasks.map((t) => [t.staging, t.parked])).toEqual(direct.tasks.map(() => [undefined, undefined]));
+  });
+
+  it.each([
+    ['a staging state this Jig UI does not know', (d: Record<string, any>) => (d.tasks[0].staging = 'ahead')],
+    ['a parked task without its reason', (d: Record<string, any>) => (d.tasks[1].parked = { hint: null })],
+  ])('refuses %s', async (_, change) => {
+    await expect(readTasks(answering(`case-${cases++}`, changed('task-list-staging.json', change)))).rejects.toBeInstanceOf(JigShapeError);
+  });
+
   it('ignores an action id this Jig UI does not know, as Jig asks of a consumer', async () => {
     const read = await readTasks(
       answering(

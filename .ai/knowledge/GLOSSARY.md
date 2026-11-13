@@ -76,6 +76,15 @@ a task takes at its next stage boundary; the card shows it with its age.
 Informal synonyms: pending move.
 Use in: source code, API, documentation.
 
+## Parked
+
+Jig's word for a ready task on its staging flow that waits at the staging branch — for a review of its
+pull request into staging, or, once there, for "prepare for prod"; not finished, and not a column.
+
+Informal synonyms: waiting at staging; landed (wrong: landed is only the merge into staging, and a
+landed task taken back for a fix is on staging but not parked).
+Use in: source code, documentation.
+
 ## Queue
 
 Jig's order of a project's work (`jig queue list`): tasks and epics by level — the top level, then

@@ -8,6 +8,12 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+- **Refresh** on a project's card brings the clone up to origin through Jig 0.45.0's `jig refresh`:
+  a fetch, and the main branch fast-forwarded without moving your checkout. It sits on *This checkout
+  is behind origin*, and beside a line saying how long ago the clone last fetched once that is more
+  than a day. When the main branch cannot move, the card says why in words. Knowledge that origin
+  already decided says so and is no longer offered for a decision.
+  ([Bringing the clone up to origin](/projects#bringing-the-clone-up-to-origin))
 - The Specs view's tabs wrap onto more rows when a project has many specs, so every spec is in
   sight and none is behind a sideways scroll.
 - A project on Jig 0.45.0's staging flow shows why a task waits at the staging branch — its pull

@@ -1,4 +1,5 @@
 import type { Attention, Project } from '../api';
+import type { Tone } from './tones';
 
 /** A connected project whose read has not landed yet: the Projects page lists it at once. */
 export interface Reading {
@@ -45,6 +46,19 @@ export type HousekeepingState =
       state: 'refused';
       message: string;
       reasons: string[];
+    };
+
+/** Refresh from a project's card: under way, what came of it in the page's words (`refreshReport`), or why it did not run. */
+export type RefreshState =
+  | { state: 'running' }
+  | {
+      state: 'done';
+      tone: Tone;
+      lines: string[];
+    }
+  | {
+      state: 'refused';
+      message: string;
     };
 
 /** The projects by id, A–Z: case aside, and numbers by value, so `app2` comes before `app10`. */

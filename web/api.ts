@@ -65,6 +65,12 @@ export type FoundProjects = Ok<Api['scan']['$post']>;
 /** What Check all merges came to: the projects landed, still waiting for a merge, and stopped. */
 export type LandedAll = Ok<Api['upgrade']['land-all']['$post']>['landed'];
 
+/** How a ready project's clone stands against origin as of its last fetch; `null` from a Jig before 0.45.0. */
+export type Origin = Extract<Project, { state: 'ready' }>['origin'];
+
+/** What bringing a project's clone up to origin did (`jig refresh`), without git's messages or a path. */
+export type Refreshed = Extract<Ok<Api['projects'][':id']['refresh']['$post']>, { refreshed: unknown }>['refreshed'];
+
 export type UpgradePlan = Extract<Ok<Api['projects'][':id']['upgrade']['plan']['$post']>, { plan: unknown }>['plan'];
 
 /** Why the page cannot show anything: the session or the server ended, the registry cannot be read, or the server failed. */

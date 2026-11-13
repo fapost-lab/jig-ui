@@ -13,6 +13,7 @@ import {
   sourceActions,
   sourceLine,
   stubLine,
+  landed,
   undecidable,
   waitingWord,
 } from './knowledge';
@@ -80,6 +81,17 @@ describe('a proposal', () => {
       'decide it once the decisions waiting there have landed',
     );
     expect(undecidable(proposal({ decidable: false, reason: 'later' }))).toBe('Jig cannot decide it yet.');
+  });
+
+  it("says a record origin decided already is decided, and that it is not the person's to decide", () => {
+    const decided = proposal({ decidable: false, reason: 'landed' });
+    expect(undecidable(decided)).toBe(
+      "Decided on origin already, so no decision is owed: it leaves this list once this checkout has origin's default branch.",
+    );
+    expect(landed(decided)).toBe(true);
+    expect(landed(linked('changed', { decidable: false, reason: 'landed' }))).toBe(true);
+    expect(landed(proposal({ decidable: false, reason: 'not-on-base' }))).toBe(false);
+    expect(landed(proposal())).toBe(false);
   });
 });
 

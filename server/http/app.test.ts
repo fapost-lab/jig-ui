@@ -6,7 +6,7 @@ import type { Hono } from 'hono';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { localSource } from '../source/local.js';
 import { tilde } from '../source/scan.js';
-import type { Change, Knowledge, ProjectFinished, ProjectSource, Written } from '../source/project-source.js';
+import type { Change, Knowledge, ProjectFinished, ProjectSource, Refreshed, Written } from '../source/project-source.js';
 import { createApp, readPackageVersion } from './app.js';
 
 const PORT = 4870;
@@ -212,7 +212,14 @@ describe('/api/projects and /api/workspace', () => {
   const ready = project('ready', '0.31.0');
   const old = project('old', '0.26.0');
   const broken = project('broken', '0.31.0', true);
-  const empty = { counts: { active: 0, paused: 0, ready: 0 }, attention: [], housekeepingStale: false, closable: [], revision: 1 };
+  const empty = {
+    counts: { active: 0, paused: 0, ready: 0 },
+    attention: [],
+    housekeepingStale: false,
+    origin: null,
+    closable: [],
+    revision: 1,
+  };
 
   it('connects, lists and disconnects a project, by id only', async () => {
     const first = await call('POST', '/api/projects', { path: ready });
@@ -1224,6 +1231,53 @@ describe('/api/projects/:id/tasks', () => {
   it('is refused without the token and from another origin', async () => {
     expect((await post(app, { task: 'a', goal: 'g' }, {})).status).toBe(401);
     expect((await post(app, { task: 'a', goal: 'g' }, { cookie: COOKIE, origin: 'https://evil.example' })).status).toBe(403);
+  });
+});
+
+describe('POST /api/projects/:id/refresh', () => {
+  const appOf = (outcome: Awaited<ReturnType<ProjectSource['refresh']>>) =>
+    createApp({
+      port: PORT,
+      token: TOKEN,
+      source: { ...localSource(join(webRoot, 'fake-refresh')), refresh: () => Promise.resolve(outcome) },
+      webRoot,
+    });
+  const post = (target: Hono, headers: Record<string, string> = { cookie: COOKIE }) =>
+    target.request('/api/projects/x/refresh', { method: 'POST', headers: { host: HOST, ...headers } });
+  const refreshed: Refreshed = {
+    fetch: 'done',
+    fetchedAt: '2026-11-13T08:40:56Z',
+    base: { name: 'main', outcome: 'fast-forwarded', from: 'a', to: 'b' },
+    writes: [],
+  };
+
+  it('answers what Jig did once it ran', async () => {
+    const res = await post(appOf({ state: 'written', refreshed }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ refreshed });
+  });
+
+  it.each([
+    ['a run past the limit', { state: 'refused', code: 'timeout' }, 422, 'timeout'],
+    ['an upgrade under way', { state: 'refused', code: 'upgrading' }, 409, 'upgrading'],
+    ['a Jig older than 0.45.0', { state: 'refused', code: 'unsupported' }, 422, 'unsupported'],
+    ["Jig's failure", { state: 'refused', code: 'failed' }, 422, 'failed'],
+    ['a project not connected', undefined, 404, 'not-connected'],
+  ] as const)('answers %s', async (_, outcome, status, code) => {
+    const res = await post(appOf(outcome));
+    expect(res.status).toBe(status);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);
+  });
+
+  it('answers the state of a project that is not ready', async () => {
+    const res = await post(appOf({ id: 'x', state: 'unreadable', code: 'timeout' }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ project: { id: 'x', state: 'unreadable', code: 'timeout' } });
+  });
+
+  it('is refused without the token', async () => {
+    const res = await post(appOf({ state: 'written', refreshed }), {});
+    expect(res.status).toBe(401);
   });
 });
 

@@ -100,6 +100,18 @@ overwrites it, but while the server runs the log keeps growing: it is not rotate
 fails to start, the end of the log is printed. To connect a project afterwards, run
 `npx @fapost/jig-ui` in its folder, or [connect it from the page](/projects).
 
+## Which GitHub account a change goes as
+
+Jig UI runs each project's `jig` without the GitHub token variables of the shell it was started
+from: `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN` and `GITHUB_ENTERPRISE_TOKEN`. A token
+there, for example one a direnv `.envrc` sets in the folder you started Jig UI in, would otherwise
+come before each clone's own account and send every project's changes as its owner. So Jig asks
+GitHub as the account the clone names (`jig config set --local github.account <login>`); without
+one, as the account it found for that clone before, the only account `gh` holds, or, of several,
+the one that may push there, and otherwise `gh`'s active account. A remote over SSH is pushed with
+your SSH key, whichever account that is. When GitHub refuses to open a pull request, the page shows
+Jig's message whole: it names the account Jig asked as and where that account came from.
+
 ## Resetting the token
 
 ```bash

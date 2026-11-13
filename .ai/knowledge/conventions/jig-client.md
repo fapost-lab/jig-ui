@@ -85,7 +85,8 @@ A write — `moveInQueue`, `setPriority`, `requestPause`, `cancelPause` — name
 `stale-revision`, `not-found`, `usage`, `already-exists` and `failed` come back as `JigRefusal`
 codes. `resumeTask` (`jig task resume <id>`) names the task by its bare id, as `jig task` does, and
 adds `not-paused`, `wrong-checkout` and `stash-conflict`; its answer (how long the pause lasted, a
-stash applied) is not read. Its success answer carries the revision before
+stash applied) is not read. `pauseTask` (`jig task pause <id> --revision <n> --json`, from Jig 0.45.0,
+`PAUSE_JIG_VERSION`) names the task by its bare id too and adds `already-paused`. Its success answer carries the revision before
 the write, so the caller reads again; a test pins each command's arguments and a refusal.
 `fileTask` (`jig task new <id> --goal <text>`) takes no revision — Jig has none for it — and its
 tests pin that a person's goal reaches Jig as one argument, unglobbed

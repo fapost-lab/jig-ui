@@ -40,7 +40,7 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   reads `jig status` (what needs the person), `jig task list`, `jig queue list` and `jig spec list`
   (feature-specs), a task's documents `jig task artifacts` and `jig task artifact read` (from Jig 0.39.0,
   adr-20261030-a-task-document-is-shown-as-written), and the writes `jig queue move`, `jig queue set --priority`, `jig queue request`
-  and `cancel` (a pause), `jig task new` and `jig task resume` (from Jig 0.35.0), `jig task set <id>
+  and `cancel` (a pause), `jig task pause` (a task nobody started, from Jig 0.45.0), `jig task new` and `jig task resume` (from Jig 0.35.0), `jig task set <id>
   status consolidated` (a close: from Jig 0.40.0 with `--revision --json`, Jig checking it; before
   that text, checked against a revision read first), a project's settings
   `jig config keys` and the person's own `jig config set|unset --local` (from Jig 0.40.0, feature-settings), a roadmap's
@@ -58,7 +58,7 @@ one line that brings its own (the install flow). Jig works exactly as before wit
 - `server/source/` — the ProjectSource port (`project-source.ts`: the workspace, the connected ids
   (`connected`), one project as the workspace shows it (`project`), the Jig projects under a folder (`scan`, walked
   by `scan.ts`), a project's live tasks, its finished tasks on demand (`finished`), one task in full, a live task's documents (`artifacts`, `artifact`), the settings (`settings`), the knowledge waiting for a decision (`knowledge`, `knowledgeDiff`, `knowledgeText`), connect, disconnect, subscribe to changes, and the writes `move`,
-  `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `resume`, `close` and `fileTask`, `housekeeping` and `refresh`, `setSetting` and `unsetSetting`, `addItem`, `moveItem` and `fileItem`, `decideKnowledge`, `planUpgrade`, `upgrade` and
+  `prioritise`, `moveEpic`, `prioritiseEpic`, `requestPause`, `cancelPause`, `pause`, `resume`, `close` and `fileTask`, `housekeeping` and `refresh`, `setSetting` and `unsetSetting`, `addItem`, `moveItem` and `fileItem`, `decideKnowledge`, `planUpgrade`, `upgrade` and
   `dismissUpgrade`, `land` and `landAll`, and the machine's runs `machine`, `selfUpdate`, `upgradeAll` and `dismissUpgradeAll`) and its local adapter (`local.ts`), which holds the
   registry, runs Jig and, while someone subscribes, follows each project through a Watcher (feature-live-updates). A
   project is `ready` (task counts and attention items), `unsupported` (Jig below the minimum, not
@@ -75,7 +75,7 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   `GET /api/projects/:id/tasks/:task` (feature-task-details), `GET /api/projects/:id/tasks/:task/artifacts` and
   `/artifacts/:kind` (a task's documents, adr-20261030-a-task-document-is-shown-as-written), `GET /api/projects/:id/specs`
   (feature-specs), `POST /api/projects/:id/queue/move`, `/queue/priority`, `/queue/epic/move`, `/queue/epic/priority`, `/queue/pause`,
-  `/queue/pause/cancel`, `/tasks/resume` (adr-20261022-writes-carry-the-revision-of-their-read) and
+  `/queue/pause/cancel`, `/tasks/pause` (adr-20261113-a-task-nobody-started-is-paused-at-once), `/tasks/resume` (adr-20261022-writes-carry-the-revision-of-their-read) and
   `/tasks/close` (adr-20261029-close-a-ready-task-from-the-board),
   `POST /api/projects/:id/tasks` (adr-20261022-filing-a-task-carries-no-revision),
   `POST /api/projects/:id/housekeeping` (adr-20261110-housekeeping-runs-from-the-project-card),
@@ -134,7 +134,7 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   again; Jig's `stale-revision` comes back as 409, and the page reads the board again and shows
   the conflict: what changed between the board the write was made on and that read, its cards
   marked (adr-20261022-writes-carry-the-revision-of-their-read, feature-board). Built for the
-  queue: order, priority and pause requests; and for a resume
+  queue: order, priority and pause requests; for a pause of a task nobody started (adr-20261113-a-task-nobody-started-is-paused-at-once); and for a resume
   (adr-20261026-a-drop-out-of-paused-resumes-at-once), a parked task's taken back for a fix included
   (adr-20261113-a-task-parked-at-staging-is-not-done); and for closing a ready task as done, after the
   person confirms, its refusal shown in Jig's words (adr-20261029-close-a-ready-task-from-the-board) — from the
@@ -199,7 +199,8 @@ The start flow, read-and-follow and change, with its conflict display, are built
   (adr-20261014-board-columns-are-derived-from-jig-state), except a drop out of Paused, which
   resumes the task at once (adr-20261026-a-drop-out-of-paused-resumes-at-once), and a drop of a task
   parked at a staging branch on the column it resumes to, which takes it back for a fix
-  (adr-20261113-a-task-parked-at-staging-is-not-done).
+  (adr-20261113-a-task-parked-at-staging-is-not-done), and a drop on Paused of a task nobody started,
+  which pauses it at once (adr-20261113-a-task-nobody-started-is-paused-at-once).
 - A hosted or self-hosted Jig UI stays possible: projects by id, access behind a replaceable
   guard, writes carrying a revision (adr-20261014-project-source-port-keeps-hosting-open) — all but
   the upgrade (adr-20261027-upgrading-a-project-runs-in-the-background), filing a task

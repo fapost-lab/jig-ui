@@ -39,6 +39,8 @@ import {
   readFinishedTasks,
   readTasks,
   releaseNamed,
+  pauseTask,
+  PAUSE_JIG_VERSION,
   requestPause,
   RESUME_JIG_VERSION,
   resumeTask,
@@ -162,19 +164,27 @@ function closable(t: Live): boolean {
   return t.knowledgeConsolidated && t.pullRequest !== null && t.pullRequest.state !== 'closed';
 }
 
-/**
- * A live task as a board's card shows it, with its place in the queue if it has one; `resumes` when the project's Jig
- * takes `task resume --revision`.
- */
-const card = (t: Live, q: QueueItem | undefined, resumes: boolean): Task => ({
+const offers = (t: Live, action: string): boolean => t.actions.some((a) => a.id === action && a.offered);
+
+/** What the project's Jig takes, for the writes a card offers: `task resume --revision`, and `task pause --revision`. */
+interface Takes {
+  resume: boolean;
+  pause: boolean;
+}
+
+/** A live task as a board's card shows it, with its place in the queue if it has one. */
+const card = (t: Live, q: QueueItem | undefined, takes: Takes): Task => ({
   id: t.id,
   class: t.class,
   status: t.status,
   goal: t.goal,
   paused: t.paused,
   pauseRequest: t.pauseRequest,
-  pauseRequestable: t.actions.some((a) => a.id === 'request-pause' && a.offered),
-  resumable: resumes && t.actions.some((a) => a.id === 'resume' && a.offered),
+  pauseRequestable: offers(t, 'request-pause'),
+  // Jig 0.45.0 also withholds the request, offering `pause`, from a started task whose pause is asked already: an agent
+  // may be in one of its stages, so only a task nobody started is paused at once.
+  pausable: takes.pause && t.branch === null && offers(t, 'pause') && !offers(t, 'request-pause'),
+  resumable: takes.resume && offers(t, 'resume'),
   closable: closable(t),
   staging: t.staging ?? null,
   parked: t.parked ?? null,
@@ -214,8 +224,8 @@ const waitsFor = (queue: ShownQueue, q: QueueItem): TaskDetails['dependsOn'] => 
 ];
 
 /** A live task in full; where its worktree is was never read, and an action Jig refuses is left out. */
-const details = (t: Live, q: QueueItem | undefined, queue: ShownQueue, attention: Attention[], resumes: boolean): TaskDetails => ({
-  ...card(t, q, resumes),
+const details = (t: Live, q: QueueItem | undefined, queue: ShownQueue, attention: Attention[], takes: Takes): TaskDetails => ({
+  ...card(t, q, takes),
   issue: t.issue,
   branch: t.branch,
   baseBranch: t.baseBranch,
@@ -279,7 +289,7 @@ async function readProject(project: Project): Promise<Read> {
   };
   // The oldest of the reads the board is made of: a write against it is refused if anything was written after any of them.
   const revision = Math.min(status.revision, list.revision, queue.revision);
-  const resumes = supports(jigVersion, RESUME_JIG_VERSION);
+  const takes = { resume: supports(jigVersion, RESUME_JIG_VERSION), pause: supports(jigVersion, PAUSE_JIG_VERSION) };
   return {
     view: {
       id: project.id,
@@ -292,8 +302,8 @@ async function readProject(project: Project): Promise<Read> {
       closable: live.filter(closable).map((t) => t.id),
       revision,
     },
-    tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id), resumes)), finishedCount: list.finished, revision },
-    details: live.map((t) => details(t, queued.get(t.id), shownQueue, status.attention, resumes)),
+    tasks: { state: 'ready', tasks: live.map((t) => card(t, queued.get(t.id), takes)), finishedCount: list.finished, revision },
+    details: live.map((t) => details(t, queued.get(t.id), shownQueue, status.attention, takes)),
     // The specs are read beside the queue: a write of an epic carries the older of the two reads, or of the board's.
     specs: {
       state: 'ready',
@@ -969,6 +979,15 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
     },
     requestPause(id, taskId, revision) {
       return writing(id, [taskId], (root) => requestPause(root, taskId, revision));
+    },
+    pause(id, taskId, revision) {
+      return writing(
+        id,
+        [taskId],
+        (root) => pauseTask(root, taskId, revision),
+        [],
+        (t) => t.pausable,
+      );
     },
     cancelPause(id, taskId, revision) {
       return writing(id, [taskId], (root) => cancelPause(root, taskId, revision));

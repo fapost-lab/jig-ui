@@ -277,6 +277,11 @@ stage begins. Until then the card stays in its column and says *Pause requested 
 **cancel** to take the request back (`jig queue cancel`, also in the ⋯ menu). Paused is offered
 only where Jig offers the request: not for a task already paused, and not twice.
 
+A task nobody started has no stage to pause at, so with Jig 0.45.0 or later it is paused at once:
+the drag onto Paused, or **Pause** in its ⋯ menu, runs `jig task pause <id>`, and the card moves to
+Paused. A task already started keeps the request, even when its pause was already asked, since an
+agent may be in one of its stages. If somebody paused the task first, the board says so.
+
 ## Resuming a task
 
 **Drag a paused card out of Paused**, or choose **Resume** in its ⋯ menu, to resume it. (A task

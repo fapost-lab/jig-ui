@@ -187,7 +187,7 @@ case "$*" in
   "task list --status abandoned --json") while [ -f hold-finished ]; do sleep 0.05; done; cat abandoned.json; if grep -q '"error"' abandoned.json; then exit 1; fi ;;
   "spec list --json") cat specs.json ;;
   "queue list --json") cat queue.json ;;
-  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*|"task set "*" --json"|"config set "*|"config unset "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
+  "queue move "*|"queue set "*|"queue request "*|"queue cancel "*|"task new "*|"task resume "*|"task pause "*|"task set "*" --json"|"config set "*|"config unset "*) while [ -f hold ]; do sleep 0.05; done; cat write.json; if grep -q '"error"' write.json; then exit 1; fi ;;
   "spec item "*) while [ -f hold ]; do sleep 0.05; done; cat item.json; if grep -q '"error"' item.json; then exit 1; fi ;;
   "task artifacts "*) while [ -f hold-artifacts ]; do sleep 0.05; done; cat artifacts.json; if grep -q '"error"' artifacts.json; then exit 1; fi ;;
   "config keys --json") cat settings.json ;;
@@ -589,6 +589,7 @@ describe('localSource', () => {
           paused: false,
           pauseRequest: null,
           pauseRequestable: true,
+          pausable: false,
           resumable: false,
           closable: false,
           staging: null,
@@ -682,6 +683,46 @@ describe('localSource', () => {
     });
   });
 
+  it('pauses at once only a task nobody started, where Jig offers `pause` and withholds the request, from Jig 0.45.0', async () => {
+    const offered = (id: string, pause: boolean, request: boolean) => [
+      { id: 'pause', command: `jig task pause ${id}`, offered: pause, reason: null },
+      { id: 'request-pause', command: `jig queue request task:${id} pause`, offered: request, reason: null },
+    ];
+    const list = {
+      tasks: [
+        task('idea', 'active', false, { branch: null, actions: offered('idea', true, false) }),
+        task('work', 'active', false, { actions: offered('work', true, true) }),
+        task('asked', 'active', false, {
+          pause_request: { requested_at: '2026-11-13T16:39:33Z' },
+          actions: offered('asked', true, false),
+        }),
+        task('dormant', 'active', true, { branch: null, actions: offered('dormant', false, false) }),
+        // A request written before Jig 0.45.0, or in a terminal: no stage will take it, and Jig's pause takes it out.
+        task('stale-ask', 'active', false, {
+          branch: null,
+          pause_request: { requested_at: '2026-11-01T09:00:00Z' },
+          actions: offered('stale-ask', true, false),
+        }),
+      ],
+      hidden: 0,
+      housekeeping: null,
+    };
+    await source.connect(project('pauses', '0.45.0', { tasks: list }));
+    await source.connect(project('pre-pause', '0.44.0', { tasks: list }));
+    expect(await source.tasks('pauses')).toMatchObject({
+      tasks: [
+        expect.objectContaining({ id: 'idea', pausable: true, pauseRequestable: false }),
+        expect.objectContaining({ id: 'work', pausable: false, pauseRequestable: true }),
+        expect.objectContaining({ id: 'asked', pausable: false, pauseRequestable: false }),
+        expect.objectContaining({ id: 'dormant', pausable: false }),
+        expect.objectContaining({ id: 'stale-ask', pausable: true, pauseRequest: { requestedAt: '2026-11-01T09:00:00Z' } }),
+      ],
+    });
+    expect(await source.tasks('pre-pause')).toMatchObject({
+      tasks: [expect.objectContaining({ id: 'idea', pausable: false }), {}, {}, {}, {}],
+    });
+  });
+
   it('disconnects by id', async () => {
     expect(await source.disconnect('gone')).toBe(true);
     expect(await source.disconnect('gone')).toBe(false);
@@ -752,7 +793,7 @@ describe('localSource, writing the queue', () => {
     hidden: 0,
     housekeeping: null,
   };
-  const writes = (dir: string) => calls(dir).filter((c) => /^(queue (move|set|request|cancel)|task (new|resume)) /.test(c));
+  const writes = (dir: string) => calls(dir).filter((c) => /^(queue (move|set|request|cancel)|task (new|resume|pause)) /.test(c));
   /** The calls since `from`: what Jig ran for one write. */
   const since = (dir: string, from: number) => calls(dir).slice(from);
 
@@ -893,6 +934,32 @@ describe('localSource, writing the queue', () => {
     expect(await source.cancelPause('pauser', 'a', 7)).toEqual({ state: 'written' });
     expect(await source.requestPause('pauser', 'gone', 7)).toEqual({ state: 'refused', code: 'not-found' });
     expect(writes(dir)).toEqual(['queue request task:a pause --revision 7 --json', 'queue cancel task:a pause --revision 7 --json']);
+  });
+
+  it('pauses at once a task the read shows pausable, and nothing else, without running Jig', async () => {
+    const pausable = {
+      tasks: [
+        task('idea', 'active', false, {
+          branch: null,
+          actions: [{ id: 'pause', command: 'jig task pause idea', offered: true, reason: null }],
+        }),
+        task('work', 'active'),
+      ],
+      hidden: 0,
+      housekeeping: null,
+    };
+    const dir = project('pause-now', '0.45.0', { tasks: pausable });
+    await source.connect(dir);
+    expect(await source.pause('pause-now', 'idea', 7)).toEqual({ state: 'written' });
+    expect(await source.pause('pause-now', 'work', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(writes(dir)).toEqual(['task pause idea --revision 7 --json']);
+    const older = project('pause-old', '0.44.0', { tasks: pausable });
+    await source.connect(older);
+    expect(await source.pause('pause-old', 'idea', 7)).toEqual({ state: 'refused', code: 'not-found' });
+    expect(writes(older)).toEqual([]);
+    const already = project('pause-already', '0.45.0', { tasks: pausable, write: 'already-paused' });
+    await source.connect(already);
+    expect(await source.pause('pause-already', 'idea', 7)).toEqual({ state: 'refused', code: 'already-paused', reasons: ['refused'] });
   });
 
   it('resumes a paused task, and carries the refusal of a stash it could not apply by its code', async () => {

@@ -13,6 +13,12 @@ export const MIN_JIG_VERSION = '0.31.0';
 export const RESUME_JIG_VERSION = '0.35.0';
 
 /**
+ * The first Jig seen to take `task pause --revision --json` and to withhold `request-pause` from a task nobody started,
+ * offering `pause` instead (task `pause-not-started-directly` in fapost-lab/jig).
+ */
+export const PAUSE_JIG_VERSION = '0.45.0';
+
+/**
  * The first Jig that remembers an upgrade's pull request (`upgrade-pull-request-*` in `jig status`) and lands it once
  * merged (`jig upgrade --land`, fapost-lab/jig#352). The project's own Jig runs both, so they reach upgrades from it on.
  */
@@ -275,6 +281,7 @@ const CODES = new Set([
   'not-found',
   'already-exists',
   'not-paused',
+  'already-paused',
   'wrong-checkout',
   'stash-conflict',
   'upgrade-blocked',
@@ -930,6 +937,14 @@ export async function cancelPause(
   platform: NodeJS.Platform = process.platform,
 ): Promise<void> {
   await readJson(root, ['queue', 'cancel', `task:${task}`, 'pause', '--revision', String(revision)], platform);
+}
+
+/**
+ * Pauses a task at once (`jig task pause <id>`), as Jig's `pause` action does: for a task nobody started, which no stage
+ * would take a pause request at. Refused as `already-paused`, and as `moveInQueue` is; the task it answers is not read.
+ */
+export async function pauseTask(root: string, task: string, revision: number, platform: NodeJS.Platform = process.platform): Promise<void> {
+  await readJson(root, ['task', 'pause', task, '--revision', String(revision)], platform);
 }
 
 /**

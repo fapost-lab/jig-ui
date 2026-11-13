@@ -482,6 +482,13 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
         return written(c, await source.cancelPause(c.req.param('id'), task, revision));
       })
 
+      // A task nobody started is paused at once: no stage of it would take a request.
+      .post('/api/projects/:id/tasks/pause', validator('json', taskAt), async (c) => {
+        const { task, revision } = c.req.valid('json');
+        if (task === undefined || revision === undefined) return refuse(c, 422, 'usage', 'Give a task and the revision it was read at.');
+        return written(c, await source.pause(c.req.param('id'), task, revision));
+      })
+
       .post('/api/projects/:id/tasks/resume', validator('json', taskAt), async (c) => {
         const { task, revision } = c.req.valid('json');
         if (task === undefined || revision === undefined) return refuse(c, 422, 'usage', 'Give a task and the revision it was read at.');

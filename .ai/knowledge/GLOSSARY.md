@@ -71,7 +71,8 @@ Use in: source code, documentation.
 ## Request
 
 A sticky ask from the page that Jig holds until it is honoured or cancelled — today a pause, which
-a task takes at its next stage boundary; the card shows it with its age.
+a started task takes at its next stage boundary; the card shows it with its age. A task nobody
+started is paused at once instead.
 
 Informal synonyms: pending move.
 Use in: source code, API, documentation.
@@ -134,8 +135,9 @@ Use in: source code.
 ## Action
 
 Something a person may do next with a task, as Jig decides it from the task's state, with the Jig
-command that takes it; Jig UI shows the ones Jig offers, and takes three of them itself — a pause
-request and a resume from the board, and a close from the board and from a project's card.
+command that takes it; Jig UI shows the ones Jig offers, and takes four of them itself — a pause
+request, a pause of a task nobody started and a resume from the board, and a close from the board
+and from a project's card.
 
 Informal synonyms: legal move, button.
 Use in: source code, API, documentation.

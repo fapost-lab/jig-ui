@@ -4,10 +4,10 @@ import { placement } from './placement';
 
 /**
  * Dragging a card: within its list (a column), with the gap it would land in and the place Jig's queue would give it;
- * onto the Paused column, a pause asked of the task; out of Paused, or a task parked at the staging branch out of
- * Ready, a resume. A drop is allowed only where `placement`
- * says one `jig queue move` puts it, on Paused when Jig offers the request, or on the one list a resume would put the
- * task in; any other list allows none.
+ * onto the Paused column, a pause — asked of the task, or made at once for a task nobody started; out of Paused, or a
+ * task parked at the staging branch out of Ready, a resume. A drop is allowed only where `placement`
+ * says one `jig queue move` puts it, on Paused when Jig offers the request or pauses the task at once, or on the one
+ * list a resume would put the task in; any other list allows none.
  */
 export function useDrop(onMove: (task: string, place: Place) => void, onPause: (task: string) => void, onResume: (task: string) => void) {
   const dragged = ref<{
@@ -24,7 +24,7 @@ export function useDrop(onMove: (task: string, place: Place) => void, onPause: (
   }>();
 
   function start(event: DragEvent, list: string, task: Task): void {
-    dragged.value = { task: task.id, list, pausable: task.pauseRequestable, resumesTo: task.resumesTo };
+    dragged.value = { task: task.id, list, pausable: task.pauseRequestable || task.pausable, resumesTo: task.resumesTo };
     event.dataTransfer?.setData('text/plain', task.id);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
   }

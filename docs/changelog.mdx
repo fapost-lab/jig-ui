@@ -8,6 +8,9 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+- A task nobody started is paused at once by a drag onto Paused, or **Pause** in its ⋯ menu, on
+  Jig 0.45.0 or later: Jig takes no pause request for a task with no stage to pause at, so the card
+  could not go to Paused before. ([Pausing a task](/projects#pausing-a-task))
 - Jig UI runs `jig` without the GitHub token variables of the shell it was started from
   (`GH_TOKEN`, `GITHUB_TOKEN` and the enterprise ones), so each project's pull requests are opened,
   and its changes pushed over HTTPS, as the account its clone names, not as a token's that a direnv

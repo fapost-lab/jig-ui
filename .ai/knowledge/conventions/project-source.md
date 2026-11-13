@@ -61,7 +61,8 @@ disconnect, `subscribe` to changes, and the writes `move(id, taskId, place, revi
 `prioritise(id, taskId, priority, revision)`, `moveEpic(id, specId, place, revision)` and
 `prioritiseEpic(id, specId, priority, revision)` — a spec's open epic, among the top level of the
 queue — `requestPause(id, taskId, revision)`,
-`cancelPause(id, taskId, revision)`, `resume(id, taskId, revision)`, `fileTask(id, taskId, goal)`, `housekeeping(id)` —
+`cancelPause(id, taskId, revision)`, `pause(id, taskId, revision)` — only a `pausable` task, any other
+`not-found` without Jig —, `resume(id, taskId, revision)`, `fileTask(id, taskId, goal)`, `housekeeping(id)` —
 Jig's report on `written` as `report` —, `refresh(id)` — what it did on `written` as `refreshed` —, and
 `setSetting(id, key, value, revision)` and `unsetSetting(id, key, revision)` — the person's own keys, always
 `--local` —, and a spec's roadmap edits `addItem(id, specId, phase, text, revision)`,

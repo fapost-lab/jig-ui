@@ -89,6 +89,7 @@ each of those is a click on the page, or a line on it, and each write is a Jig c
 - [ ] drop to land — on Jig's staging flow a drop of a card from Review onto On staging lands it, the same write as Land on staging; while the review is not approved Jig refuses, the card goes back and says who it waits for (after: review and staging as columns — the two columns the drop goes between; staging from the card — the land it reuses)
 - [ ] the rest of a person's writes — each a button or a menu entry on the page, through Jig with the revision of the read the person saw and a refusal read by code, offered only when Jig's actions for the task offer it: approve a design at its gate — the design shown as written, then Approve (`jig task gate <id> approved`); give a task up with a reason (`jig task abandon`), archive it and bring it back from the archive (`jig task archive|unarchive`); drop a roadmap item with its task (`jig spec drop`); link two tasks by a dependency with its reason, and unlink them (`jig queue depend|undepend`, already with a revision and JSON); taking a task into work is not one of them — the person's agent does that work, so the page offers the request for the agent instead (after: task details — where a task's actions are; Jig — `--revision <n> --json` and refusal codes for gate, abandon, archive, unarchive and spec drop, task `ui-writes-json` in fapost-lab/jig)
 - [ ] Jig's version in the header — the page's header shows the Jig installed on this machine and the newest Jig released, side by side; when they differ the newer one is marked and the header offers Update Jig on this machine, the update the upgrade panel already runs; offline, or before Jig has checked, only the installed one is shown, without a mark (after: a newer Jig UI — the same place in the header and the same quiet failure; Jig — `jig version --json` with `installed`, `latest` and `checked_at`, read without a project, task `version-json-latest` in fapost-lab/jig)
+- [ ] merge from the card — on the direct flow a ready task's card offers Merge when Jig's actions for it do: one click merges its open pull request on the forge and closes the task, through `jig task merge <id> --revision <n> --json`; it is offered only with CI green and the review approved where one is asked for, and a refusal reads by code — CI red or still running, the review waiting with who it waits for, a conflict, a draft — so the card says why instead of merging; when the knowledge decision is not recorded yet, the merge happens and the card says the close waits for it; on the staging flow the same place is Land on staging (after: staging from the card — the same write on the other flow; Jig — `jig task merge`, task `staging-actions-json` in fapost-lab/jig)
 ## Waves
 
 1. package and release pipeline
@@ -119,6 +120,7 @@ each of those is a click on the page, or a line on it, and each write is a Jig c
 26. review and staging as columns
 27. drop to land; the rest of a person's writes
 28. Jig's version in the header
+29. merge from the card
 
 <!--
 Rules (jig-idea §8):

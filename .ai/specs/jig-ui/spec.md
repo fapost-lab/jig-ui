@@ -257,6 +257,14 @@ Independent failure hunt (2026-10-14), against the decisions in `stack.md` and
   the person's checkout, and refuses with a reason when that would touch their work. Rejected: Jig UI
   running `git fetch` or `git pull` itself — RULES let it write nothing in a project but through
   Jig; reads that fetch on their own — every page refresh would then reach the forge.
+- A task parked at the staging branch is not finished (Jig 0.45.0's staging flow; the maintainer, 2026-11-13: "a new
+  Jig release, a new flow"). Its pull request into staging, once merged, read on a card as a task done, and the close's
+  fallback offered to close it on that merge; landing on staging does not close a task, so the page reads `parked`
+  before the pull request, offers a parked task no close, and takes one back for a fix with Jig's `resume`. Rejected: a
+  column of its own for parked tasks — a parked task is a `ready` one with a reason, and a column only some projects
+  have would change the board's grid for all of them; Land and Prepare for prod buttons — Jig offers `land` only at
+  `agent.git: merge`, answers neither `task land` nor `task promote` as JSON with a revision, and leaves "prepare for
+  prod" to a person through their agent, or to CI.
 - Closing a task from the page was proposed by the agent for Phase 4 and found built already: a ready
   card's ✕ (task `close-ready-task`, adr-20261029-close-a-ready-task-from-the-board), which checks the
   revision by a read before Jig's `task set`. The item narrows to passing the revision to Jig once

@@ -483,6 +483,30 @@ const onBranch: Spec['phases'] = [
   { phase: 2, title: 'Writes', done: 0, total: 0, filed: 0, fog: 1, items: [specItems[4]!] },
 ];
 const waiting = { branch: 'spec/jig-ui', base: 'main', commits: 3, progress: shop.progress, phases: onBranch };
+/** A project with many specs, as the maintainer's screenshot showed: the Specs view's tabs wrap instead of scrolling. */
+export const manySpecIds = [
+  'audit-log',
+  'data-lifecycle',
+  'ecosystem-distribution',
+  'extension-docs',
+  'first-contact-path',
+  'forge-gitlab',
+  'knowledge-graph',
+  'multi-repo',
+  'notifications',
+  'offline-mode',
+  'onboarding',
+  'phase-runs',
+  'plugin-api',
+  'release-train',
+  'review-models',
+  'secrets-scan',
+  'staging-flow',
+  'telemetry-opt-in',
+  'windows-support',
+  'workspace-sync',
+];
+
 export const waitingSpecs: Spec[] = [
   { ...shop, id: 'committed', waiting: { ...waiting, pushed: false, pr: null } },
   { ...shop, id: 'pushed', waiting: { ...waiting, pushed: true, pr: null } },

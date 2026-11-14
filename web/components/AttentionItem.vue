@@ -74,13 +74,14 @@
         {{ refreshing ? 'Refreshing…' : 'Refresh' }}
       </Button>
       <Button
-        v-if="closable && !asking"
+        v-if="closable"
         variant="outline"
         size="xs"
         class="shrink-0 text-foreground"
         :disabled="closing"
         :aria-label="`Close ${item.subject.id} as done`"
-        @click="asking = true"
+        :aria-expanded="asking"
+        @click="asking = !asking"
       >
         {{ closing ? 'Closing…' : 'Close task' }}
       </Button>

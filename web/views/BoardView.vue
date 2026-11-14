@@ -562,11 +562,12 @@
     const { code } = body.error;
     const reasons = 'reasons' in body.error && Array.isArray(body.error.reasons) ? body.error.reasons.map(String) : [];
     const doc = 'doc' in body.error && typeof body.error.doc === 'string' ? body.error.doc : null;
-    notice.value = { text: knowledgeRefusal(code, reasons, doc), changed: [] };
+    // Given back: this write's decisions and every one queued behind it.
+    notice.value = { text: knowledgeRefusal(code, reasons, doc, decisions.length + deciding.queued.value.size), changed: [] };
     return false;
   }
 
-  const decisions = useDecisions(
+  const deciding = useDecisions(
     send,
     () => typeof knowledge.value === 'object' && knowledge.value.state === 'ready' && knowledge.value.canDecideMany,
   );
@@ -722,10 +723,10 @@
         :knowledge="knowledge"
         :diffs="diffs"
         :texts="texts"
-        :queued="decisions.queued.value"
-        :sending="decisions.sending.value"
-        @decide="decisions.decide"
-        @take-back="decisions.takeBack"
+        :queued="deciding.queued.value"
+        :sending="deciding.sending.value"
+        @decide="deciding.decide"
+        @take-back="deciding.takeBack"
         @toggle="toggleDiff"
         @toggle-text="toggleText"
       />

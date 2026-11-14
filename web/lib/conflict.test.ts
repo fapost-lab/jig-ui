@@ -63,6 +63,12 @@ describe('conflict', () => {
     expect(conflict(before, board(cards), 'alpha')).toEqual({ changed: [mover], said: 'alpha did not change, 1 other card changed' });
   });
 
+  it('marks a card whose note moved only on the staging flow: its pull request into staging landed', () => {
+    const then = board([], [queued('alpha', 100, { status: 'ready', staging: 'on', parked: { reason: 'review', hint: null } })]);
+    const now = board([], [queued('alpha', 100, { status: 'ready', staging: 'on', parked: { reason: 'signal', hint: null } })]);
+    expect(conflict(then, now, 'beta')).toMatchObject({ changed: ['alpha'] });
+  });
+
   it('does not mark a card for what it does not show, such as when its pull request was last asked about', () => {
     const pr = (fetchedAt: string) => ({ url: 'https://github.com/o/r/pull/7', state: 'open', ci: 'green', fetchedAt });
     const then = board([queued('alpha', 100, { pullRequest: pr('2026-10-25T10:00:00Z') })]);

@@ -8,9 +8,10 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
-- Filing an item's task on Jig 0.42.0 or later marks a taken id at once — an archived task's too —
-  without reading the finished tasks, and an item that names a task already says so in a line of its
-  own.
+- Small fixes: **Close task** on a card's item stays *Closing…* until the card is read again, and
+  keeps keyboard focus when its question opens; a card is marked *Changed while you acted* when only
+  its staging state moved; a refused knowledge decision says how many decisions are back, and a
+  refused single decision names its document.
 - The board's **List** reads more easily: a strip above it counts all five columns, a zero included;
   each row shows the task's whole id, its goal under it (or *no goal yet*) and what it waits for
   under that; an empty In progress says how a task gets there. ([Projects](/projects))
@@ -74,6 +75,9 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 - The board no longer reads the finished tasks of a project. **N finished tasks** still shows their
   number, from the board's own read, and the list is read when you open it. A failure to read it
   stays in the list, with **Read again**, and leaves the project and its board as they are.
+- Filing an item's task on Jig 0.42.0 or later marks a taken id at once — an archived task's too —
+  without reading the finished tasks, and an item that names a task already says so in a line of its
+  own.
 
 ## 0.6.0 — 2026-10-31
 

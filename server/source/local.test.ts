@@ -1163,7 +1163,7 @@ describe('localSource, writing the queue', () => {
       expect(await source.decideKnowledge('old-knowing', [{ doc: 'checkout', decision: 'accept' }], 7)).toEqual({
         state: 'refused',
         code: 'unsupported',
-        doc: null,
+        doc: 'checkout',
       });
       expect(knows(dir)).toEqual([]);
     });
@@ -1313,7 +1313,7 @@ describe('localSource, writing the queue', () => {
         state: 'refused',
         code: 'not-on-base',
         reasons: ['refused'],
-        doc: null,
+        doc: 'search',
       });
       expect(decisions(dir)).toEqual(['knowledge accept search --revision 7 --json']);
     });
@@ -1324,7 +1324,7 @@ describe('localSource, writing the queue', () => {
         state: 'refused',
         code: 'not-found',
         reasons: ['refused'],
-        doc: null,
+        doc: 'checkout',
       });
     });
 
@@ -1333,7 +1333,7 @@ describe('localSource, writing the queue', () => {
       expect(await source.decideKnowledge('unpushed', [{ doc: 'checkout', decision: 'accept' }], 7)).toEqual({
         state: 'refused',
         code: 'not-on-branch',
-        doc: null,
+        doc: 'checkout',
       });
     });
 
@@ -1343,7 +1343,7 @@ describe('localSource, writing the queue', () => {
         state: 'refused',
         code: 'stale-revision',
         reasons: ['refused'],
-        doc: null,
+        doc: 'checkout',
       });
     });
   });

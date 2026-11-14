@@ -500,8 +500,8 @@ waiting were started — decide it once they have landed. Jig fetches before it 
 sent after the push goes through; one sent too early is refused with Jig's reason.
 
 When Jig refuses, it writes none of the decisions it was sent: every decision queued is given back,
-with its buttons, and a line above the lists says why, naming the document Jig stopped at. Jig
-refuses when:
+with its buttons, and a line above the lists says why, naming the document Jig stopped at and how
+many decisions are back. Jig refuses when:
 
 - `agent.git` is `none` (Jig's default) in your clone: choose a level in the project's **Settings**.
 - the document is proposed in a commit not on origin's default branch yet — `knowledge/decisions`

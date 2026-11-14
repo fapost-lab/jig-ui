@@ -8,19 +8,16 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
-- Small fixes: **Close task** on a card's item stays *Closing…* until the card is read again, and
-  keeps keyboard focus when its question opens; a card is marked *Changed while you acted* when only
-  its staging state moved; a refused knowledge decision says how many decisions are back, and a
-  refused single decision names its document.
+## 0.7.0 — 2026-11-14
+
 - A write whose answer this Jig UI cannot read — from a later Jig — says Jig may have made the change
-  and to update Jig UI, instead of "Jig refused the change". On macOS and Linux a token variable in
-  another case (`gh_token`) reaches Jig as any other variable; only Windows folds the case.
+  and to update Jig UI, instead of "Jig refused the change".
 - The board's **List** reads more easily: a strip above it counts all five columns, a zero included;
   each row shows the task's whole id, its goal under it (or *no goal yet*) and what it waits for
   under that; an empty In progress says how a task gets there. ([Projects](/projects))
 - A knowledge decision no longer holds the page: **Accept**, **Reject**, **Keep** and **Drop** mark
-  their document queued at once, with **Take back**, and you go on to the next. What is queued goes as
-  one write — on Jig 0.44.0 or later one `jig knowledge decide` —, so deciding many documents costs a
+  their document queued at once, with **Take back**, and you go on to the next. On Jig 0.44.0 or later
+  what is queued goes as one write, one `jig knowledge decide`, so deciding many documents costs a
   push or two, not one each; a refusal gives every queued decision back.
   ([Deciding knowledge](/projects#deciding-knowledge))
 - A task nobody started is paused at once by a drag onto Paused, or **Pause** in its ⋯ menu, on
@@ -39,8 +36,8 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
   ([Bringing the clone up to origin](/projects#bringing-the-clone-up-to-origin))
 - The Specs view's tabs wrap onto more rows when a project has many specs, so every spec is in
   sight and none is behind a sideways scroll.
-- A project on Jig 0.45.0's staging flow shows why a task waits at the staging branch — its pull
-  request into staging waiting for a review, or for you to land it, or its work on staging waiting
+- In a project on Jig 0.45.0's staging flow, a task's card and its List row show why it waits at the
+  staging branch — its pull request into staging waiting for a review, or for you to land it, or its work on staging waiting
   for "prepare for prod" — instead of a merged pull request that looks done. **Take back for a fix**
   resumes a parked task, and a parked task has no ✕: Jig UI offers the close only once housekeeping
   saw the task's work in the main branch. See [Tasks on staging](/projects#tasks-on-staging).
@@ -51,8 +48,9 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
   report on the card, so pull request facts and finished tasks no longer wait for a terminal or an
   agent's next session. See [What the page shows](/projects#what-the-page-shows).
 - A lighter page: text in the system's own font, monospace kept for ids, commands and code,
-  headings in sentence case, and tasks, items and proposals as white cards on tinted panels, a column, a List group or a lane with its colour as a stripe along the top. [Specs](/projects#specs)
-  shows one spec at a time as a roadmap board: a step for each phase, and the chosen phase's items
+  headings in sentence case, and tasks, items and proposals as cards on tinted panels, a column, a
+  List group or a lane with its colour as a stripe along the top. [Specs](/projects#specs) shows one
+  spec at a time as a roadmap board: a step for each phase, and the chosen phase's items
   in **To file**, **In work** and **Done**; **Up** and **Down** move an item within its lane.
 - A project's [settings](/projects#settings): **Settings…** in its card's **⋯** menu shows Jig's
   settings for the project and for this clone, and changes your own through
@@ -61,18 +59,18 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
   itself against the board you saw, so a change made between the check and the close is caught too.
 - [Editing a roadmap](/projects#editing-a-roadmap) on the Specs view: add an item to a phase, move
   an item up, down or to another phase, and file an item's task. Jig commits each edit on the spec's
-  branch, never in your checkout, and the card shows the edits waiting there. Needs Jig 0.40.0 in the
+  branch, never in your checkout, and the spec shows the edits waiting there. Needs Jig 0.40.0 in the
   project.
 - [Deciding knowledge](/projects#deciding-knowledge) on a project's new **Knowledge** view: accept or
   reject the knowledge proposed in the project, and keep a linked file that changed after reading its
   diff. Jig commits each decision on `knowledge/decisions`, never in your checkout. Needs Jig 0.40.0
   in the project.
-- [Deciding knowledge](/projects#deciding-knowledge) in a project on Jig 0.41.0: **Document** shows a
+- [Deciding knowledge](/projects#deciding-knowledge) on Jig 0.41.0 or later: **Document** shows a
   proposed document's text, and a linked file's own; **Drop** ends the link of a file that changed,
   has no approved text or is gone; a document Jig cannot decide yet says why above its buttons. A
   task's documents now show a template's placeholders, such as `<id>`, as written, and a link to
   another file of the project as its text.
-- [Filing an item's task](/projects#editing-a-roadmap) in a project on Jig 0.41.0 is one Jig
+- [Filing an item's task](/projects#editing-a-roadmap) on Jig 0.41.0 or later is one Jig
   command, checked against the specs you saw; when Jig refuses it, no task is filed. An id a
   finished task has is said to be one.
 - The board no longer reads the finished tasks of a project. **N finished tasks** still shows their

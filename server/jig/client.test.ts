@@ -635,6 +635,18 @@ describe('writing a roadmap', () => {
     await expect(write(answering(`case-${cases++}`, json, 1))).rejects.toMatchObject({ code, reasons });
   });
 
+  // From Jig 0.42.0 an item that names a task already is refused with a code of its own (fapost-lab/jig#442).
+  it('carries already-filed as its own code, not as a failure', async () => {
+    const json = JSON.stringify({
+      schema: 1,
+      revision: 7,
+      generated_at: 'x',
+      error: { code: 'already-filed', message: 'spec item file: i-230488071aa6 already names a task: started' },
+    });
+    const write = fileItem(answering(`case-${cases++}`, json, 1), 'shop', 'i-230488071aa6', 'started', 1);
+    await expect(write).rejects.toMatchObject({ code: 'already-filed' });
+  });
+
   it('refuses an answer without its write', async () => {
     const json = changed('spec-item-add.json', (data) => {
       delete data.write;

@@ -1379,7 +1379,7 @@ describe('localSource, writing the queue', () => {
       });
     });
 
-    // Jig 0.45.0 offers `close` once the pull request into staging merged, before the work reached the base.
+    // Jig 0.45.0's close command closes the task once the pull request into staging merged, before the work reached the base.
     it('is offered on the staging flow only once housekeeping found the work in the base', async () => {
       const parked = { reason: 'signal', hint: null };
       const merged = ['needs-consolidation'];

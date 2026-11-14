@@ -155,8 +155,8 @@ const gone = (t: Finished): FinishedTask => ({
  * `jig housekeeping`, so a project that has not run it lately offers no close for a merged task; the command asks the
  * forge itself and refuses one that has not merged.
  *
- * On the staging flow (`staging` is there) the pull request is the one into staging, and Jig 0.45.0 offers and runs
- * the close once that one merged, before the work reached the base. There only housekeeping's `needs-consolidation`,
+ * On the staging flow (`staging` is there) the pull request is the one into staging, and Jig 0.45.0's close command
+ * closes the task once that one merged, before the work reached the base (fapost-lab/jig#509). There only housekeeping's `needs-consolidation`,
  * a merge into the base, makes a task closable.
  */
 function closable(t: Live): boolean {

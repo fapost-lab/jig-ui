@@ -491,6 +491,8 @@ export type Written =
       reasons?: string[];
       /** Filing an item's task on Jig 0.40.0: the task was filed, and Jig refused to name it on the item. */
       filed?: true;
+      /** Filing an item's new task from Jig 0.42.0: its id is a task's already, as Jig's `already-exists` now says alone. */
+      taken?: true;
       /** Knowledge decisions: the document the refusal is about — the one not open, or the first sent that Jig's line names —, `null` for none. */
       doc?: string | null;
     }

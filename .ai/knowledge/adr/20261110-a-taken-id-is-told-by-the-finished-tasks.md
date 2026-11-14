@@ -8,7 +8,7 @@ paths:
   - server/http/app.ts
   - web/lib/refusal.ts
 summary: A filing's new id refused already-exists is said to be a finished task's, with the id field marked, when Jig's list of finished tasks holds it; otherwise Jig's line is shown (amends adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41)
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-14
 ---
 # A filing's new id that Jig refuses `already-exists` is told taken by Jig's list of finished tasks, not by its words
 
@@ -37,6 +37,13 @@ is therefore a finished task's, and Jig lists those tasks (`finished`).
 
 This amends adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41 where it shows
 `already-exists` in Jig's line. The rest of that ADR stands.
+
+**Amended 2026-11-14 (task `already-filed-code`).** Jig 0.42.0 made the root fix below
+(fapost-lab/jig#442): an item that names a task already is refused `already-filed`, so `already-exists`
+on `--new` means only that the id is a task's. From `FILED_JIG_VERSION` (0.42.0) the adapter marks that
+refusal `taken` and the route answers `taken: true` without reading the finished tasks — an archived
+task's id is marked too; `already-filed` gets a line of its own, saying the item names a task already
+and the roadmap is shown as it is now. Below 0.42.0 the decision above stands as it is.
 
 ## Alternatives
 

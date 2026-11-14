@@ -10,6 +10,7 @@
     LOSSY,
     LOSSY_NAME,
     NO_DROP,
+    pendingLine,
     readFirst,
     shownDiff,
     shownText,
@@ -33,17 +34,24 @@
     knowledge: ReadyKnowledge;
     diffs: Partial<Record<string, SourceDiff | 'reading' | 'not-found'>>;
     texts: Partial<Record<string, DocumentText | 'reading' | 'not-found'>>;
-    /** The document whose decision is on its way to Jig. */
-    busy?: string;
-    /** A decision is on its way to Jig: every other one waits. */
-    disabled?: boolean;
+    /** Decisions pressed that wait for a write: each can be taken back. */
+    queued: ReadonlyMap<string, Decision>;
+    /** Decisions in the write under way. */
+    sending: ReadonlyMap<string, Decision>;
   }>();
 
   const emit = defineEmits<{
     decide: [doc: string, decision: Decision];
     toggle: [doc: string, open: boolean];
     toggleText: [doc: string, open: boolean];
+    takeBack: [doc: string];
   }>();
+
+  /** The line of a decision the page holds for a document, `undefined` for none. */
+  function pending(doc: string, of: 'proposal' | 'source'): string | undefined {
+    const decision = props.sending.get(doc) ?? props.queued.get(doc);
+    return decision && pendingLine(decision, of, props.sending.has(doc));
+  }
 
   /** Each proposal with why Jig cannot decide it as of the last fetch, and its text as shown — a Markdown file as HTML cleaned of anything that could run —, `undefined` while closed. */
   const proposals = computed(() =>
@@ -149,11 +157,13 @@
           <template v-else>
             <p v-if="blocked" :class="landed(p) ? 'text-muted-foreground' : toneText.attention">{{ blocked }}</p>
             <p v-if="!knowledge.canRead && !landed(p)" class="text-muted-foreground">{{ readFirst(p) }}</p>
-            <p v-if="!landed(p)" class="flex flex-wrap items-center gap-2">
-              <Button size="xs" :disabled="disabled" @click="emit('decide', p.id, 'accept')">
-                {{ busy === p.id ? 'Sending…' : 'Accept' }}
-              </Button>
-              <Button variant="outline" size="xs" :disabled="disabled" @click="emit('decide', p.id, 'reject')">Reject</Button>
+            <p v-if="pending(p.id, 'proposal')" class="flex flex-wrap items-center gap-2 text-muted-foreground">
+              {{ pending(p.id, 'proposal') }}
+              <Button v-if="queued.has(p.id)" variant="outline" size="xs" @click="emit('takeBack', p.id)">Take back</Button>
+            </p>
+            <p v-else-if="!landed(p)" class="flex flex-wrap items-center gap-2">
+              <Button size="xs" @click="emit('decide', p.id, 'accept')">Accept</Button>
+              <Button variant="outline" size="xs" @click="emit('decide', p.id, 'reject')">Reject</Button>
             </p>
           </template>
         </li>
@@ -205,13 +215,13 @@
           </p>
           <template v-else>
             <p v-if="blocked" :class="landed(s) ? 'text-muted-foreground' : toneText.attention">{{ blocked }}</p>
-            <p v-if="(actions.keep || actions.drop) && !landed(s)" class="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <Button v-if="actions.keep" size="xs" :disabled="disabled" @click="emit('decide', s.id, 'reviewed')">{{
-                busy === s.id ? 'Sending…' : 'Keep'
-              }}</Button>
-              <Button v-if="actions.drop" variant="outline" size="xs" :disabled="disabled" @click="emit('decide', s.id, 'reject')">{{
-                busy === s.id && s.state === 'missing' ? 'Sending…' : 'Drop'
-              }}</Button>
+            <p v-if="pending(s.id, 'source')" class="flex flex-wrap items-center gap-2 text-muted-foreground">
+              {{ pending(s.id, 'source') }}
+              <Button v-if="queued.has(s.id)" variant="outline" size="xs" @click="emit('takeBack', s.id)">Take back</Button>
+            </p>
+            <p v-else-if="(actions.keep || actions.drop) && !landed(s)" class="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Button v-if="actions.keep" size="xs" @click="emit('decide', s.id, 'reviewed')">Keep</Button>
+              <Button v-if="actions.drop" variant="outline" size="xs" @click="emit('decide', s.id, 'reject')">Drop</Button>
               <span v-else class="text-muted-foreground">{{ NO_DROP }}</span>
             </p>
           </template>

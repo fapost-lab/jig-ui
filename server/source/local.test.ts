@@ -195,7 +195,7 @@ case "$*" in
   "knowledge sources --json") cat sources.json ;;
   "knowledge sources --diff "*) cat diff.json; if grep -q '"error"' diff.json; then exit 1; fi ;;
   "knowledge read "*) cat read.json; if grep -q '"error"' read.json; then exit 1; fi ;;
-  "knowledge accept "*|"knowledge reject "*|"knowledge reviewed "*) while [ -f hold ]; do sleep 0.05; done; cat decision.json; if grep -q '"error"' decision.json; then exit 1; fi ;;
+  "knowledge accept "*|"knowledge reject "*|"knowledge reviewed "*|"knowledge decide "*) while [ -f hold ]; do sleep 0.05; done; cat decision.json; if grep -q '"error"' decision.json; then exit 1; fi ;;
   "task artifact read "*) cat artifact.json; if grep -q '"error"' artifact.json; then exit 1; fi ;;
   "task set "*) cat set.err >&2; exit ${answers.set?.code ?? 0} ;;
   "refresh --json") cat refresh.json; if grep -q '"error"' refresh.json; then exit 1; fi ;;
@@ -1160,7 +1160,11 @@ describe('localSource, writing the queue', () => {
         minimum: '0.40.0',
       });
       expect(await source.knowledgeDiff('old-knowing', 'rules')).toMatchObject({ state: 'unsupported' });
-      expect(await source.decideKnowledge('old-knowing', 'checkout', 'accept', 7)).toEqual({ state: 'refused', code: 'unsupported' });
+      expect(await source.decideKnowledge('old-knowing', [{ doc: 'checkout', decision: 'accept' }], 7)).toEqual({
+        state: 'refused',
+        code: 'unsupported',
+        doc: null,
+      });
       expect(knows(dir)).toEqual([]);
     });
 
@@ -1178,16 +1182,81 @@ describe('localSource, writing the queue', () => {
       const dir = project('deciding', '0.40.0', { knowledge });
       await source.connect(dir);
       const note = { state: 'written', note: 'agent.git is push: the pull request is yours' };
-      expect(await source.decideKnowledge('deciding', 'checkout', 'accept', 5)).toEqual(note);
-      expect(await source.decideKnowledge('deciding', 'style', 'reject', 6)).toEqual(note);
-      expect(await source.decideKnowledge('deciding', 'rules', 'reviewed', 7)).toEqual(note);
-      expect(await source.decideKnowledge('deciding', 'old', 'reviewed', 7)).toEqual(note);
+      expect(await source.decideKnowledge('deciding', [{ doc: 'checkout', decision: 'accept' }], 5)).toEqual(note);
+      expect(await source.decideKnowledge('deciding', [{ doc: 'style', decision: 'reject' }], 6)).toEqual(note);
+      expect(await source.decideKnowledge('deciding', [{ doc: 'rules', decision: 'reviewed' }], 7)).toEqual(note);
+      expect(await source.decideKnowledge('deciding', [{ doc: 'old', decision: 'reviewed' }], 7)).toEqual(note);
       expect(decisions(dir)).toEqual([
         'knowledge accept checkout --revision 5 --json',
         'knowledge reject style --revision 6 --json',
         'knowledge reviewed rules --revision 7 --json',
         'knowledge reviewed old --revision 7 --json',
       ]);
+    });
+
+    it('decides several documents of any kinds as one `jig knowledge decide` from Jig 0.44.0, and says so on the read', async () => {
+      const dir = project('batching', '0.44.0', { knowledge });
+      await source.connect(dir);
+      expect(await source.knowledge('batching')).toMatchObject({ state: 'ready', canDecideMany: true });
+      const many = [
+        { doc: 'checkout', decision: 'accept' },
+        { doc: 'style', decision: 'reject' },
+        { doc: 'rules', decision: 'reviewed' },
+      ] as const;
+      expect(await source.decideKnowledge('batching', [...many], 7)).toEqual({
+        state: 'written',
+        note: 'agent.git is push: the pull request is yours',
+      });
+      expect(decisions(dir)).toEqual(['knowledge decide --accept checkout --reject style --reviewed rules --revision 7 --json']);
+    });
+
+    it('refuses more than one decision below Jig 0.44.0 as usage, running no decision', async () => {
+      const dir = project('one-by-one', '0.43.0', { knowledge });
+      await source.connect(dir);
+      expect(await source.knowledge('one-by-one')).toMatchObject({ state: 'ready', canDecideMany: false });
+      const two = [
+        { doc: 'checkout', decision: 'accept' },
+        { doc: 'style', decision: 'reject' },
+      ] as const;
+      expect(await source.decideKnowledge('one-by-one', [...two], 7)).toEqual({ state: 'refused', code: 'usage', doc: null });
+      expect(decisions(dir)).toEqual([]);
+    });
+
+    it('refuses them all as not-found, naming the first that is not open, running no decision', async () => {
+      const dir = project('one-closed', '0.44.0', { knowledge });
+      await source.connect(dir);
+      const three = [
+        { doc: 'checkout', decision: 'accept' },
+        { doc: 'decided', decision: 'accept' },
+        { doc: 'nobody', decision: 'reject' },
+      ] as const;
+      expect(await source.decideKnowledge('one-closed', [...three], 7)).toEqual({ state: 'refused', code: 'not-found', doc: 'decided' });
+      expect(decisions(dir)).toEqual([]);
+    });
+
+    it("names the document Jig's refusal names as a word of its own, not one whose id it only contains", async () => {
+      const proposed = { ...knowledge.proposed, proposals: [proposal('style'), proposal('style-guide')] };
+      const dir = project('stopped', '0.44.0', { knowledge: { ...knowledge, proposed } });
+      writeFileSync(
+        join(dir, 'decision.json'),
+        JSON.stringify({
+          schema: 1,
+          revision: 9,
+          generated_at: 'x',
+          error: { code: 'not-proposed', message: 'knowledge: not a proposed document: style-guide (status: accepted)' },
+        }),
+      );
+      await source.connect(dir);
+      const two = [
+        { doc: 'style', decision: 'accept' },
+        { doc: 'style-guide', decision: 'accept' },
+      ] as const;
+      expect(await source.decideKnowledge('stopped', [...two], 7)).toEqual({
+        state: 'refused',
+        code: 'not-proposed',
+        reasons: ['not a proposed document: style-guide (status: accepted)'],
+        doc: 'style-guide',
+      });
     });
 
     let undecided = 0;
@@ -1204,7 +1273,7 @@ describe('localSource, writing the queue', () => {
       const name = `undecided-${undecided++}`;
       const dir = project(name, '0.40.0', { knowledge });
       await source.connect(dir);
-      expect(await source.decideKnowledge(name, id, decision, 7)).toEqual({ state: 'refused', code: 'not-found' });
+      expect(await source.decideKnowledge(name, [{ doc: id, decision }], 7)).toEqual({ state: 'refused', code: 'not-found', doc: id });
       expect(decisions(dir)).toEqual([]);
     });
 
@@ -1212,11 +1281,19 @@ describe('localSource, writing the queue', () => {
       const dir = project('dropping', '0.41.0', { knowledge });
       await source.connect(dir);
       for (const id of ['rules', 'old', 'gone']) {
-        expect(await source.decideKnowledge('dropping', id, 'reject', 7)).toMatchObject({ state: 'written' });
+        expect(await source.decideKnowledge('dropping', [{ doc: id, decision: 'reject' }], 7)).toMatchObject({ state: 'written' });
       }
       for (const id of ['kept', 'fine'])
-        expect(await source.decideKnowledge('dropping', id, 'reject', 7)).toEqual({ state: 'refused', code: 'not-found' });
-      expect(await source.decideKnowledge('dropping', 'gone', 'accept', 7)).toEqual({ state: 'refused', code: 'not-found' });
+        expect(await source.decideKnowledge('dropping', [{ doc: id, decision: 'reject' }], 7)).toEqual({
+          state: 'refused',
+          code: 'not-found',
+          doc: id,
+        });
+      expect(await source.decideKnowledge('dropping', [{ doc: 'gone', decision: 'accept' }], 7)).toEqual({
+        state: 'refused',
+        code: 'not-found',
+        doc: 'gone',
+      });
       expect(decisions(dir)).toEqual([
         'knowledge reject rules --revision 7 --json',
         'knowledge reject old --revision 7 --json',
@@ -1232,34 +1309,41 @@ describe('localSource, writing the queue', () => {
       };
       const dir = project('unjudged', '0.41.0', { knowledge: judged });
       await source.connect(dir);
-      expect(await source.decideKnowledge('unjudged', 'search', 'accept', 7)).toEqual({
+      expect(await source.decideKnowledge('unjudged', [{ doc: 'search', decision: 'accept' }], 7)).toEqual({
         state: 'refused',
         code: 'not-on-base',
         reasons: ['refused'],
+        doc: null,
       });
       expect(decisions(dir)).toEqual(['knowledge accept search --revision 7 --json']);
     });
 
     it("keeps Jig 0.41.0's not-found as it is", async () => {
       await source.connect(project('unfound-041', '0.41.0', { knowledge: { ...knowledge, decision: 'not-found' } }));
-      expect(await source.decideKnowledge('unfound-041', 'checkout', 'accept', 7)).toEqual({
+      expect(await source.decideKnowledge('unfound-041', [{ doc: 'checkout', decision: 'accept' }], 7)).toEqual({
         state: 'refused',
         code: 'not-found',
         reasons: ['refused'],
+        doc: null,
       });
     });
 
     it('says a document Jig did not find where it decides is not on its branch', async () => {
       await source.connect(project('unpushed', '0.40.0', { knowledge: { ...knowledge, decision: 'not-found' } }));
-      expect(await source.decideKnowledge('unpushed', 'checkout', 'accept', 7)).toEqual({ state: 'refused', code: 'not-on-branch' });
+      expect(await source.decideKnowledge('unpushed', [{ doc: 'checkout', decision: 'accept' }], 7)).toEqual({
+        state: 'refused',
+        code: 'not-on-branch',
+        doc: null,
+      });
     });
 
     it("carries Jig's refusal of a decision by its code, with its reason", async () => {
       await source.connect(project('refused-decision', '0.40.0', { knowledge: { ...knowledge, decision: 'stale-revision' } }));
-      expect(await source.decideKnowledge('refused-decision', 'checkout', 'accept', 7)).toEqual({
+      expect(await source.decideKnowledge('refused-decision', [{ doc: 'checkout', decision: 'accept' }], 7)).toEqual({
         state: 'refused',
         code: 'stale-revision',
         reasons: ['refused'],
+        doc: null,
       });
     });
   });

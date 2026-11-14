@@ -466,10 +466,19 @@ with no approved text kept to compare with says so: read it whole before you kee
 gone has only **Drop**, or move the link in the project with your agent (`jig-accept`). Drop needs
 Jig 0.41.0; on Jig 0.40.0 a gone file has no button.
 
-Jig UI runs `jig knowledge accept`, `reject` or `reviewed` with the revision of the knowledge you
-saw. Jig commits each decision on the branch `knowledge/decisions` in a tree of its own, never in
-your checkout, and takes it as far as `agent.git` lets it, as for [roadmap edits](#editing-a-roadmap).
-A decided document stays in the list, marked *Accepted, waiting*, *Rejected, waiting*, *Kept,
+A decision never holds the page. The document is marked at once — *Accepted, queued* (or *Rejected*,
+*Kept*, *Dropped*) with **Take back** — and you go on to the next. Whatever is queued goes to Jig as
+one write as soon as none is running; what you decide while one runs waits and goes as the next, so
+any number of decisions costs a fetch, a commit and a push or two, not one each. While its write runs
+a document reads *…, sending…*, and it can no longer be taken back. A queued decision lives in the
+project's page: leaving it — for another project or a task's details — or closing it before its
+write starts drops it.
+
+On Jig 0.44.0 or later Jig UI sends them with one `jig knowledge decide`; below that, one decision a
+write with `jig knowledge accept`, `reject` or `reviewed`, one after another. Each write carries the
+revision of the knowledge you saw. Jig commits the decisions on the branch `knowledge/decisions` in a
+tree of its own, never in your checkout, and takes them as far as `agent.git` lets it, as for
+[roadmap edits](#editing-a-roadmap). A decided document stays in the list, marked *Accepted, waiting*, *Rejected, waiting*, *Kept,
 waiting* or *Dropped, waiting*, until that branch's pull request is merged; a line above the lists
 says where the decisions wait.
 
@@ -484,7 +493,9 @@ your clone — push it first, then decide —, or it reached the default branch 
 waiting were started — decide it once they have landed. Jig fetches before it decides, so a decision
 sent after the push goes through; one sent too early is refused with Jig's reason.
 
-Jig refuses a decision when:
+When Jig refuses, it writes none of the decisions it was sent: every decision queued is given back,
+with its buttons, and a line above the lists says why, naming the document Jig stopped at. Jig
+refuses when:
 
 - `agent.git` is `none` (Jig's default) in your clone: choose a level in the project's **Settings**.
 - the document is proposed in a commit not on origin's default branch yet — `knowledge/decisions`
@@ -492,7 +503,7 @@ Jig refuses a decision when:
 - `knowledge/decisions` is checked out in a checkout of yours: switch it to another branch first.
 - decisions committed on `knowledge/decisions` in your clone never reached origin, above ones origin
   no longer has: Jig says how to move them to a branch of your own.
-- the project changed since you saw the knowledge: it is read again; decide again on it.
+- the project changed since you saw the knowledge: it is read again; decide again on it as it is now.
 
 ## Task details
 

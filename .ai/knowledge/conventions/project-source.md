@@ -7,7 +7,7 @@ paths:
   - "server/source/**"
   - "server/board/**"
 summary: "MAY/MUST/MUST NOT for the ProjectSource port: ids not paths, typed data, no files or processes leak"
-reviewed_at: 2026-11-13
+reviewed_at: 2026-11-14
 ---
 # ProjectSource — how the server reaches a project
 
@@ -68,9 +68,10 @@ Jig's report on `written` as `report` —, `refresh(id)` — what it did on `wri
 `--local` —, and a spec's roadmap edits `addItem(id, specId, phase, text, revision)`,
 `moveItem(id, specId, item, place, revision)` and `fileItem(id, specId, item, taskId, goal, revision)`, and the
 knowledge waiting for a decision — `knowledge(id)`, with a revision of its own and whether the project's Jig
-reads a document's text and drops a link (`canRead`, `canDrop`), a linked file's diff `knowledgeDiff(id, doc)`
+reads a document's text, drops a link and decides several documents in one write (`canRead`, `canDrop`,
+`canDecideMany`), a linked file's diff `knowledgeDiff(id, doc)`
 and a proposed document's text `knowledgeText(id, doc)`, read through Jig at each call, and the write
-`decideKnowledge(id, doc, decision, revision)` —,
+`decideKnowledge(id, decisions, revision)`, every `{doc, decision}` as one write, refused with the `doc` it stopped at —,
 which answer `written` — with Jig's `note`, paths cut, where a roadmap edit carries one —, `refused` with Jig's code,
 or the project's state when it is not `ready`; and the upgrade of a project's Jig — `planUpgrade(id)`,
 `upgrade(id)`, which answers `started` before Jig has run, and `dismissUpgrade(id)`; its local adapter
@@ -117,7 +118,8 @@ with `filed: true`, and the same request again with the same id — now live —
 (adr-20261106-editing-a-roadmap-from-the-page).
 
 A knowledge decision reads the knowledge again first — no held read lists it — and runs Jig only for
-an id that read lists open to the decision: `accept` and `reject` a proposal, `reviewed` a linked file
+every id that read lists open to its decision — one that is not refuses them all, with its `doc` (adr-20261114-knowledge-decisions-are-queued-on-the-page):
+`accept` and `reject` a proposal, `reviewed` a linked file
 not `missing`, and from `KNOWLEDGE_TEXT_JIG_VERSION` `reject` a listed linked file too, which drops its
 link — each with no decision waiting on it; anything else is `refused: not-found` without Jig. A record
 Jig reads as not decidable now is still sent: Jig's write fetches first and judges it. A diff runs Jig

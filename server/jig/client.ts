@@ -41,6 +41,9 @@ export const KNOWLEDGE_JIG_VERSION = '0.40.0';
  * on it would be judged on what the read shows.
  */
 export const KNOWLEDGE_TEXT_JIG_VERSION = '0.41.0';
+
+/** The first Jig that decides several knowledge documents, of any kinds, in one write: `jig knowledge decide`. */
+export const DECIDE_JIG_VERSION = '0.44.0';
 /** The first Jig that files an item's new task and names it on the item in one write (`spec item file --new`, fapost-lab/jig#390). */
 export const FILE_NEW_JIG_VERSION = '0.41.0';
 /** The first Jig that brings the clone up to origin (`jig refresh`) and says how it stands against origin (`jig status`'s `origin`). */
@@ -251,6 +254,8 @@ export class JigRefusal extends Error {
   constructor(
     readonly code: string,
     readonly reasons: string[] = [],
+    /** The document a refused knowledge decision stopped at, when Jig's line names one. */
+    readonly doc?: string,
   ) {
     super(`jig refused: ${code}`);
   }
@@ -1168,23 +1173,46 @@ export async function readKnowledgeText(
 /** A person's decision on a knowledge document, as Jig's command is named. */
 export type KnowledgeDecision = 'accept' | 'reject' | 'reviewed';
 
+/** One document and how a person decided it. */
+export interface DocumentDecision {
+  doc: string;
+  decision: KnowledgeDecision;
+}
+
 /**
- * Decides one document (`jig knowledge accept|reject|reviewed <id> --revision <n> --json`): Jig commits it on
- * `knowledge/decisions` in a tree of its own and goes as far as `agent.git` allows. The revision is never left out —
- * without it Jig decides unchecked. Answers Jig's note without a path; refused as a roadmap edit is, and `not-proposed`
- * (decided already, or not a proposal) and `source-missing`; from Jig 0.41.0 also `not-on-base`, `not-on-branch` (the
- * document is not on the branch the decision is judged on yet) and `write-still-waits`.
+ * Decides documents against the revision of the knowledge read they were based on, as one write: from
+ * `DECIDE_JIG_VERSION` `jig knowledge decide --accept|--reject|--reviewed <id>… --revision <n> --json`, each id with the
+ * flag of its decision, in the order given; below it `jig knowledge accept|reject|reviewed <id> --revision <n> --json`,
+ * one decision only — more is refused `usage` without Jig. Jig commits them on `knowledge/decisions` in a tree of its
+ * own and goes as far as `agent.git` allows; any refusal refuses them all, before anything is written. The revision is
+ * never left out — without it Jig decides unchecked. Answers Jig's note without a path; refused as a roadmap edit is,
+ * and `not-proposed` (decided already, or not a proposal) and `source-missing`; from Jig 0.41.0 also `not-on-base`,
+ * `not-on-branch` (the document is not on the branch the decision is judged on yet) and `write-still-waits`. Jig's
+ * line names the document it stopped at, and only there: the refusal carries it as `doc`, the one of these the line
+ * names as a word of its own, not as part of a longer id.
  */
 export async function decideKnowledge(
   root: string,
-  decision: KnowledgeDecision,
-  id: string,
+  decisions: DocumentDecision[],
   revision: number,
+  jigVersion: string,
   platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
-  const { data } = await readJson(root, ['knowledge', decision, id, '--revision', String(revision)], platform, KNOWLEDGE_TIMEOUT_MS);
-  const { note } = parsed(WriteNote, data).write;
-  return note && withoutPaths(note);
+  const many = supports(jigVersion, DECIDE_JIG_VERSION);
+  if (decisions.length === 0 || (!many && decisions.length > 1)) throw new JigRefusal('usage');
+  const named = many
+    ? ['decide', ...decisions.flatMap(({ doc, decision }) => [`--${decision}`, doc])]
+    : [decisions[0]!.decision, decisions[0]!.doc];
+  try {
+    const { data } = await readJson(root, ['knowledge', ...named, '--revision', String(revision)], platform, KNOWLEDGE_TIMEOUT_MS);
+    const { note } = parsed(WriteNote, data).write;
+    return note && withoutPaths(note);
+  } catch (error) {
+    if (!(error instanceof JigRefusal)) throw error;
+    const names = (line: string, doc: string) => line.split(/[^\w-]+/).includes(doc);
+    const stopped = decisions.find(({ doc }) => error.reasons.some((line) => names(line, doc)))?.doc;
+    throw new JigRefusal(error.code, error.reasons, stopped);
+  }
 }
 
 /** Closing asks the forge whether the task's pull request merged: a network round trip. */

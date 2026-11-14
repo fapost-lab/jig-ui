@@ -6,6 +6,7 @@ import {
   ARTIFACTS_JIG_VERSION,
   cancelPause,
   closeTask,
+  DECIDE_JIG_VERSION,
   decideKnowledge,
   FILE_NEW_JIG_VERSION,
   fileItem,
@@ -63,6 +64,7 @@ import { scanFolder, tilde } from './scan.js';
 import type {
   Attention,
   Change,
+  DocumentDecision,
   FinishedTask,
   LandedAll,
   MergeWait,
@@ -1084,7 +1086,13 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       if (!answer.read) return { id, state: 'unreadable', code: 'failed' };
       // A document's text and a dropped link came in the same Jig.
       const later = supports(answer.jigVersion, KNOWLEDGE_TEXT_JIG_VERSION);
-      return { state: 'ready', ...answer.read, canRead: later, canDrop: later };
+      return {
+        state: 'ready',
+        ...answer.read,
+        canRead: later,
+        canDrop: later,
+        canDecideMany: supports(answer.jigVersion, DECIDE_JIG_VERSION),
+      };
     },
     async knowledgeDiff(id, docId) {
       const answer = await onDemand(id, KNOWLEDGE_JIG_VERSION, async (root) =>
@@ -1100,27 +1108,31 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       );
       return answer?.state === 'ready' ? { state: 'ready', text: answer.read } : answer;
     },
-    decideKnowledge(id, docId, decision, revision) {
-      return writing(id, [], async (root, jigVersion) => {
+    async decideKnowledge(id, decisions, revision) {
+      let doc: string | null = null;
+      const written = await writing(id, [], async (root, jigVersion) => {
         if (!supports(jigVersion, KNOWLEDGE_JIG_VERSION)) throw new JigRefusal('unsupported');
         // No held read lists knowledge: Jig's own lists, read now, name what each decision may take.
         const { proposals, sources } = await readKnowledge(root);
         const later = supports(jigVersion, KNOWLEDGE_TEXT_JIG_VERSION);
         // From Jig 0.41.0 `reject` also drops the link of a stub listed as changed, unrecorded or missing.
-        const open =
+        const open = ({ doc, decision }: DocumentDecision) =>
           decision === 'reviewed'
-            ? sources.some((s) => s.id === docId && s.state !== 'missing' && s.waiting === null)
-            : proposals.some((p) => p.id === docId && p.waiting === null) ||
-              (decision === 'reject' && later && sources.some((s) => s.id === docId && s.waiting === null));
-        if (!open) throw new JigRefusal('not-found');
+            ? sources.some((s) => s.id === doc && s.state !== 'missing' && s.waiting === null)
+            : proposals.some((p) => p.id === doc && p.waiting === null) ||
+              (decision === 'reject' && later && sources.some((s) => s.id === doc && s.waiting === null));
+        doc = decisions.find((d) => !open(d))?.doc ?? null;
+        if (doc !== null) throw new JigRefusal('not-found');
         try {
-          return await decideKnowledge(root, decision, docId, revision);
+          return await decideKnowledge(root, decisions, revision, jigVersion);
         } catch (error) {
+          if (error instanceof JigRefusal) doc = error.doc ?? null;
           // Listed in the checkout, yet not where Jig 0.40.0 decides: `knowledge/decisions`, cut from origin's base. Jig
           // 0.41.0 says so itself, as `not-on-base` or `not-on-branch`, and its `not-found` is one.
           throw error instanceof JigRefusal && error.code === 'not-found' && !later ? new JigRefusal('not-on-branch') : error;
         }
       });
+      return written?.state === 'refused' ? { ...written, doc } : written;
     },
     async planUpgrade(id) {
       const found = await upgradable(id);

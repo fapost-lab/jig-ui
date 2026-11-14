@@ -869,7 +869,9 @@ describe('readKnowledgeText', () => {
 describe('decideKnowledge', () => {
   it("drops an approved stub's link with reject (Jig 0.41.0)", async () => {
     const dir = logging(`case-${cases++}`, 'knowledge-drop.json');
-    expect(await decideKnowledge(dir, 'reject', 'convention-team-rules', 1794230818)).toBe('agent.git is push: the pull request is yours');
+    expect(await decideKnowledge(dir, [{ doc: 'convention-team-rules', decision: 'reject' }], 1794230818, '0.41.0')).toBe(
+      'agent.git is push: the pull request is yours',
+    );
     expect(args(dir)).toEqual(['knowledge', 'reject', 'convention-team-rules', '--revision', '1794230818', '--json']);
   });
 
@@ -879,7 +881,7 @@ describe('decideKnowledge', () => {
     ['reviewed', 'knowledge-reviewed.json'],
   ] as const)("runs %s on one document against the revision it was read at and answers Jig's note", async (decision, json) => {
     const dir = logging(`case-${cases++}`, json);
-    expect(await decideKnowledge(dir, decision, 'feature-checkout', 1793950153)).toBe(
+    expect(await decideKnowledge(dir, [{ doc: 'feature-checkout', decision }], 1793950153, '0.43.0')).toBe(
       'agent.git is commit: pushing knowledge/decisions is yours',
     );
     expect(args(dir)).toEqual(['knowledge', decision, 'feature-checkout', '--revision', '1793950153', '--json']);
@@ -938,7 +940,8 @@ describe('decideKnowledge', () => {
   ] as const)(
     "carries the refusal in %s as %s of %s, Jig's reason without its command's name or a path",
     async (json, code, decision, reasons) => {
-      await expect(decideKnowledge(answering(`case-${cases++}`, json, 1), decision, 'convention-ops', 1)).rejects.toMatchObject({
+      const dir = answering(`case-${cases++}`, json, 1);
+      await expect(decideKnowledge(dir, [{ doc: 'convention-ops', decision }], 1, '0.43.0')).rejects.toMatchObject({
         code,
         reasons,
       });
@@ -955,14 +958,73 @@ describe('decideKnowledge', () => {
     const json = changed('knowledge-accept.json', (data) => {
       data.write.note = note;
     });
-    expect(await decideKnowledge(answering(`case-${cases++}`, json), 'accept', 'feature-checkout', 1)).toBe(note);
+    expect(await decideKnowledge(answering(`case-${cases++}`, json), [{ doc: 'feature-checkout', decision: 'accept' }], 1, '0.45.0')).toBe(
+      note,
+    );
   });
 
   it('refuses an answer without its write', async () => {
     const json = changed('knowledge-accept.json', (data) => {
       delete data.write;
     });
-    await expect(decideKnowledge(answering(`case-${cases++}`, json), 'accept', 'x', 1)).rejects.toBeInstanceOf(JigShapeError);
+    await expect(
+      decideKnowledge(answering(`case-${cases++}`, json), [{ doc: 'x', decision: 'accept' }], 1, '0.43.0'),
+    ).rejects.toBeInstanceOf(JigShapeError);
+  });
+
+  // Jig 0.45.0 in a scratch project: three documents, one of each kind, in one write.
+  it('decides several documents of any kinds in one `jig knowledge decide` from Jig 0.44.0, each with the flag of its decision', async () => {
+    const dir = logging(`case-${cases++}`, 'knowledge-decide.json');
+    const decisions = [
+      { doc: 'adr-20261114-alpha', decision: 'accept' },
+      { doc: 'adr-20261114-beta', decision: 'reject' },
+      { doc: 'adr-use-postgres', decision: 'reviewed' },
+    ] as const;
+    expect(await decideKnowledge(dir, [...decisions], 1794637520, '0.44.0')).toBe(
+      'agent.git is commit: pushing knowledge/decisions is yours',
+    );
+    expect(args(dir)).toEqual([
+      'knowledge',
+      'decide',
+      '--accept',
+      'adr-20261114-alpha',
+      '--reject',
+      'adr-20261114-beta',
+      '--reviewed',
+      'adr-use-postgres',
+      '--revision',
+      '1794637520',
+      '--json',
+    ]);
+  });
+
+  it('carries the refusal of a decide whole, its line naming the document Jig stopped at', async () => {
+    const dir = answering(`case-${cases++}`, 'knowledge-decide-not-proposed.json', 1);
+    const decisions = [
+      { doc: 'adr-20261114-gamma', decision: 'accept' },
+      { doc: 'adr-20261114-alpha', decision: 'accept' },
+    ] as const;
+    await expect(decideKnowledge(dir, [...decisions], 1794637528, '0.45.0')).rejects.toMatchObject({
+      code: 'not-proposed',
+      reasons: ['not a proposed document: adr-20261114-alpha (status: accepted)'],
+      doc: 'adr-20261114-alpha',
+    });
+  });
+
+  it.each([
+    ['none at all', [], '0.45.0'],
+    [
+      'more than one below Jig 0.44.0',
+      [
+        { doc: 'a', decision: 'accept' },
+        { doc: 'b', decision: 'reject' },
+      ],
+      '0.43.0',
+    ],
+  ] as const)('refuses %s as usage without running Jig', async (_, decisions, version) => {
+    const dir = logging(`case-${cases++}`, 'knowledge-decide.json');
+    await expect(decideKnowledge(dir, [...decisions], 1, version)).rejects.toMatchObject({ code: 'usage' });
+    expect(existsSync(join(dir, 'args.log'))).toBe(false);
   });
 });
 

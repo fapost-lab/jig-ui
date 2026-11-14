@@ -13,6 +13,7 @@ import {
   ARTIFACT_KINDS,
   type ArtifactKind,
   type ItemPlace,
+  type DocumentDecision,
   type KnowledgeDecision,
   type Place,
   type ProjectSource,
@@ -97,6 +98,14 @@ const isValue = (v: unknown): v is string => typeof v === 'string' && v.length <
 /** A decision on a knowledge document, as Jig's command is named: `reviewed` keeps a changed linked file. */
 const isDecision = (v: unknown): v is KnowledgeDecision => v === 'accept' || v === 'reject' || v === 'reviewed';
 
+/** Documents and how each was decided, each document once and at least one; `undefined` where any is invalid. */
+function documentDecisions(v: unknown): DocumentDecision[] | undefined {
+  if (!Array.isArray(v) || v.length === 0) return undefined;
+  const decisions = v.map((d: unknown) => ({ doc: field(d, 'doc'), decision: field(d, 'decision') }));
+  if (!decisions.every((d): d is DocumentDecision => isId(d.doc) && isDecision(d.decision))) return undefined;
+  return new Set(decisions.map((d) => d.doc)).size === decisions.length ? decisions : undefined;
+}
+
 /** A roadmap phase's number, `## Phase <n>`. */
 const isPhase = (v: unknown): v is number => Number.isSafeInteger(v) && (v as number) >= 0;
 
@@ -148,6 +157,16 @@ function edited(c: Context, w: Written | undefined) {
     return c.json({ error: { code: w.code, message, reasons: w.reasons ?? [], filed: true as const } }, 422);
   }
   return unwritten(c, w);
+}
+
+/**
+ * What knowledge decisions came to, as `edited` says; a refusal names the document it is about, `null` for none —
+ * `stale-revision` and `not-found` too, with their own statuses.
+ */
+function decided(c: Context, w: Written | undefined) {
+  if (w?.state !== 'refused') return edited(c, w);
+  const status = w.code === 'stale-revision' ? 409 : w.code === 'not-found' ? 404 : 422;
+  return c.json({ error: { code: w.code, message: 'Jig did not decide them.', reasons: w.reasons ?? [], doc: w.doc ?? null } }, status);
 }
 
 /** An upgrade refused before it ran, in the API's form: under way already, none to make, or Jig's code and its reasons. */
@@ -537,23 +556,25 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
         },
       )
 
-      // A knowledge decision: Jig commits it on `knowledge/decisions` in a tree of its own, never in the person's checkout.
+      // Knowledge decisions, as one write: Jig commits them on `knowledge/decisions` in a tree of its own, never in the
+      // person's checkout.
       .post(
         '/api/projects/:id/knowledge/decide',
         validator('json', (body: unknown) => {
-          const [doc, decision, revision] = [field(body, 'doc'), field(body, 'decision'), field(body, 'revision')];
-          return {
-            doc: isId(doc) ? doc : undefined,
-            decision: isDecision(decision) ? decision : undefined,
-            revision: isRevision(revision) ? revision : undefined,
-          };
+          const revision = field(body, 'revision');
+          return { decisions: documentDecisions(field(body, 'decisions')), revision: isRevision(revision) ? revision : undefined };
         }),
         async (c) => {
-          const { doc, decision, revision } = c.req.valid('json');
-          if (doc === undefined || decision === undefined || revision === undefined) {
-            return refuse(c, 422, 'usage', 'Give a document, accept, reject or reviewed, and the revision the knowledge was read at.');
+          const { decisions, revision } = c.req.valid('json');
+          if (decisions === undefined || revision === undefined) {
+            return refuse(
+              c,
+              422,
+              'usage',
+              'Give the documents, each once with accept, reject or reviewed, and the revision the knowledge was read at.',
+            );
           }
-          return edited(c, await source.decideKnowledge(c.req.param('id'), doc, decision, revision));
+          return decided(c, await source.decideKnowledge(c.req.param('id'), decisions, revision));
         },
       )
 

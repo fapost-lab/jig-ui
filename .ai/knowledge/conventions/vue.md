@@ -6,7 +6,7 @@ domains: []
 paths:
   - "web/**"
 summary: MAY/MUST/MUST NOT for web/ layers (views → components → components/ui), styling, lib decisions with tests, and the canvas
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-14
 ---
 # The page in Vue
 
@@ -16,7 +16,9 @@ reviewed_at: 2026-11-10
   member (convention-code-style); `defineModel` for a v-model.
 - A view's reads go through `lastWins` (`lib/last-wins.ts`), so an older answer never lands over a
   newer one, and start from `onChange`, which runs them once the change stream is open — no read
-  on mount (feature-live-updates).
+  on mount (feature-live-updates). The one exception: a write's own read lands even when a later
+  one superseded it, if Jig's revision shows it newer than what is shown, so the next write goes on
+  it (`newer` in `lib/knowledge.ts`, adr-20261114-knowledge-decisions-are-queued-on-the-page).
 - Layers point one way: `views/` → `components/` → `components/ui/`; `lib/` from any of them.
 
 ```

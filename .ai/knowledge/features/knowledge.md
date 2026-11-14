@@ -44,7 +44,9 @@ whatever is queued goes as one write as soon as none runs; while it runs, "…, 
 (`web/lib/decisions.ts`, adr-20261114-knowledge-decisions-are-queued-on-the-page). A write is `POST /api/projects/:id/knowledge/decide`
 `{decisions: [{doc, decision}, …], revision}`: from Jig 0.44.0 one `jig knowledge decide`, below it
 `jig knowledge accept|reject|reviewed`, one a write (adr-20261106-knowledge-decisions-from-the-page).
-A refusal gives every queued decision back, under a line naming the document Jig stopped at and how many are back. A decided
+A refusal gives every queued decision back, under a line naming the document Jig stopped at and how many are back;
+an answer this Jig UI cannot read (`incompatible`) says instead that Jig may have written them, and the knowledge read
+after it shows which (task `knowledge-incompatible`). A decided
 document stays listed — Jig lists it until `knowledge/decisions` lands — marked "Accepted, waiting",
 "Rejected, waiting", "Kept, waiting" or "Dropped, waiting", under a line saying where the decisions
 wait. Bytes Jig dropped as not UTF-8 are said, on a text and on a record whose file name may then be

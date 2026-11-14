@@ -251,6 +251,16 @@ describe('knowledgeRefusal', () => {
     );
   });
 
+  // A later Jig may have written what it answered in a form this Jig UI does not read: the knowledge read after it shows.
+  it('says an answer it cannot read may have written the decisions, never that Jig wrote none', () => {
+    expect(knowledgeRefusal('incompatible', [], null, 1)).toBe(
+      'Jig answered in a form this Jig UI does not read, and may have written your decision: the knowledge is shown as it is now; update Jig UI.',
+    );
+    expect(knowledgeRefusal('incompatible', [], null, 3)).toBe(
+      'Jig answered in a form this Jig UI does not read, and may have written your decisions: the knowledge is shown as it is now, with what it did not write back for you to decide; update Jig UI.',
+    );
+  });
+
   it('says one decision given back as one', () => {
     expect(knowledgeRefusal('stale-revision', [], null, 1)).toBe(
       'The knowledge changed since it was shown: your decision is back, decide it on it as it is now.',

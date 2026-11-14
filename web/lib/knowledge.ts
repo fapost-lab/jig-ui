@@ -185,12 +185,15 @@ export function shownText(proposal: Proposal, read: DocumentText | 'reading' | '
  * branch, is said so; otherwise Jig's own reasons — Jig 0.41.0 says itself why a document is not where the decision is
  * judged —, paths already cut out by the server, or the code. `doc` is the document the refusal names, `null` for none;
  * `back` how many decisions are given back, the refused write's and those queued behind it. Jig wrote none of them,
- * whatever an earlier write of the same run did.
+ * whatever an earlier write of the same run did — except for an answer this Jig UI cannot read (`incompatible`), which
+ * may have written the write's: the knowledge read after it shows which.
  */
 export function knowledgeRefusal(code: string, reasons: string[], doc: string | null, back: number): string {
   const one = back === 1;
   if (code === 'stale-revision')
     return `The knowledge changed since it was shown: ${one ? 'your decision is' : `your ${back} decisions are`} back, decide ${one ? 'it' : 'them'} on it as it is now.`;
+  if (code === 'incompatible')
+    return `Jig answered in a form this Jig UI does not read, and may have written your ${one ? 'decision: the knowledge is shown as it is now' : 'decisions: the knowledge is shown as it is now, with what it did not write back for you to decide'}; update Jig UI.`;
   const line = why(code, reasons, doc ?? 'them');
   const given = one
     ? 'Jig did not write your decision: it is back for you to decide.'

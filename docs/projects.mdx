@@ -437,8 +437,8 @@ Jig refuses edits when:
 - the id given to a new task is a finished task's: choose another id. From Jig 0.42.0 an archived
   task's id is marked too, at once, without reading the finished tasks.
 - the item already names a task on the spec's branch, for example one filed in another clone: from
-  Jig 0.42.0 the page says so in a line of its own and shows the roadmap as it is now; below it,
-  Jig's line says so.
+  Jig 0.42.0 the page says so in a line of its own and shows the roadmap as it is now; below Jig
+  0.42.0, Jig's line says so.
 
 With Jig 0.41.0 or later, filing a new task is one Jig command, `jig spec item file --new`, with
 the revision of the specs you saw, as for every other edit: a change made in the project since then
@@ -536,7 +536,9 @@ page of their own, with an address you can keep, and with what Jig offers. The d
 - **Its autopilot run** — the stage it entered last and, when it stopped, the question it stopped
   on.
 - **Its pull request** — open, merged or closed, its CI, and a link, as Jig's last
-  `jig housekeeping` heard it.
+  `jig housekeeping` heard it. On the [staging flow](#tasks-on-staging), once the task waits at the
+  staging branch or its work went there, the link is its **pull request into staging**, and the state
+  and CI Jig reads are its **promotion**'s into the main branch, shown while its work is on staging.
 - **What needs you** about it, and the housekeeping flags that still stand for it.
 - **What Jig offers now**, on the full page only — each step Jig would accept on the task as it is (approve the design,
   answer the autopilot, pause, ship, close…) with the command to run in the project and a **copy**

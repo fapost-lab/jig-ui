@@ -288,6 +288,16 @@ export const details: ReadyDetails[] = [
     actions: [{ id: 'start', command: 'jig task start file-backlog-task' }],
     column: { id: 'backlog', title: 'Backlog' },
   },
+  // Jig's staging flow: the work on staging, its promotion into the base open — the link is the pull request into staging.
+  {
+    ...base,
+    ...tasks.find((t) => t.id === 'staging-signal')!,
+    parked: null,
+    pullRequest: pr('open', 'green'),
+    branch: 'task/staging-signal',
+    actions: [],
+    column: { id: 'ready', title: 'Ready' },
+  },
 ];
 
 const ready = (id: string, more: Partial<Extract<Project, { state: 'ready' }>> = {}): Project => ({

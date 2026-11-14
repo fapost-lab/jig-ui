@@ -41,6 +41,27 @@ export function waits(task: Omit<Task, 'resumesTo'>):
   return task.autopilot === 'on' ? { text: 'On autopilot', tone: 'quiet' } : undefined;
 }
 
+/**
+ * A task's pull request as its details show it. On Jig's staging flow, once the task waits at the staging branch or its
+ * work went there, Jig's link is the pull request into staging while its state and CI are the promotion's into the base
+ * (as `waits` reads them), so the two are shown apart: the promotion only while its work is on staging, as on the card.
+ * Elsewhere, one pull request.
+ */
+export function pullRequests(task: Pick<Task, 'pullRequest' | 'staging' | 'parked'>): {
+  title: string;
+  text: string | null;
+  url: string | null;
+}[] {
+  const pr = task.pullRequest;
+  if (!pr) return [];
+  const ci = pr.ci && pr.ci !== 'none' ? `, CI ${pr.ci}` : '';
+  if (task.staging === null && task.parked === null) {
+    return [{ title: 'Pull request', text: `${pr.state ?? 'state not known yet'}${ci}`, url: pr.url }];
+  }
+  const into = { title: 'Pull request into staging', text: null, url: pr.url };
+  return task.staging === 'on' && pr.state ? [into, { title: 'Promotion', text: `${pr.state}${ci}`, url: null }] : [into];
+}
+
 /** What a card says of a pause asked of its task, with how long ago; shown beside any note `waits` gives. */
 export function requested(task: Task, now = Date.now()): string | undefined {
   return task.pauseRequest ? `Pause requested ${ago(task.pauseRequest.requestedAt, now)}` : undefined;

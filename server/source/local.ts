@@ -1132,7 +1132,8 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
           throw error instanceof JigRefusal && error.code === 'not-found' && !later ? new JigRefusal('not-on-branch') : error;
         }
       });
-      return written?.state === 'refused' ? { ...written, doc } : written;
+      // A write of one decision is about that one, whether Jig's line names it or not.
+      return written?.state === 'refused' ? { ...written, doc: doc ?? (decisions.length === 1 ? decisions[0]!.doc : null) } : written;
     },
     async planUpgrade(id) {
       const found = await upgradable(id);

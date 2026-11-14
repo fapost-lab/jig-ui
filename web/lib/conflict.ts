@@ -16,6 +16,8 @@ const facts = (t: Task): string =>
     t.paused,
     t.pauseRequest,
     t.pullRequest && [t.pullRequest.state, t.pullRequest.ci, t.pullRequest.url],
+    t.staging,
+    t.parked && [t.parked.reason, t.parked.hint],
     t.queue && [t.queue.level],
   ]);
 

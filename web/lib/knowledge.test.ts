@@ -237,17 +237,26 @@ describe('knowledgeRefusal', () => {
     ['not-on-base', ['commit and push it, then decide'], 'Jig did not decide feature-checkout: commit and push it, then decide'],
     ['write-still-waits', ['Move them to a branch of your own'], 'Jig did not decide feature-checkout: Move them to a branch of your own'],
   ])('says %s, and that every decision is back', (code, reasons, text) => {
-    expect(knowledgeRefusal(code, reasons, 'feature-checkout')).toBe(
-      `${/[.!?]$/.test(text) ? text : `${text}.`} Nothing was written: your decisions are back for you to decide.`,
+    expect(knowledgeRefusal(code, reasons, 'feature-checkout', 3)).toBe(
+      `${/[.!?]$/.test(text) ? text : `${text}.`} Jig wrote none of the 3 decisions: they are back for you to decide.`,
     );
   });
 
   it('says a stale read as the knowledge having changed, and a refusal that names no document as about them all', () => {
-    expect(knowledgeRefusal('stale-revision', ['the clone changed since revision 1'], null)).toBe(
-      'The knowledge changed since it was shown: your decisions are back, decide them on it as it is now.',
+    expect(knowledgeRefusal('stale-revision', ['the clone changed since revision 1'], null, 2)).toBe(
+      'The knowledge changed since it was shown: your 2 decisions are back, decide them on it as it is now.',
     );
-    expect(knowledgeRefusal('write-still-waits', ['Move them to a branch of your own'], null)).toBe(
-      'Jig did not decide them: Move them to a branch of your own. Nothing was written: your decisions are back for you to decide.',
+    expect(knowledgeRefusal('write-still-waits', ['Move them to a branch of your own'], null, 2)).toBe(
+      'Jig did not decide them: Move them to a branch of your own. Jig wrote none of the 2 decisions: they are back for you to decide.',
+    );
+  });
+
+  it('says one decision given back as one', () => {
+    expect(knowledgeRefusal('stale-revision', [], null, 1)).toBe(
+      'The knowledge changed since it was shown: your decision is back, decide it on it as it is now.',
+    );
+    expect(knowledgeRefusal('upgrading', [], 'feature-checkout', 1)).toBe(
+      'Jig is being upgraded in this project: try deciding feature-checkout again once it has finished. Jig did not write your decision: it is back for you to decide.',
     );
   });
 });

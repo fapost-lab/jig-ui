@@ -55,7 +55,8 @@ refuses the whole call before anything is written. Decided with the maintainer a
   Jig.
 - **A refusal names the document it stopped at** as `doc`: the one the adapter found not open, else
   the first sent document Jig's line names as a word of its own (found in `server/jig/client.ts`, so
-  knowledge of Jig's words stays there), else `null`, and the page says "them".
+  knowledge of Jig's words stays there), else, for a write of one, that one, else `null`, and the page
+  says "them". The line also says how many decisions it gives back (task `ui-nits`).
 
 This amends adr-20261106-knowledge-decisions-from-the-page where it rejects several ids as one
 decision: each document is still one press by a person who saw it; only the write is shared. The rest

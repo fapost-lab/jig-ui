@@ -292,6 +292,7 @@ const CODES = new Set([
   'stale-revision',
   'not-found',
   'already-exists',
+  'already-filed',
   'not-paused',
   'already-paused',
   'wrong-checkout',

@@ -74,10 +74,10 @@ readable project's card shows:
   may be missing until it runs.
 - **Housekeeping**, beside **Board**, runs `jig housekeeping` in the project — what Jig's session
   hook runs once a day: merged tasks' workspaces go to Jig's trash for 7 days, abandoned ones to the
-  archive, the pull request facts are read again, and merged branches are deleted as far as the
-  project's settings let Jig. The card shows Jig's report until you **Dismiss** it. Jig fetches
-  first, so a dialog for your git credentials, such as the macOS keychain's, may ask you to allow
-  it; the run waits for it up to two minutes.
+  archive after 14 days (from Jig 0.37.0; before it, to the trash), the pull request facts are read
+  again, and merged branches are deleted as far as the project's settings let Jig. The card shows
+  Jig's report until you **Dismiss** it. Jig fetches first, so a dialog for your git credentials,
+  such as the macOS keychain's, may ask you to allow it; the run waits for it up to two minutes.
 - **The newer Jig on this machine**, after the project's own version, when the project runs an
   older Jig than the one installed here: *0.34.0 → 0.35.0 on this machine*, and **Upgrade…** to
   upgrade it from the page ([Upgrading a project's Jig](#upgrading-a-projects-jig)). Above the
@@ -202,13 +202,13 @@ keeps its notes; an archived task is shown nowhere on the board, and `jig task l
 archived` lists them. A closed task that never had a branch, or whose branch housekeeping never
 sees merged, stays. The history of finished work is the project's merged pull requests.
 
-**Board / List** switches between the columns side by side and a list: the same columns as
-groups of rows, each group folding away; **Specs** shows the project's specs
-([Specs](#specs)). The browser remembers the choice. Above the list a strip counts all five
-columns — Needs you, In progress, Ready, Backlog, Paused —, a zero included. Each row shows the
-task's whole id with its class and priority, its goal under it (or *no goal yet*), and under that
-what it waits for. An empty group is its header alone, except In progress, which says how a task
-gets there.
+**Board / List** switches between the columns side by side and a list: the same columns as groups of
+rows, each group folding away; **Specs** shows the project's specs ([Specs](#specs)); **Knowledge**,
+the knowledge waiting for your decision ([Deciding knowledge](#deciding-knowledge)). The browser
+remembers the choice. Above the list a strip counts all five columns — Needs you, In progress,
+Ready, Backlog, Paused —, a zero included. Each row shows the task's whole id with its class and
+priority, its goal under it (or *no goal yet*), and under that what it waits for. An empty group is
+its header alone, except In progress, which says how a task gets there.
 
 ## Sorting and finding tasks
 
@@ -382,10 +382,10 @@ missing `spec.md` or `roadmap.md` says so. The specs follow the project like the
 
 ### Asking your agent
 
-The page plans nothing in a spec itself: a spec with work for your agent offers the request to
-copy. For the first phase with an item that has no task, it is *File the tasks for phase 3 of spec
-shop in acme*; while the spec has fog, *Continue spec shop in acme: lift its fog items*. Your agent
-takes them with Jig's `jig-idea` skill.
+Beyond [editing a roadmap](#editing-a-roadmap), the page plans nothing in a spec itself: a spec with
+work for your agent offers the request to copy. For the first phase with an item that has no task,
+it is *File the tasks for phase 3 of spec shop in acme*; while the spec has fog, *Continue spec shop
+in acme: lift its fog items*. Your agent takes them with Jig's `jig-idea` skill.
 
 ### Ordering the epics
 
@@ -434,8 +434,11 @@ Jig refuses edits when:
 - an earlier edit of the spec still waits where this one cannot follow (Jig 0.41.0): an epic was
   opened or finished since, or edits that never reached the remote sit above a pull request closed
   unmerged, or above edits the remote no longer has. Jig's line says what to do.
-- the id given to a new task is a finished task's: choose another id. When the item already names a
-  task on the spec's branch, for example one filed in another clone, Jig's line says so.
+- the id given to a new task is a finished task's: choose another id. From Jig 0.42.0 an archived
+  task's id is marked too, at once, without reading the finished tasks.
+- the item already names a task on the spec's branch, for example one filed in another clone: from
+  Jig 0.42.0 the page says so in a line of its own and shows the roadmap as it is now; below it,
+  Jig's line says so.
 
 With Jig 0.41.0 or later, filing a new task is one Jig command, `jig spec item file --new`, with
 the revision of the specs you saw, as for every other edit: a change made in the project since then
@@ -474,8 +477,9 @@ Jig 0.41.0; on Jig 0.40.0 a gone file has no button.
 
 A decision never holds the page. The document is marked at once — *Accepted, queued* (or *Rejected*,
 *Kept*, *Dropped*) with **Take back** — and you go on to the next. Whatever is queued goes to Jig as
-one write as soon as none is running; what you decide while one runs waits and goes as the next, so
-any number of decisions costs a fetch, a commit and a push or two, not one each. While its write runs
+soon as no write is running; what you decide while one runs waits and goes as the next. On Jig 0.44.0
+or later all that is queued goes as one write, so any number of decisions costs a fetch, a commit and
+a push or two, not one each. While its write runs
 a document reads *…, sending…*, and it can no longer be taken back. A queued decision lives in the
 project's page: leaving it — for another project or a task's details — or closing it before its
 write starts drops it.
@@ -561,6 +565,8 @@ the main branch could not move, it says why, and nothing was changed:
 | main is checked out in another worktree of this clone | bring it up from that worktree |
 | main here has commits origin's does not | push them, or drop them, with your agent |
 | Jig could not reach origin | try again once you are online |
+| There is no main here, or none on origin | set `git.base_branch` in the project's `.ai/config.yaml`, or push the branch |
+| This clone has no origin to fetch from | add the remote; until then the main branch is compared with nothing |
 
 Jig fetches as the clone's own account, so a dialog for your git credentials, such as the macOS
 keychain's, may ask you to allow it. Jig UI never runs **Refresh** on its own, so that dialog only

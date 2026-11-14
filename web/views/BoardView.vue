@@ -440,7 +440,7 @@
           ? `The project has a task called ${task} already, maybe a finished one. Choose another id.`
           : code === 'usage'
             ? 'Jig does not take this id or goal: one line of goal, not starting with #.'
-            : `Jig refused to file ${task} (${code}).`;
+            : refusal(code, 'filing', task);
 
       filingRefusal.value = { code, text };
     }

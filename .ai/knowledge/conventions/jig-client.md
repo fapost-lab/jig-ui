@@ -76,7 +76,8 @@ A task-list read runs Jig's JSON task listing, the live tasks only, checks the e
 `TaskList` schema — the status among Jig's own words — and returns typed tasks and the count of finished ones left out
 (`hidden`, less `archived` from Jig 0.37.0, which counts those among the hidden). The finished tasks themselves are
 `readFinishedTasks`: `--status` takes one status, so two runs, and either's failure fails the read. Jig's refusal throws `JigRefusal` with its code
-(an unknown code is `failed`); an envelope of another shape throws `JigShapeError`, which the
+(an unknown code is `failed`, so a code the page tells apart is in the client's `CODES` with a test
+that it arrives as itself — `already-filed` reached the page as `failed` until task `release-0-7-0`); an envelope of another shape throws `JigShapeError`, which the
 project shows as `incompatible` ("update Jig UI"), never half-parsed. Each read has a contract
 test over a fixture in `server/jig/fixtures/`. Each Jig run of a read, `--version` included, has
 30 s (`TIMEOUT_MS`); a run Node stops at the limit throws `JigRefusal('timeout')`, not `failed`,

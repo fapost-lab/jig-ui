@@ -14,7 +14,7 @@ paths:
   - web/lib/refusal.ts
   - web/lib/sift.ts
 summary: Board columns from Jig's task state, first rule wins, shown Needs you first; Board and List views; why Needs you is read from state, not attention
-reviewed_at: 2026-11-13
+reviewed_at: 2026-11-14
 ---
 # Board
 
@@ -31,9 +31,13 @@ keeps (`web/components/FinishedList.vue`, its words from `web/lib/finished.ts`).
 `web/views/BoardView.vue` reads the board and shows it two ways, switched by the person and
 remembered by the browser (`localStorage` `jig-ui.board-view`): Board (`BoardColumns`), the
 columns side by side, where a click expands a card into its details; List (`BoardList`), the
-columns as folding groups of one-line rows, a selected row's details in a pane on the right. Each
+columns as folding groups of rows under a strip counting all five columns, a zero included, a selected
+row's details in a pane on the right. A row (`TaskRow`) is the task's whole id, wrapped and never cut,
+with its class and priority; its goal under it, or a muted "no goal yet"; and under that what it waits
+for — the card's order, so Board and List read alike (task `list-view-sections`). Each
 column, and each List group, is a tinted panel with the column's accent as a stripe along its top;
-an empty column holds a dashed "nothing here" box, an empty group is its muted header alone; both
+an empty column holds a dashed "nothing here" box, an empty group is its muted header alone — but In
+progress, which keeps a dashed box saying a task from Backlog comes there once started; both
 still take a drop, so Paused does (adr-20261110-the-page-speaks-a-quiet-design-language). The
 two take the columns and the selected task as props and emit the choice; the view holds it. Both read the details on demand (feature-task-details).
 Specs (feature-specs) and Knowledge (feature-knowledge) are the third and fourth choices of the same switch; the sort

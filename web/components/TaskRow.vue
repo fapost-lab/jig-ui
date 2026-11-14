@@ -43,28 +43,28 @@
 
 <template>
   <div class="border-b">
-    <div class="flex items-center pr-2 hover:bg-muted/50" :class="[selected && 'bg-muted', busy && 'opacity-60']">
+    <div class="flex items-start pt-1.5 pr-2 hover:bg-muted/50" :class="[selected && 'bg-muted', busy && 'opacity-60']">
       <button
         type="button"
-        class="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left"
+        class="flex min-w-0 flex-1 flex-col gap-0.5 px-4 py-2.5 text-left"
         :aria-pressed="selected"
         @click="$emit('select')"
       >
-        <span class="w-44 shrink-0 truncate font-mono text-xs" :title="task.id">{{ task.id }}</span>
-        <span class="w-8 shrink-0"
-          ><Badge v-if="task.class" variant="outline">{{ task.class }}</Badge></span
-        >
-        <span
-          class="w-6 shrink-0 text-xs text-muted-foreground tabular-nums"
-          :title="task.priority === null ? undefined : `Priority ${task.priority}`"
-        >
-          {{ task.priority === null ? '' : `P${task.priority}` }}
+        <span class="flex items-center gap-2">
+          <span class="min-w-0 font-mono text-xs break-words text-muted-foreground">{{ task.id }}</span>
+          <Badge v-if="task.class" variant="outline">{{ task.class }}</Badge>
+          <span v-if="task.priority !== null" class="text-xs text-muted-foreground tabular-nums" :title="`Priority ${task.priority}`"
+            >P{{ task.priority }}</span
+          >
         </span>
-        <span class="min-w-0 flex-1 truncate">{{ task.goal }}</span>
-        <span v-if="changed" class="shrink-0 text-[13px]" :class="toneText.attention">changed</span>
-        <span v-if="busy" class="shrink-0 text-[13px] text-muted-foreground" role="status">sending to Jig…</span>
-        <span v-else-if="note" class="shrink-0 text-[13px]" :class="toneText[note.tone]">{{ note.text }}</span>
-        <span v-if="request && !busy" class="shrink-0 text-[13px]" :class="toneText.quiet">{{ request }}</span>
+        <span v-if="task.goal" class="line-clamp-2">{{ task.goal }}</span>
+        <span v-else class="text-muted-foreground">no goal yet</span>
+        <span v-if="changed || busy || note || request" class="flex flex-wrap gap-x-3 text-[13px]">
+          <span v-if="changed" :class="toneText.attention">changed</span>
+          <span v-if="busy" class="text-muted-foreground" role="status">sending to Jig…</span>
+          <span v-else-if="note" :class="toneText[note.tone]">{{ note.text }}</span>
+          <span v-if="request && !busy" :class="toneText.quiet">{{ request }}</span>
+        </span>
       </button>
       <QueueMenu
         v-if="cards"

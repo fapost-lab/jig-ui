@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { closeRefusal, fileItemRefusal, refusal, roadmapRefusal, unnamedRefusal } from './refusal';
+import { closeRefusal, fileItemRefusal, reasonsOf, refusal, roadmapRefusal, unnamedRefusal } from './refusal';
+
+describe('reasonsOf', () => {
+  it("reads Jig's reasons as lines, and none from an answer without them or with them in another shape", () => {
+    expect(reasonsOf({ code: 'refused', reasons: ['not merged', 7] })).toEqual(['not merged', '7']);
+    expect(reasonsOf({ code: 'refused' })).toEqual([]);
+    expect(reasonsOf({ code: 'refused', reasons: 'not merged' })).toEqual([]);
+  });
+});
 
 describe('refusal', () => {
   it.each([

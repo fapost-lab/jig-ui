@@ -32,7 +32,7 @@
     type RefreshState,
   } from '@/lib/projects';
   import { refreshReport } from '@/lib/refresh';
-  import { closeRefusal } from '@/lib/refusal';
+  import { closeRefusal, reasonsOf } from '@/lib/refusal';
   import { withConnected } from '@/lib/scan';
   import { settingRefusal } from '@/lib/settings';
   import { toneRule, toneText } from '@/lib/tones';
@@ -262,12 +262,7 @@
     settingKey.value = undefined;
     if (error?.code === 'stale-revision')
       settingNotice.value = 'The settings changed since they were shown: here they are as they are now.';
-    else if (error)
-      settingNotice.value = settingRefusal(
-        error.code,
-        'reasons' in error && Array.isArray(error.reasons) ? error.reasons.map(String) : [],
-        key,
-      );
+    else if (error) settingNotice.value = settingRefusal(error.code, reasonsOf(error), key);
   }
 
   const setSetting = (key: string, value: string) =>
@@ -359,7 +354,7 @@
     const body = await res.json();
     if ('report' in body) housekept.value[id] = { state: 'done', report: body.report };
     else if ('error' in body) {
-      const reasons = 'reasons' in body.error && Array.isArray(body.error.reasons) ? body.error.reasons.map(String) : [];
+      const reasons = reasonsOf(body.error);
       housekept.value[id] = { state: 'refused', message: body.error.message, reasons };
     } else delete housekept.value[id]; // the project cannot be read now: its card says why
     await load();
@@ -391,7 +386,7 @@
 
     const error = res && res.status !== 200 ? (await res.json()).error : undefined;
     if (error !== undefined) {
-      const reasons = 'reasons' in error && Array.isArray(error.reasons) ? error.reasons.map(String) : [];
+      const reasons = reasonsOf(error);
       closing.value[id] = { task, state: 'refused', message: closeRefusal(error.code, reasons, task) };
     }
     // A close that went through stays running until the read without the task has landed, as the board's does.

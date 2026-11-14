@@ -19,7 +19,7 @@ paths:
   - web/components/ConnectForm.vue
   - web/components/AttentionItem.vue
 summary: "The workspace page: a list of the connected projects with search and the chosen one's card — Jig's attention items, the mark and count of projects whose Jig is older than the machine's, their upgrade from the card — and Find projects, which lists the Jig projects in a folder not connected yet"
-reviewed_at: 2026-11-13
+reviewed_at: 2026-11-14
 ---
 # Workspace — every connected project on one page
 
@@ -33,7 +33,8 @@ that needs the person — not readable, or with an attention item — else the f
 shown. The card has its Jig version, its live tasks counted, what needs the person there — Jig's
 attention items as `jig status --json` lists them, `knowledge-proposed` and `sources-changed` with a link to the
 project's Knowledge view (`AttentionItem.vue`, feature-knowledge), and `needs-consolidation` ("Merged: the task can be
-closed") with **Close task** for a task the board's card could close (`closableBy` in `web/lib/projects.ts`;
+closed") with **Close task** for a task the board's card could close (`closableTask` in `web/lib/projects.ts`, the task it
+gives being the item's `closes`;
 adr-20261029-close-a-ready-task-from-the-board) — and the housekeeping note. **Housekeeping**, left
 of Board, runs `jig housekeeping` in the project and leaves Jig's report on the card until **Dismiss**
 (adr-20261110-housekeeping-runs-from-the-project-card). **Refresh**, on Jig's `base-behind-origin` item and beside a

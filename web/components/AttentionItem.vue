@@ -8,13 +8,13 @@
 
   /**
    * `project`: the project the item is about, given where the item can link to its page — the workspace card.
-   * `closable`: the item's task can be closed as done from here; `closing`: that close is on its way to Jig.
+   * `closes`: the item's task, where it can be closed as done from here; `closing`: that close is on its way to Jig.
    * `refreshable`: a clone behind origin can be brought up from here; `refreshing`: that refresh is on its way to Jig.
    */
   const props = defineProps<{
     item: Attention;
     project?: string;
-    closable?: boolean;
+    closes?: string;
     closing?: boolean;
     refreshable?: boolean;
     refreshing?: boolean;
@@ -22,7 +22,7 @@
 
   defineEmits<{
     /** Close task, confirmed: the view closes the item's task. */
-    close: [];
+    close: [task: string];
     /** Refresh on a clone behind origin: the view runs `jig refresh` in the project. */
     refresh: [];
   }>();
@@ -74,12 +74,12 @@
         {{ refreshing ? 'Refreshing…' : 'Refresh' }}
       </Button>
       <Button
-        v-if="closable"
+        v-if="closes"
         variant="outline"
         size="xs"
         class="shrink-0 text-foreground"
         :disabled="closing"
-        :aria-label="`Close ${item.subject.id} as done`"
+        :aria-label="`Close ${closes} as done`"
         :aria-expanded="asking"
         @click="asking = !asking"
       >
@@ -87,11 +87,11 @@
       </Button>
     </div>
     <CloseConfirm
-      v-if="closable && asking && item.subject.id"
-      :task="item.subject.id"
+      v-if="closes && asking"
+      :task="closes"
       @close="
         asking = false;
-        $emit('close');
+        $emit('close', closes);
       "
       @cancel="asking = false"
     />

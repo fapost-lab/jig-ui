@@ -569,8 +569,10 @@ const TaskRow = z
     pullRequest: pr && { url: pr.url, state: pr.state, ci: pr.ci, fetchedAt: pr.fetched_at },
     housekeepingFlags: t.housekeeping_flags,
     actions: t.actions.filter((a) => ACTIONS.has(a.id)),
-    staging: t.staging,
-    parked: t.parked,
+    /** Jig's staging flow, named once: only there are `staging` and `parked` given, `null` or not. */
+    stagingFlow: t.staging !== undefined,
+    staging: t.staging ?? null,
+    parked: t.parked ?? null,
   }));
 export type TaskSummary = z.output<typeof TaskRow>;
 

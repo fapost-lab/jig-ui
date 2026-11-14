@@ -48,8 +48,10 @@ any item. It reads as `null` when absent, and an `upgrade-available` item withou
 as a field Jig dropped does (task `projects-to-upgrade`). A roadmap item's `id` (Jig's handle) and a
 spec's `waiting` (the edits on its write branch, with the roadmap there) are printed from Jig 0.40.0
 only, and read as `null` when absent (task `roadmap-from-page`). A task's `staging` and `parked` are
-printed on Jig 0.45.0's staging flow only, absent on any other; the schema reads them as `undefined`
-when absent, and that absence is how the adapter tells the flow (task `tasks-on-staging`).
+printed on Jig 0.45.0's staging flow only, absent on any other; that absence is how the adapter tells
+the flow (task `tasks-on-staging`), and the schema names it once, as `stagingFlow`, reading both as
+`null` when absent — a check on `staging` itself would read every staging-flow task not on staging as
+direct (task `refactor-nits`).
 
 A test that runs real processes — a stand-in `jig` script that starts a child, leaves its process
 group, or waits — waits for a marker file the process writes once it is where the test needs it,

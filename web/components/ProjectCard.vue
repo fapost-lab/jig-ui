@@ -5,7 +5,7 @@
   import { Button } from '@/components/ui/button';
   import { Card } from '@/components/ui/card';
   import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-  import { type ClosingState, closableBy, type HousekeepingState, type RefreshState } from '@/lib/projects';
+  import { type ClosingState, closableTask, type HousekeepingState, type RefreshState } from '@/lib/projects';
   import { staleFetch } from '@/lib/refresh';
   import { toneRule, toneText } from '@/lib/tones';
   import { mergeWaitOf, needsUpgrade, type PlanState, upgradeMark } from '@/lib/upgrade';
@@ -136,13 +136,13 @@
           <AttentionItem
             :item="item"
             :project="project.id"
-            :closable="closableBy(project, item) !== undefined"
+            :closes="closableTask(project, item)"
             :closing="closing?.state === 'running' && closing.task === item.subject.id"
             :asking="asking !== undefined && asking === item.subject.id"
             :refreshable="project.upgrade?.state !== 'running'"
             :refreshing="refresh?.state === 'running'"
             @update:asking="(open) => (asking = open ? (item.subject.id ?? undefined) : undefined)"
-            @close="item.subject.id && $emit('closeTask', item.subject.id)"
+            @close="(task) => $emit('closeTask', task)"
             @refresh="$emit('refresh')"
           />
         </li>

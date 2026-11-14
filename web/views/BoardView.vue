@@ -44,7 +44,7 @@
   import { settleFinished } from '@/lib/finished';
   import { knowledgeRefusal, newer, noKnowledge } from '@/lib/knowledge';
   import { lastWins } from '@/lib/last-wins';
-  import { closeRefusal, fileItemRefusal, refusal, roadmapRefusal } from '@/lib/refusal';
+  import { closeRefusal, fileItemRefusal, reasonsOf, refusal, roadmapRefusal } from '@/lib/refusal';
   import { filtered, fromQuery, reorders, sift, type Sift, toQuery } from '@/lib/sift';
   import { toneText } from '@/lib/tones';
 
@@ -240,9 +240,7 @@
       };
     } else if (error !== undefined) {
       notice.value = {
-        text:
-          explain?.(error.code, 'reasons' in error && Array.isArray(error.reasons) ? error.reasons.map(String) : []) ??
-          refusal(error.code, doing, task),
+        text: explain?.(error.code, reasonsOf(error)) ?? refusal(error.code, doing, task),
         changed: [],
       };
     }
@@ -345,7 +343,7 @@
     // A project no longer ready is not written: the specs read again show its state.
     if (!('error' in body)) return { text: 'note' in body ? body.note : null };
     const { code } = body.error;
-    const reasons = 'reasons' in body.error && Array.isArray(body.error.reasons) ? body.error.reasons.map(String) : [];
+    const reasons = reasonsOf(body.error);
     if (code === 'stale-revision')
       return { code, text: `The project changed while you were ${doing}. Try again on the specs as they are now.` };
     const filed = 'filed' in body.error && body.error.filed === true;
@@ -560,7 +558,7 @@
     }
     if (!('error' in body)) return false;
     const { code } = body.error;
-    const reasons = 'reasons' in body.error && Array.isArray(body.error.reasons) ? body.error.reasons.map(String) : [];
+    const reasons = reasonsOf(body.error);
     const doc = 'doc' in body.error && typeof body.error.doc === 'string' ? body.error.doc : null;
     // Given back: this write's decisions and every one queued behind it.
     notice.value = { text: knowledgeRefusal(code, reasons, doc, decisions.length + deciding.queued.value.size), changed: [] };

@@ -203,8 +203,12 @@ archived` lists them. A closed task that never had a branch, or whose branch hou
 sees merged, stays. The history of finished work is the project's merged pull requests.
 
 **Board / List** switches between the columns side by side and a list: the same columns as
-groups of one-line rows, each group folding away; **Specs** shows the project's specs
-([Specs](#specs)). The browser remembers the choice.
+groups of rows, each group folding away; **Specs** shows the project's specs
+([Specs](#specs)). The browser remembers the choice. Above the list a strip counts all five
+columns — Needs you, In progress, Ready, Backlog, Paused —, a zero included. Each row shows the
+task's whole id with its class and priority, its goal under it (or *no goal yet*), and under that
+what it waits for. An empty group is its header alone, except In progress, which says how a task
+gets there.
 
 ## Sorting and finding tasks
 

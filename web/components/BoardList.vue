@@ -12,8 +12,10 @@
   import TaskRow from './TaskRow.vue';
 
   /**
-   * The board as folding groups of rows; `selected` is the row whose `details` the pane shows. A row is moved in Jig's
-   * queue by dragging it within its group, or from its menu; `pending` is the one whose change is on its way.
+   * The board as folding groups of rows under a strip that counts every column, a zero included; `selected` is the row
+   * whose `details` the pane shows. An empty group is its muted header, except In progress, which keeps a dashed box
+   * saying how a task comes there. A row is moved in Jig's queue by dragging it within its group, or from its menu;
+   * `pending` is the one whose change is on its way.
    */
   const props = defineProps<{
     project: string;
@@ -57,73 +59,97 @@
 
 <template>
   <div class="flex min-h-0 flex-1">
-    <div class="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-      <Collapsible
-        v-for="column in columns"
-        :key="column.id"
-        :open="!folded.has(column.id)"
-        @update:open="(open: boolean) => fold(column.id, open)"
-        @dragover="(e: DragEvent) => drag.over(e, column.id, sorted ? undefined : column.cards)"
-        @drop.prevent="drag.drop(column.id)"
-      >
-        <GroupPanel
-          :accent="columnAccent[column.id] ?? 'bg-border'"
-          :class="gap?.list === column.id && gap.index < 0 && 'ring-2 ring-primary/40'"
+    <div class="flex min-w-0 flex-1 flex-col">
+      <ul class="flex flex-wrap gap-x-4 gap-y-1 border-b px-4 py-2 text-[13px]" aria-label="Tasks by column">
+        <li
+          v-for="column in columns"
+          :key="column.id"
+          class="flex items-center gap-1.5"
+          :class="column.cards.length === 0 && 'text-muted-foreground'"
         >
-          <template #head>
-            <h2>
-              <CollapsibleTrigger
-                class="flex w-full items-center gap-2 px-3 py-2 hover:bg-foreground/5"
-                :class="column.cards.length === 0 && 'text-muted-foreground'"
-              >
-                <ChevronRight v-if="folded.has(column.id)" class="size-3 shrink-0" />
-                <ChevronDown v-else class="size-3 shrink-0" />
-                <ColumnHeader :title="column.title" :count="column.cards.length" />
-              </CollapsibleTrigger>
-            </h2>
-          </template>
-          <CollapsibleContent
-            v-if="column.cards.length > 0"
-            class="relative mx-2 mb-2 overflow-clip rounded-lg border bg-card [&>[data-card]:last-child>div]:border-b-0"
+          <span class="size-2 rounded-full" :class="columnAccent[column.id] ?? 'bg-border'" aria-hidden="true" />
+          {{ column.title }}
+          <span
+            class="text-muted-foreground tabular-nums"
+            :aria-label="`${column.cards.length} ${column.cards.length === 1 ? 'task' : 'tasks'}`"
+            >{{ column.cards.length }}</span
           >
-            <div
-              v-for="(task, i) in column.cards"
-              :key="task.id"
-              data-card
-              :draggable="pending === undefined"
-              class="relative"
-              @dragstart="(e) => drag.start(e, column.id, task)"
-              @dragend="drag.end()"
+        </li>
+      </ul>
+      <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
+        <Collapsible
+          v-for="column in columns"
+          :key="column.id"
+          :open="!folded.has(column.id)"
+          @update:open="(open: boolean) => fold(column.id, open)"
+          @dragover="(e: DragEvent) => drag.over(e, column.id, sorted ? undefined : column.cards)"
+          @drop.prevent="drag.drop(column.id)"
+        >
+          <GroupPanel
+            :accent="columnAccent[column.id] ?? 'bg-border'"
+            :class="gap?.list === column.id && gap.index < 0 && 'ring-2 ring-primary/40'"
+          >
+            <template #head>
+              <h2>
+                <CollapsibleTrigger
+                  class="flex w-full items-center gap-2 px-3 py-2 hover:bg-foreground/5"
+                  :class="column.cards.length === 0 && column.id !== 'in-progress' && 'text-muted-foreground'"
+                >
+                  <ChevronRight v-if="folded.has(column.id)" class="size-3 shrink-0" />
+                  <ChevronDown v-else class="size-3 shrink-0" />
+                  <ColumnHeader :title="column.title" :count="column.cards.length" />
+                </CollapsibleTrigger>
+              </h2>
+            </template>
+            <CollapsibleContent
+              v-if="column.cards.length > 0"
+              class="relative mx-2 mb-2 overflow-clip rounded-lg border bg-card [&>[data-card]:last-child>div]:border-b-0"
             >
-              <span
-                v-if="gap?.list === column.id && gap.index === i"
-                class="absolute inset-x-0 top-0 h-0.5 bg-primary"
-                aria-hidden="true"
-              />
-              <TaskRow
-                :task="task"
-                :selected="selected === task.id"
-                :cards="column.cards"
-                :sorted="sorted"
-                :filtered="filtered"
-                :busy="pending === task.id"
-                :changed="changed?.includes(task.id)"
-                @select="$emit('select', task.id)"
-                @move="(place) => $emit('move', task.id, place)"
-                @prioritise="(p) => $emit('prioritise', task.id, p)"
-                @pause="(ask) => $emit('pause', task.id, ask)"
-                @resume="$emit('resume', task.id)"
-                @close="$emit('close', task.id)"
-              />
-              <span
-                v-if="gap?.list === column.id && gap.index === column.cards.length && i === column.cards.length - 1"
-                class="absolute inset-x-0 bottom-0 h-0.5 bg-primary"
-                aria-hidden="true"
-              />
-            </div>
-          </CollapsibleContent>
-        </GroupPanel>
-      </Collapsible>
+              <div
+                v-for="(task, i) in column.cards"
+                :key="task.id"
+                data-card
+                :draggable="pending === undefined"
+                class="relative"
+                @dragstart="(e) => drag.start(e, column.id, task)"
+                @dragend="drag.end()"
+              >
+                <span
+                  v-if="gap?.list === column.id && gap.index === i"
+                  class="absolute inset-x-0 top-0 h-0.5 bg-primary"
+                  aria-hidden="true"
+                />
+                <TaskRow
+                  :task="task"
+                  :selected="selected === task.id"
+                  :cards="column.cards"
+                  :sorted="sorted"
+                  :filtered="filtered"
+                  :busy="pending === task.id"
+                  :changed="changed?.includes(task.id)"
+                  @select="$emit('select', task.id)"
+                  @move="(place) => $emit('move', task.id, place)"
+                  @prioritise="(p) => $emit('prioritise', task.id, p)"
+                  @pause="(ask) => $emit('pause', task.id, ask)"
+                  @resume="$emit('resume', task.id)"
+                  @close="$emit('close', task.id)"
+                />
+                <span
+                  v-if="gap?.list === column.id && gap.index === column.cards.length && i === column.cards.length - 1"
+                  class="absolute inset-x-0 bottom-0 h-0.5 bg-primary"
+                  aria-hidden="true"
+                />
+              </div>
+            </CollapsibleContent>
+            <CollapsibleContent
+              v-else-if="column.id === 'in-progress'"
+              class="mx-2 mb-2 rounded-lg border border-dashed px-3 py-4 text-center text-xs text-muted-foreground"
+            >
+              Nothing in progress: a task from Backlog comes here once it is started.
+            </CollapsibleContent>
+          </GroupPanel>
+        </Collapsible>
+      </div>
     </div>
     <aside class="w-96 shrink-0 overflow-y-auto border-l" aria-label="Task">
       <template v-if="picked">

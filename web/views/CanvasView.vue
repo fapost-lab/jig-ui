@@ -474,12 +474,18 @@
       </div>
     </CanvasSection>
 
-    <CanvasSection title="BoardList" note="a row picked with its details; nothing picked; no live task">
+    <CanvasSection
+      title="BoardList"
+      note="a row picked with its details; nothing picked; In progress empty among full groups; no live task"
+    >
       <div class="flex h-[28rem] flex-col">
         <BoardList project="jig-ui" :columns="board" :selected="tasks[2]!.id" :details="details[0]" />
       </div>
       <div class="flex h-64 flex-col">
         <BoardList project="jig-ui" :columns="board" />
+      </div>
+      <div class="flex h-80 flex-col">
+        <BoardList project="jig-ui" :columns="board.map((c) => (c.id === 'in-progress' ? { ...c, cards: [] } : c))" />
       </div>
       <div class="flex h-64 flex-col">
         <BoardList project="jig-ui" :columns="emptyBoard" />

@@ -8,6 +8,9 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+- The board's **List** reads more easily: a strip above it counts all five columns, a zero included;
+  each row shows the task's whole id, its goal under it (or *no goal yet*) and what it waits for
+  under that; an empty In progress says how a task gets there. ([Projects](/projects))
 - A knowledge decision no longer holds the page: **Accept**, **Reject**, **Keep** and **Drop** mark
   their document queued at once, with **Take back**, and you go on to the next. What is queued goes as
   one write — on Jig 0.44.0 or later one `jig knowledge decide` —, so deciding many documents costs a

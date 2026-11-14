@@ -52,13 +52,15 @@ export function unnamedRefusal(code: string, reasons: string[], task: string): s
 
 /**
  * The line for filing an item's task that Jig refused: filed and not named (Jig 0.40.0) as `unnamedRefusal` says it;
- * an id a finished task has (`taken`); any other `already-exists` in Jig's own words, since from Jig 0.41.0 it is also
- * an item that names a task already on its branch; an id or a goal Jig does not take; `undefined` for anything else,
- * which `roadmapRefusal` says.
+ * an id a finished task has (`taken`); an item that names a task already, Jig 0.42.0's `already-filed`; any other
+ * `already-exists` in Jig's own words, since on Jig 0.41.0 it is also that item; an id or a goal Jig does not take;
+ * `undefined` for anything else, which `roadmapRefusal` says.
  */
 export function fileItemRefusal(code: string, reasons: string[], task: string, filed: boolean, taken: boolean): string | undefined {
   if (filed) return unnamedRefusal(code, reasons, task);
   if (taken) return `The project has a finished task called ${task}. Choose another id.`;
+  if (code === 'already-filed')
+    return 'The item names a task already, filed from another clone perhaps: the roadmap is shown as it is now.';
   if (code === 'already-exists' && reasons.length > 0) return `Jig did not file ${task}: ${reasons.join(' ')}`;
   return code === 'usage' ? 'Jig does not take this id or goal: one line of goal, not starting with #.' : undefined;
 }

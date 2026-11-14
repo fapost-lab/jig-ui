@@ -9,6 +9,7 @@ import {
   DECIDE_JIG_VERSION,
   decideKnowledge,
   FILE_NEW_JIG_VERSION,
+  FILED_JIG_VERSION,
   fileItem,
   fileNewItem,
   fileTask,
@@ -1040,8 +1041,9 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
         (root) => moveItem(root, specId, item, place, revision),
       );
     },
-    fileItem(id, specId, item, taskId, goal, revision) {
-      return roadmapWriting(
+    async fileItem(id, specId, item, taskId, goal, revision) {
+      let told = false;
+      const written = await roadmapWriting(
         id,
         specId,
         (phases) => {
@@ -1055,7 +1057,10 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
           }
           if (goal === null) throw new JigRefusal('usage');
           // From Jig 0.41.0 one write files the task and names it, against the read the person saw; a refusal files nothing.
-          if (supports(jigVersion, FILE_NEW_JIG_VERSION)) return fileNewItem(root, specId, item, taskId, goal, revision);
+          if (supports(jigVersion, FILE_NEW_JIG_VERSION)) {
+            told = supports(jigVersion, FILED_JIG_VERSION);
+            return fileNewItem(root, specId, item, taskId, goal, revision);
+          }
           // `none`, the default, refuses every roadmap write: filed first, the task would be left with no item naming it.
           if ((await readSettings(root)).keys.find((k) => k.key === 'agent.git')?.value === 'none') {
             throw new JigRefusal('git-not-allowed');
@@ -1070,6 +1075,8 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
           }
         },
       );
+      // From Jig 0.42.0 an item that names a task already is `already-filed`: `already-exists` is the id, taken.
+      return told && written?.state === 'refused' && written.code === 'already-exists' ? { ...written, taken: true } : written;
     },
     async settings(id) {
       const answer = await onDemand(id, SETTINGS_JIG_VERSION, (root) => readSettings(root));

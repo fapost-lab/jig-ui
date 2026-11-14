@@ -1744,6 +1744,20 @@ describe('localSource, editing a roadmap', () => {
     expect(edits(dir)).toEqual([`spec item file shop ${a} --new search --goal Search --revision 5 --json`]);
   });
 
+  it.each([
+    ['0.42.0', 'told', { taken: true }],
+    ['0.41.0', 'untold', {}],
+  ] as const)("says a new id Jig %s refused already-exists is taken only where Jig's code says so alone", async (version, name, more) => {
+    const dir = project(name, version, { tasks, specs: { specs: [shop()] }, item: 'already-exists' });
+    await source.connect(dir);
+    expect(await source.fileItem(name, 'shop', a, 'search', 'Search', 5)).toEqual({
+      state: 'refused',
+      code: 'already-exists',
+      reasons: ['refused'],
+      ...more,
+    });
+  });
+
   it('runs nothing for a checked item, one that names a task, a new task without its goal, or a Jig older than 0.40.0', async () => {
     const dir = project('item-refuser', '0.40.0', { tasks, specs: { specs: [shop()] }, settings: level('commit'), item: answered });
     await source.connect(dir);

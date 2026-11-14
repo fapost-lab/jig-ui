@@ -70,6 +70,14 @@ describe('fileItemRefusal', () => {
       false,
       'Jig did not file search: i-aaaaaaaaaaaa already names task other',
     ],
+    // Jig 0.42.0: an item that names a task already has a code of its own.
+    [
+      'already-filed',
+      ['i-aaaaaaaaaaaa already names task other'],
+      false,
+      false,
+      'The item names a task already, filed from another clone perhaps: the roadmap is shown as it is now.',
+    ],
     ['usage', [], false, false, 'Jig does not take this id or goal: one line of goal, not starting with #.'],
   ])('says %s with %j', (code, reasons, filed, taken, line) => {
     expect(fileItemRefusal(code, reasons, 'search', filed, taken)).toContain(line);

@@ -478,11 +478,12 @@ function apiRoutes(source: ProjectSource, version: string, stop?: () => void, ne
           }
           const id = c.req.param('id');
           const w = await source.fileItem(id, spec, item, task, goal, revision);
-          // A new id Jig refuses `already-exists` is a finished task's when Jig's list of them holds it; else the item names a
-          // task already, as Jig's line says. The list tells them apart, not Jig's words.
+          // A new id Jig refuses `already-exists` is taken: from Jig 0.42.0 Jig's code says so alone (`taken`); before, it
+          // is a finished task's when Jig's list of them holds it, else the item names a task already, as Jig's line says.
+          // The list tells them apart, not Jig's words.
           if (w?.state === 'refused' && w.code === 'already-exists' && goal !== null) {
-            const finished = await source.finished(id);
-            if (finished?.state === 'ready' && finished.tasks.some((t) => t.id === task)) {
+            const finished = w.taken ? undefined : await source.finished(id);
+            if (w.taken || (finished?.state === 'ready' && finished.tasks.some((t) => t.id === task))) {
               const message = 'The project has a finished task with this id.';
               return c.json({ error: { code: w.code, message, reasons: w.reasons ?? [], taken: true as const } }, 422);
             }

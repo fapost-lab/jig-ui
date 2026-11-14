@@ -46,6 +46,12 @@ export const KNOWLEDGE_TEXT_JIG_VERSION = '0.41.0';
 export const DECIDE_JIG_VERSION = '0.44.0';
 /** The first Jig that files an item's new task and names it on the item in one write (`spec item file --new`, fapost-lab/jig#390). */
 export const FILE_NEW_JIG_VERSION = '0.41.0';
+
+/**
+ * The first Jig that refuses filing an item that names a task already with a code of its own, `already-filed`
+ * (fapost-lab/jig#442), so its `already-exists` on `--new` says only that the id is a task's.
+ */
+export const FILED_JIG_VERSION = '0.42.0';
 /** The first Jig that brings the clone up to origin (`jig refresh`) and says how it stands against origin (`jig status`'s `origin`). */
 export const REFRESH_JIG_VERSION = '0.45.0';
 

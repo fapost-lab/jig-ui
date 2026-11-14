@@ -113,7 +113,9 @@ read shows — the one on the spec's write branch while edits wait there — and
 `ROADMAP_JIG_VERSION` answers `refused: unsupported`; the specs read says which (`editable`).
 `fileItem` with a live task id runs only `spec item file --task` with the person's revision. With a
 new id, from `FILE_NEW_JIG_VERSION` it runs only `spec item file --new` with the person's revision,
-and a refusal files nothing (adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41). On Jig 0.40.0 it is the one write of two Jig writes: `agent.git`
+and a refusal files nothing (adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41); from `FILED_JIG_VERSION`
+(0.42.0) its `already-exists` answers `refused` with `taken: true`, the id being a task's
+(adr-20261110-a-taken-id-is-told-by-the-finished-tasks). On Jig 0.40.0 it is the one write of two Jig writes: `agent.git`
 read first (`none` is `refused: git-not-allowed` without Jig writing anything), `task new`, the
 revision read again, `spec item file` with it; a refusal after the task was filed answers `refused`
 with `filed: true`, and the same request again with the same id — now live — names it

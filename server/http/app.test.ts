@@ -1012,6 +1012,24 @@ describe('/api/projects/:id/specs/items', () => {
     ]);
   });
 
+  it('says a new id is taken when the adapter says so, from Jig 0.42.0, reading no finished tasks', async () => {
+    const outcome: Written = { state: 'refused', code: 'already-exists', reasons: ['task already exists: search'], taken: true };
+    const { app, sent } = faked(outcome);
+    const res = await post(app, 'file', { spec: 'shop', item, task: 'search', goal: 'g', revision: 3 });
+    expect([res.status, await res.json()]).toEqual([
+      422,
+      {
+        error: {
+          code: 'already-exists',
+          message: 'The project has a finished task with this id.',
+          reasons: ['task already exists: search'],
+          taken: true,
+        },
+      },
+    ]);
+    expect(sent).toEqual([['file', 'x', 'shop', item, 'search', 'g', 3]]);
+  });
+
   it.each<[string, ProjectFinished]>([
     ['no finished task of that id', { state: 'ready', tasks: [] }],
     ['a list Jig did not give', { id: 'x', state: 'unreadable', code: 'failed' }],

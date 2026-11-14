@@ -279,7 +279,8 @@ Jig UI runs `jig queue request task:<id> pause`; the task is not paused at once.
 on it pauses at its next stage boundary, and a task nobody is working on pauses when its next
 stage begins. Until then the card stays in its column and says *Pause requested 12 min ago*, with
 **cancel** to take the request back (`jig queue cancel`, also in the ⋯ menu). Paused is offered
-only where Jig offers the request: not for a task already paused, and not twice.
+only where Jig offers the request, or pauses the task at once (below): not for a task already
+paused, and not twice.
 
 A task nobody started has no stage to pause at, so with Jig 0.45.0 or later it is paused at once:
 the drag onto Paused, or **Pause** in its ⋯ menu, runs `jig task pause <id>`, and the card moves to
@@ -342,7 +343,7 @@ its card says why it waits instead of what its pull request did:
 | The card says | The task |
 | --- | --- |
 | Pull request into staging waits for review | its pull request into the staging branch is open and waits for a review |
-| Pull request into staging — yours to land | the same, and landing it is yours: your `agent.git` is below `merge`, so merge it on the forge or run `jig task land <id>` |
+| Pull request into staging — yours to land | the same, and landing it is yours: your `agent.git` is below `merge`, so merge it on the forge |
 | On staging, waits for prepare for prod | its work is on the staging branch; once it passed its test there, tell your agent "prepare for prod" |
 | Fix not on staging yet | you took it back for a fix, and the fix has commits the staging branch does not have yet |
 | Promotion open, CI green | its promotion, the pull request into the main branch, is open; the note follows its state and CI |
@@ -355,7 +356,8 @@ prod" have no button: Jig answers neither as data the page can read, so they sta
 or your CI.
 
 A task on the staging flow has no ✕ until its work is in the main branch. Landing on staging does not
-finish a task, yet Jig 0.45.0 offers to close one as soon as its pull request into staging merged.
+finish a task, yet on Jig 0.45.0 `jig task set <id> status consolidated` closes one as soon as its pull
+request into staging merged (fapost-lab/jig#509).
 On this flow Jig UI offers the close only once `jig housekeeping` saw the work in the main branch: the
 task's item *Merged: the task can be closed*. **Housekeeping** on the project's card runs it.
 

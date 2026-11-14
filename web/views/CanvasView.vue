@@ -506,7 +506,7 @@
 
     <CanvasSection
       title="TaskFacts"
-      note="everything a task can carry, in an epic and waiting for two; queued at the top; a task not started"
+      note="everything a task can carry, in an epic and waiting for two; queued at the top; a task not started; on the staging flow, its pull request into staging apart from the promotion"
     >
       <TaskFacts v-for="d in details" :key="d.id" :details="d" class="border-b pb-3" />
     </CanvasSection>

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Task } from '../api';
-import { requested, waits } from './waits';
+import { pullRequests, requested, waits } from './waits';
 
 const task = (more: Partial<Task> = {}): Task => ({
   id: 't',
@@ -140,6 +140,30 @@ describe('waits', () => {
     ['a running autopilot', { autopilot: 'on' }, { text: 'On autopilot', tone: 'quiet' }],
   ])('%s', (_, more, expected) => {
     expect(waits(task(more))).toEqual(expected);
+  });
+});
+
+describe('pullRequests', () => {
+  it('shows one pull request off the staging flow, and none without one', () => {
+    expect(pullRequests(task({ pullRequest: pr('open', 'green') }))).toEqual([
+      { title: 'Pull request', text: 'open, CI green', url: 'https://github.com/o/r/pull/7' },
+    ]);
+    expect(pullRequests(task({ pullRequest: pr(null, 'none') }))).toEqual([
+      { title: 'Pull request', text: 'state not known yet', url: 'https://github.com/o/r/pull/7' },
+    ]);
+    expect(pullRequests(task())).toEqual([]);
+  });
+
+  // On Jig 0.45.0's staging flow the link is the pull request into staging; the state and CI are the promotion's.
+  it('shows the pull request into staging apart from the promotion, the promotion only while the work is on staging', () => {
+    const into = { title: 'Pull request into staging', text: null, url: 'https://github.com/o/r/pull/7' };
+    expect(pullRequests(task({ staging: 'on', parked: null, pullRequest: pr('open', 'red') }))).toEqual([
+      into,
+      { title: 'Promotion', text: 'open, CI red', url: null },
+    ]);
+    expect(pullRequests(task({ staging: 'on', parked: { reason: 'signal', hint: null }, pullRequest: pr(null, null) }))).toEqual([into]);
+    expect(pullRequests(task({ parked: { reason: 'review', hint: null }, pullRequest: pr('open', 'green') }))).toEqual([into]);
+    expect(pullRequests(task({ staging: 'behind', pullRequest: pr('merged', 'green') }))).toEqual([into]);
   });
 });
 

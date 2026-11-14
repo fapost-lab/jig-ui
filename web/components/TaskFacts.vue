@@ -2,6 +2,7 @@
   import { ExternalLink } from '@lucide/vue';
   import { link, type ReadyDetails } from '@/api';
   import { placeLine, priorityLabel, waitLine } from '@/lib/queue';
+  import { pullRequests } from '@/lib/waits';
   import { toneRule } from '@/lib/tones';
 
   defineProps<{
@@ -69,21 +70,20 @@
           >
         </dd>
       </template>
-      <template v-if="details.pullRequest">
-        <dt class="text-[13px] text-muted-foreground">Pull request</dt>
+      <template v-for="(pr, i) in pullRequests(details)" :key="pr.title">
+        <dt class="text-[13px] text-muted-foreground">{{ pr.title }}</dt>
         <dd class="mb-1 @sm:mb-0">
-          {{ details.pullRequest.state ?? 'state not known yet'
-          }}<template v-if="details.pullRequest.ci && details.pullRequest.ci !== 'none'">, CI {{ details.pullRequest.ci }}</template>
+          {{ pr.text }}
           <a
-            v-if="link(details.pullRequest.url)"
-            :href="link(details.pullRequest.url)"
+            v-if="link(pr.url)"
+            :href="link(pr.url)"
             target="_blank"
             rel="noopener noreferrer"
             class="inline-flex items-center gap-1 underline underline-offset-2"
           >
             open<ExternalLink class="size-3" />
           </a>
-          <span v-if="details.pullRequest.fetchedAt" class="block text-muted-foreground"
+          <span v-if="details.pullRequest?.fetchedAt && i === pullRequests(details).length - 1" class="block text-muted-foreground"
             >as Jig's housekeeping heard it at {{ details.pullRequest.fetchedAt }}</span
           >
         </dd>

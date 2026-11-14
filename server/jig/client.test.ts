@@ -283,6 +283,9 @@ describe('readTasks', () => {
       pullRequest: null,
       housekeepingFlags: [],
       actions: expect.any(Array),
+      stagingFlow: false,
+      staging: null,
+      parked: null,
     });
     expect(read.tasks[0]?.actions.map((a) => a.id)).toEqual([
       'start',
@@ -355,16 +358,16 @@ describe('readTasks', () => {
   // `tested` merged into origin's staging branch, `fixing` merged and taken back with a fix, `waiting` pushed only.
   it('reads where a task stands on the staging flow, and nothing of it on any other flow', async () => {
     const read = await readTasks(answering('tasks-staging', 'task-list-staging.json'));
-    expect(read.tasks.map((t) => [t.id, t.staging, t.parked])).toEqual([
-      ['fixing', 'behind', null],
-      ['tested', 'on', { reason: 'signal', hint: null }],
-      ['waiting', null, null],
+    expect(read.tasks.map((t) => [t.id, t.stagingFlow, t.staging, t.parked])).toEqual([
+      ['fixing', true, 'behind', null],
+      ['tested', true, 'on', { reason: 'signal', hint: null }],
+      ['waiting', true, null, null],
     ]);
     // A pull request into staging waits for its review, which the person lands (their agent.git below merge).
     const review = changed('task-list-staging.json', (d) => (d.tasks[2].parked = { reason: 'review', hint: 'landing' }));
     expect((await readTasks(answering(`case-${cases++}`, review))).tasks[2]?.parked).toEqual({ reason: 'review', hint: 'landing' });
     const direct = await readTasks(answering('tasks-direct', 'task-list.json'));
-    expect(direct.tasks.map((t) => [t.staging, t.parked])).toEqual(direct.tasks.map(() => [undefined, undefined]));
+    expect(direct.tasks.map((t) => [t.stagingFlow, t.staging, t.parked])).toEqual(direct.tasks.map(() => [false, null, null]));
   });
 
   it.each([

@@ -13,7 +13,8 @@ export function useDrop(onMove: (task: string, place: Place) => void, onPause: (
   const dragged = ref<{
     task: string;
     list: string;
-    pausable: boolean;
+    /** May go onto Paused: a pause asked of it, or made at once. */
+    toPaused: boolean;
     resumesTo: string | null;
   }>();
   /** Where the card would land: a gap in its own list, or another list as a whole (`index` -1, no place). */
@@ -24,7 +25,7 @@ export function useDrop(onMove: (task: string, place: Place) => void, onPause: (
   }>();
 
   function start(event: DragEvent, list: string, task: Task): void {
-    dragged.value = { task: task.id, list, pausable: task.pauseRequestable || task.pausable, resumesTo: task.resumesTo };
+    dragged.value = { task: task.id, list, toPaused: task.pauseRequestable || task.pausable, resumesTo: task.resumesTo };
     event.dataTransfer?.setData('text/plain', task.id);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
   }
@@ -37,7 +38,7 @@ export function useDrop(onMove: (task: string, place: Place) => void, onPause: (
     const d = dragged.value;
     if (!d) return;
     if (d.list !== list) {
-      if (list === 'paused' ? !d.pausable : list !== d.resumesTo) return;
+      if (list === 'paused' ? !d.toPaused : list !== d.resumesTo) return;
       gap.value = { list, index: -1 };
       event.preventDefault(); // allows the drop here
       return;

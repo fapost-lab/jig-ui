@@ -361,9 +361,9 @@
     >
       <AttentionItem v-for="(item, i) in attention" :key="i" :item="item" />
       <AttentionItem :item="knowledgeAttention" project="acme" />
-      <AttentionItem :item="mergedAttention" project="acme" closable />
-      <AttentionItem :item="mergedAttention" project="acme" closable asking />
-      <AttentionItem :item="mergedAttention" project="acme" closable closing />
+      <AttentionItem :item="mergedAttention" project="acme" closes="close-from-attention" />
+      <AttentionItem :item="mergedAttention" project="acme" closes="close-from-attention" asking />
+      <AttentionItem :item="mergedAttention" project="acme" closes="close-from-attention" closing />
       <AttentionItem :item="behindAttention" project="acme" refreshable />
       <AttentionItem :item="behindAttention" project="acme" refreshable refreshing />
     </CanvasSection>

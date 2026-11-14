@@ -28,7 +28,7 @@ export type ClosingState =
  * The task an attention item on a project's card offers to close as done: Jig's "Merged: the task can be closed"
  * (`needs-consolidation`), for a task the project lists as closable, as its card on the board is.
  */
-export function closableBy(project: Project, item: Attention): string | undefined {
+export function closableTask(project: Project, item: Attention): string | undefined {
   const task = item.subject.id;
   return project.state === 'ready' && item.kind === 'needs-consolidation' && task !== null && project.closable.includes(task)
     ? task

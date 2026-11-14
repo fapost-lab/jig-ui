@@ -1,3 +1,6 @@
+/** Jig's reasons in a refusal the server answered with, paths already cut out by the server; none where it gave none. */
+export const reasonsOf = (error: object): string[] => ('reasons' in error && Array.isArray(error.reasons) ? error.reasons.map(String) : []);
+
 /**
  * The line above the board for a change Jig refused, other than a stale revision (that one shows the conflict) —
  * never Jig's message, which may name a path.

@@ -156,13 +156,13 @@ const gone = (t: Finished): FinishedTask => ({
  * `jig housekeeping`, so a project that has not run it lately offers no close for a merged task; the command asks the
  * forge itself and refuses one that has not merged.
  *
- * On the staging flow (`staging` is there) the pull request is the one into staging, and Jig 0.45.0's close command
+ * On the staging flow (`stagingFlow`) the pull request is the one into staging, and Jig 0.45.0's close command
  * closes the task once that one merged, before the work reached the base (fapost-lab/jig#509). There only housekeeping's `needs-consolidation`,
  * a merge into the base, makes a task closable.
  */
 function closable(t: Live): boolean {
   if (t.status !== 'ready') return false;
-  if (t.staging !== undefined) return t.knowledgeConsolidated && t.parked === null && t.housekeepingFlags.includes('needs-consolidation');
+  if (t.stagingFlow) return t.knowledgeConsolidated && t.parked === null && t.housekeepingFlags.includes('needs-consolidation');
   if (t.actions.some((a) => a.id === 'close' && a.offered)) return true;
   return t.knowledgeConsolidated && t.pullRequest !== null && t.pullRequest.state !== 'closed';
 }
@@ -189,8 +189,8 @@ const card = (t: Live, q: QueueItem | undefined, takes: Takes): Task => ({
   pausable: takes.pause && t.branch === null && offers(t, 'pause') && !offers(t, 'request-pause'),
   resumable: takes.resume && offers(t, 'resume'),
   closable: closable(t),
-  staging: t.staging ?? null,
-  parked: t.parked ?? null,
+  staging: t.staging,
+  parked: t.parked,
   started: t.branch !== null,
   gate: t.gate?.state ?? null,
   autopilot: t.autopilot?.state ?? null,

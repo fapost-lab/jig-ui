@@ -797,11 +797,15 @@ export function localSource(configDir: string, { rescanMs = 60_000, quietMs, max
       else if (typeof note === 'object' && note) written = { state: 'written', refreshed: note };
       else if (note) written = { state: 'written', note };
     } catch (error) {
-      // Only the code goes on, and reasons Jig UI cut the paths out of: Jig's message may name a path.
+      // Only the code goes on, and reasons Jig UI cut the paths out of: Jig's message may name a path. An answer in a
+      // form this Jig UI does not read came from a later Jig, which may have made the change: `incompatible`.
       written =
         error instanceof JigRefusal && error.reasons.length > 0
           ? { state: 'refused', code: error.code, reasons: error.reasons }
-          : { state: 'refused', code: error instanceof JigRefusal ? error.code : 'failed' };
+          : {
+              state: 'refused',
+              code: error instanceof JigRefusal ? error.code : error instanceof JigShapeError ? 'incompatible' : 'failed',
+            };
       if (error instanceof Unnamed) written = { ...written, filed: true };
     } finally {
       entry.writes.delete(run);

@@ -58,7 +58,8 @@ fixed 300 ms lost the race to `perl`'s `setsid` (task `stopjig-test-race`, Relea
 after #80). The `stopJig` tests write `waiter.pid` and `left` for this.
 
 Every Jig run gets Jig UI's environment without `GH_TOKEN`, `GITHUB_TOKEN`, `GH_ENTERPRISE_TOKEN` and
-`GITHUB_ENTERPRISE_TOKEN` (`withoutTokens` in `ran()`, on both paths; any case, for Windows). Jig puts such a token
+`GITHUB_ENTERPRISE_TOKEN` (`withoutTokens` in `ran()`, on both paths; any case only on Windows, which names a variable in any case — elsewhere
+`gh_token` is a variable of its own and reaches Jig). Jig puts such a token
 before `github.account` and the accounts `gh` holds, so a token a direnv `.envrc` set in the folder Jig UI was started
 in chose the account for every connected project: the maintainer met `must be a collaborator` on a knowledge decision,
 2026-11-12 (spec `jig-ui`; task `clone-account`). Rejected: removing them from `process.env` at start-up — the

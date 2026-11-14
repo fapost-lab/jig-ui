@@ -11,6 +11,7 @@ describe('refusal', () => {
     ['not-paused', 'Somebody resumed a first.'],
     ['already-paused', 'Somebody paused a first.'],
     ['upgrading', 'Jig is being upgraded in this project: try resuming a again once it has finished.'],
+    ['incompatible', 'Jig answered resuming a in a form this Jig UI does not read, and may have done it: update Jig UI.'],
     ['already-exists', 'Jig refused resuming a (already-exists).'],
   ])('says %s in its own words', (code, line) => {
     expect(refusal(code, 'resuming', 'a')).toBe(line);

@@ -99,10 +99,11 @@ const TOKENS = new Set(['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITH
  * Jig UI's environment for a Jig run, without the GitHub token variables of the shell it was started from. Jig puts such
  * a token before `github.account` and the accounts `gh` holds, so a token a direnv `.envrc` set in the folder Jig UI
  * was started in chose the account for every connected project (the maintainer, 2026-11-12: `must be a collaborator` on
- * a knowledge decision). Windows names a variable in any case.
+ * a knowledge decision). Windows names a variable in any case, so there `gh_token` is `GH_TOKEN`; elsewhere it is a
+ * variable of its own, and reaches Jig.
  */
-const withoutTokens = (env: NodeJS.ProcessEnv): NodeJS.ProcessEnv =>
-  Object.fromEntries(Object.entries(env).filter(([name]) => !TOKENS.has(name.toUpperCase())));
+export const withoutTokens = (env: NodeJS.ProcessEnv, platform: NodeJS.Platform): NodeJS.ProcessEnv =>
+  Object.fromEntries(Object.entries(env).filter(([name]) => !TOKENS.has(platform === 'win32' ? name.toUpperCase() : name)));
 
 /** A Jig run's standard output, as `ran` makes the run. */
 async function jig(root: string, args: string[], platform: NodeJS.Platform, timeout = TIMEOUT_MS): Promise<string> {
@@ -127,7 +128,7 @@ interface Ran {
 async function ran(root: string, args: string[], platform: NodeJS.Platform, timeout: number): Promise<Ran> {
   if (stopping) throw new Error('Jig UI is stopping');
   const argv = [SCRIPT, ...args];
-  const env = withoutTokens(process.env);
+  const env = withoutTokens(process.env, platform);
   // Elsewhere each run leads a process group of its own, so that stopping Jig UI can stop all of it (`stopJig`).
   const running =
     platform === 'win32'

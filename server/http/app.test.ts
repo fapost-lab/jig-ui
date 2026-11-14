@@ -1310,6 +1310,17 @@ describe('POST /api/projects/:id/refresh', () => {
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe(code);
   });
 
+  it('answers an answer this Jig UI does not read as incompatible, saying Jig may have made the change', async () => {
+    const res = await post(appOf({ state: 'refused', code: 'incompatible' }));
+    expect(res.status).toBe(422);
+    expect(await res.json()).toEqual({
+      error: {
+        code: 'incompatible',
+        message: 'Jig answered in a form this Jig UI does not read, and may have made the change: update Jig UI.',
+      },
+    });
+  });
+
   it('answers the state of a project that is not ready', async () => {
     const res = await post(appOf({ id: 'x', state: 'unreadable', code: 'timeout' }));
     expect(res.status).toBe(200);

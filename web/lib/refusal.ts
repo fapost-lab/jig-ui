@@ -11,6 +11,8 @@ export function refusal(code: string, doing: string, task: string): string {
   if (code === 'not-paused') return `Somebody resumed ${task} first.`;
   if (code === 'already-paused') return `Somebody paused ${task} first.`;
   if (code === 'upgrading') return `Jig is being upgraded in this project: try ${doing} ${task} again once it has finished.`;
+  if (code === 'incompatible')
+    return `Jig answered ${doing} ${task} in a form this Jig UI does not read, and may have done it: update Jig UI.`;
   return `Jig refused ${doing} ${task} (${code}).`;
 }
 

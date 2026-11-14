@@ -8,6 +8,9 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+- A write whose answer this Jig UI cannot read — from a later Jig — says Jig may have made the change
+  and to update Jig UI, instead of "Jig refused the change". On macOS and Linux a token variable in
+  another case (`gh_token`) reaches Jig as any other variable; only Windows folds the case.
 - The board's **List** reads more easily: a strip above it counts all five columns, a zero included;
   each row shows the task's whole id, its goal under it (or *no goal yet*) and what it waits for
   under that; an empty In progress says how a task gets there. ([Projects](/projects))

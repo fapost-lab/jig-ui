@@ -141,6 +141,9 @@ function unwritten(c: Context, w: Exclude<Written, { state: 'written' }> | undef
   if (w.state !== 'refused') return c.json({ project: w }, 200);
   if (w.code === 'stale-revision') return refuse(c, 409, w.code, 'The project changed since the board was read.');
   if (w.code === 'not-found') return refuse(c, 404, w.code, 'This project has no live task with this id.');
+  if (w.code === 'incompatible') {
+    return refuse(c, 422, w.code, 'Jig answered in a form this Jig UI does not read, and may have made the change: update Jig UI.');
+  }
   // Jig's own reasons, where the command gave them (a close): the person sees why, not only a code.
   if (w.reasons) return c.json({ error: { code: w.code, message: 'Jig refused the change.', reasons: w.reasons } }, 422);
   return refuse(c, 422, w.code, 'Jig refused the change.');

@@ -96,7 +96,9 @@ finished after the last listener left (task `specs-and-epics`: the next listener
 
 A write runs Jig only when the task, and a move's anchor, are live in the last read the adapter
 showed — anything else is `refused: not-found` without Jig — and answers after the project is
-read again (adr-20261022-writes-carry-the-revision-of-their-read). A board's `revision` is the
+read again (adr-20261022-writes-carry-the-revision-of-their-read). A write whose answer this Jig UI does not read
+(`JigShapeError`, a later Jig's new word) is `refused: incompatible`, never `failed`: Jig may have made the change, and
+the page says to update Jig UI. A board's `revision` is the
 lowest of its reads' revisions (status, task list, queue); a ready project as the workspace shows it carries the
 same `revision` and the ids of the tasks its board would offer to close (`closable`), for a close from its card
 (task `close-from-attention`). `fileTask` is the exception: its id is

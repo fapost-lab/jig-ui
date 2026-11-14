@@ -899,6 +899,14 @@ describe('localSource, writing the queue', () => {
     expect(await source.refresh('nobody')).toBeUndefined();
   });
 
+  it('answers a refresh whose answer this Jig UI does not read as incompatible, not as refused', async () => {
+    const refreshed = JSON.parse(readFileSync(new URL('../jig/fixtures/refresh-elsewhere.json', import.meta.url), 'utf8')).data;
+    const later = { ...refreshed, base: { ...refreshed.base, outcome: 'a-later-outcome' } };
+    const dir = project('refreshing-later', '0.45.0', { tasks, refresh: later });
+    await source.connect(dir);
+    expect(await source.refresh('refreshing-later')).toEqual({ state: 'refused', code: 'incompatible' });
+  });
+
   it('refuses a refresh below Jig 0.45.0 without running it', async () => {
     const dir = project('no-refresh', '0.44.0', { tasks });
     await source.connect(dir);

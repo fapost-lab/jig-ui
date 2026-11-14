@@ -14,6 +14,7 @@ import {
   fileTask,
   housekeeping,
   jigVersion,
+  withoutTokens,
   landUpgrade,
   JigRefusal,
   JigShapeError,
@@ -86,6 +87,15 @@ describe('the environment of a Jig run', () => {
       `#!/usr/bin/env bash\n[ -z "\${GH_TOKEN+x}\${GITHUB_TOKEN+x}\${GH_ENTERPRISE_TOKEN+x}\${GITHUB_ENTERPRISE_TOKEN+x}" ] || exit 1\n[ "$JIG_UI_KEPT" = kept ] || exit 1\necho "jig 0.45.0"\n`,
     );
     expect(await jigVersion(dir)).toBe('0.45.0');
+  });
+
+  it.each([
+    ['darwin', ['Gh_Token', 'github_token', 'KEPT']],
+    ['linux', ['Gh_Token', 'github_token', 'KEPT']],
+    ['win32', ['KEPT']],
+  ] as const)('on %s leaves out a token variable in another case only where the system names variables in any case', (platform, kept) => {
+    const env = { GH_TOKEN: 't', Gh_Token: 't', github_token: 't', KEPT: 'k' };
+    expect(Object.keys(withoutTokens(env, platform))).toEqual(kept);
   });
 });
 

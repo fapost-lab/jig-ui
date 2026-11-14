@@ -5,7 +5,8 @@ import type { Decision, DocumentDecision } from '@/api';
  * Knowledge decisions in the background: a press queues its document at once, and whatever is queued goes as one write
  * as soon as none runs — what is pressed while one runs goes as the next. `send` makes the write and reads the knowledge
  * again, answering whether Jig wrote it; a refusal gives back everything, the write's and what waits behind it, since
- * Jig wrote none of them and most refusals would refuse the rest too. `many` is false below Jig 0.44.0: one decision a
+ * Jig wrote none of them and most refusals would refuse the rest too — an answer this Jig UI cannot read may have written
+ * the write's, and the knowledge read after it no longer offers those. `many` is false below Jig 0.44.0: one decision a
  * write. A queued document can be taken back until its write starts. The queue ends with the page that holds it: what
  * waits is dropped, never sent behind a page nobody sees.
  */

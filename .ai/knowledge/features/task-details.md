@@ -16,7 +16,7 @@ paths:
   - web/lib/artifacts.ts
   - web/lib/markdown.ts
 summary: What a task's details show from Jig's task row and queue, and its documents on the full page; why only offered actions reach the page and a document is shown as written
-reviewed_at: 2026-11-09
+reviewed_at: 2026-11-14
 ---
 # Task details
 
@@ -29,7 +29,8 @@ and only it lists the actions Jig offers. All three are served by
 `GET /api/projects/:id/tasks/:task` from `ProjectSource.task`: the task's row from Jig's task list
 in full — column (the board's rule), status, class, branch and base, worktree's uncommitted count,
 knowledge decision, dates, gate, autopilot run with its stage and stop question, pull request with
-CI, housekeeping flags — the attention items that name it, the actions Jig offers with their
+CI — on the staging flow the pull request into staging apart from the promotion, as `waits` reads them
+(`pullRequests` in `web/lib/waits.ts`, task `staging-task-details-pr`) —, housekeeping flags — the attention items that name it, the actions Jig offers with their
 commands, and from `jig queue list` its priority, its place and what it waits for. Its place is
 counted among the live tasks and open epics of its level (`server/source/local.ts`): Jig keeps a
 finished task or epic in its queue until `jig queue remove`, and counting it would put a task

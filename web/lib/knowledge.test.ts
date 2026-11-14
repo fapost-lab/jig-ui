@@ -6,6 +6,8 @@ import {
   diffLines,
   isMarkdown,
   knowledgeRefusal,
+  newer,
+  pendingLine,
   noKnowledge,
   readFirst,
   shownDiff,
@@ -154,7 +156,16 @@ describe('sourceActions', () => {
 });
 
 describe('noKnowledge', () => {
-  const ready: ReadyKnowledge = { state: 'ready', revision: 1, proposals: [], sources: [], waiting: null, canRead: false, canDrop: false };
+  const ready: ReadyKnowledge = {
+    state: 'ready',
+    revision: 1,
+    proposals: [],
+    sources: [],
+    waiting: null,
+    canRead: false,
+    canDrop: false,
+    canDecideMany: false,
+  };
 
   it('says nothing waits, and nothing while something does', () => {
     expect(noKnowledge(ready)).toBe('Nothing waits for your decision.');
@@ -225,7 +236,52 @@ describe('knowledgeRefusal', () => {
     ],
     ['not-on-base', ['commit and push it, then decide'], 'Jig did not decide feature-checkout: commit and push it, then decide'],
     ['write-still-waits', ['Move them to a branch of your own'], 'Jig did not decide feature-checkout: Move them to a branch of your own'],
-  ])('says %s', (code, reasons, text) => {
-    expect(knowledgeRefusal(code, reasons, 'feature-checkout')).toBe(text);
+  ])('says %s, and that every decision is back', (code, reasons, text) => {
+    expect(knowledgeRefusal(code, reasons, 'feature-checkout')).toBe(
+      `${/[.!?]$/.test(text) ? text : `${text}.`} Nothing was written: your decisions are back for you to decide.`,
+    );
+  });
+
+  it('says a stale read as the knowledge having changed, and a refusal that names no document as about them all', () => {
+    expect(knowledgeRefusal('stale-revision', ['the clone changed since revision 1'], null)).toBe(
+      'The knowledge changed since it was shown: your decisions are back, decide them on it as it is now.',
+    );
+    expect(knowledgeRefusal('write-still-waits', ['Move them to a branch of your own'], null)).toBe(
+      'Jig did not decide them: Move them to a branch of your own. Nothing was written: your decisions are back for you to decide.',
+    );
+  });
+});
+
+describe('pendingLine', () => {
+  it.each([
+    ['accept', 'proposal', false, 'Accepted, queued'],
+    ['reject', 'proposal', true, 'Rejected, sending…'],
+    ['reviewed', 'source', false, 'Kept, queued'],
+    ['reject', 'source', true, 'Dropped, sending…'],
+  ] as const)('says %s of a %s, sending %s, as %s', (decision, of, sending, line) => {
+    expect(pendingLine(decision, of, sending)).toBe(line);
+  });
+});
+
+describe('newer', () => {
+  const at = (revision: number): ReadyKnowledge => ({
+    state: 'ready',
+    revision,
+    proposals: [],
+    sources: [],
+    waiting: null,
+    canRead: false,
+    canDrop: false,
+    canDecideMany: false,
+  });
+
+  it('is a ready read past the revision shown, or over nothing ready', () => {
+    expect(newer(at(8), at(7))).toBe(true);
+    expect(newer(at(7), at(7))).toBe(false);
+    expect(newer(at(7), at(8))).toBe(false);
+    expect(newer(at(7), undefined)).toBe(true);
+    expect(newer(at(7), { id: 'x', state: 'unreadable', code: 'failed' })).toBe(true);
+    expect(newer({ id: 'x', state: 'unreadable', code: 'failed' }, at(7))).toBe(false);
+    expect(newer('not-connected', undefined)).toBe(false);
   });
 });

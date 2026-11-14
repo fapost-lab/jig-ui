@@ -8,6 +8,11 @@ Stable releases run with `npx @fapost/jig-ui`; what is under **Unreleased** is o
 
 ## Unreleased
 
+- A knowledge decision no longer holds the page: **Accept**, **Reject**, **Keep** and **Drop** mark
+  their document queued at once, with **Take back**, and you go on to the next. What is queued goes as
+  one write — on Jig 0.44.0 or later one `jig knowledge decide` —, so deciding many documents costs a
+  push or two, not one each; a refusal gives every queued decision back.
+  ([Deciding knowledge](/projects#deciding-knowledge))
 - A task nobody started is paused at once by a drag onto Paused, or **Pause** in its ⋯ menu, on
   Jig 0.45.0 or later: Jig takes no pause request for a task with no stage to pause at, so the card
   could not go to Paused before. ([Pausing a task](/projects#pausing-a-task))

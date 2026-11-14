@@ -2,6 +2,7 @@ import type {
   Artifact,
   ArtifactKind,
   Attention,
+  DocumentDecision,
   ItemPlace,
   Knowledge,
   KnowledgeDecision,
@@ -20,6 +21,7 @@ export type {
   Artifact,
   ArtifactKind,
   Attention,
+  DocumentDecision,
   ItemPlace,
   Knowledge,
   KnowledgeDecision,
@@ -383,6 +385,8 @@ export type ProjectKnowledge =
       /** Jig 0.41.0 and later: a proposal's text can be read (`knowledgeText`), and `reject` drops a stub's link. */
       canRead: boolean;
       canDrop: boolean;
+      /** Jig 0.44.0 and later: several decisions, of any kinds, go as one write (`jig knowledge decide`). */
+      canDecideMany: boolean;
     } & Knowledge)
   | Exclude<ProjectView, { state: 'ready' }>;
 
@@ -487,6 +491,8 @@ export type Written =
       reasons?: string[];
       /** Filing an item's task on Jig 0.40.0: the task was filed, and Jig refused to name it on the item. */
       filed?: true;
+      /** Knowledge decisions: the document the refusal is about — the one not open, or the first sent that Jig's line names —, `null` for none. */
+      doc?: string | null;
     }
   | Exclude<ProjectView, { state: 'ready' }>;
 
@@ -623,15 +629,17 @@ export interface ProjectSource {
    */
   knowledgeText(id: string, docId: string): Promise<KnowledgeText | undefined>;
   /**
-   * Decides one document against the revision of the knowledge read it was based on: `accept` or `reject` a proposal,
-   * `reviewed` keeps a stub's changed or unrecorded file, and from Jig 0.41.0 `reject` drops the link of a stub whose file
-   * changed, has no approved text or is gone. Jig runs only for what a knowledge read just before lists as open to that
-   * decision — else `refused: not-found` —, commits it on `knowledge/decisions` and goes as far as `agent.git` allows; its
-   * note comes back. A document not yet where the decision is judged is `refused: not-on-base` or `not-on-branch` by Jig
-   * 0.41.0; Jig 0.40.0 does not find it, as the branch starts from origin's base, and that is `refused: not-on-branch`
-   * too. Below Jig 0.40.0 refused `unsupported`. `undefined` when no project has that id.
+   * Decides documents against the revision of the knowledge read they were based on, as one write: `accept` or `reject` a
+   * proposal, `reviewed` keeps a stub's changed or unrecorded file, and from Jig 0.41.0 `reject` drops the link of a stub
+   * whose file changed, has no approved text or is gone. Several only from Jig 0.44.0 (`canDecideMany`); below it more
+   * than one is `refused: usage`. Jig runs only when a knowledge read just before lists every one of them as open to its
+   * decision — else `refused: not-found` naming it —, commits them on `knowledge/decisions` and goes as far as
+   * `agent.git` allows; its note comes back. Any refusal refuses them all, with `doc` the document it names, or `null`. A
+   * document not yet where the decision is judged is `refused: not-on-base` or `not-on-branch` by Jig 0.41.0; Jig 0.40.0
+   * does not find it, as the branch starts from origin's base, and that is `refused: not-on-branch` too. Below Jig 0.40.0
+   * refused `unsupported`. `undefined` when no project has that id.
    */
-  decideKnowledge(id: string, docId: string, decision: KnowledgeDecision, revision: number): Promise<Written | undefined>;
+  decideKnowledge(id: string, decisions: DocumentDecision[], revision: number): Promise<Written | undefined>;
   /**
    * What upgrading the project's Jig would do, changing nothing, for a project that shows Jig's `upgrade-available`
    * item; refused `not-found` without one, `running` while its upgrade runs. `undefined` when no project has that id.

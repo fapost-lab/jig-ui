@@ -2,6 +2,7 @@
 import type {
   Attention,
   Column,
+  Decision,
   DocumentText,
   Project,
   ReadyDetails,
@@ -644,6 +645,7 @@ export const knowledge: ReadyKnowledge = {
   revision: 1,
   canRead: false,
   canDrop: false,
+  canDecideMany: false,
   proposals: [
     {
       id: 'feature-checkout',
@@ -735,6 +737,7 @@ export const knowledgeLater: ReadyKnowledge = {
   revision: 1,
   canRead: true,
   canDrop: true,
+  canDecideMany: false,
   proposals: [
     {
       id: 'feature-checkout',
@@ -954,3 +957,10 @@ export const closings: ClosingState[] = [
     message: 'Jig did not close close-from-attention: its pull request has not merged (https://github.com/o/r/pull/12 is open).',
   },
 ];
+
+/** Decisions the page holds: none; a proposal's Accept being sent and a stub's Keep queued; two Drops, one queued and one being sent. */
+export const noDecisions = new Map<string, Decision>();
+export const sendingAccept = new Map<string, Decision>([['feature-checkout', 'accept']]);
+export const queuedKeep = new Map<string, Decision>([['convention-team-rules', 'reviewed']]);
+export const queuedDrop = new Map<string, Decision>([['convention-legacy', 'reject']]);
+export const sendingDrop = new Map<string, Decision>([['convention-deploy', 'reject']]);

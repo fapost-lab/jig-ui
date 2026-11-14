@@ -1,4 +1,4 @@
-import type { DocumentText, Knowledge, LinkedSource, Proposal, SourceDiff } from '@/api';
+import type { Decision, DocumentText, Knowledge, LinkedSource, Proposal, SourceDiff } from '@/api';
 import { size } from './artifacts';
 import { NO_COMMITS, refusal } from './refusal';
 import type { Tone } from './tones';
@@ -7,6 +7,13 @@ import type { Tone } from './tones';
 export function waitingWord(waiting: NonNullable<Proposal['waiting']>, of: 'proposal' | 'source' = 'proposal'): string {
   if (of === 'source' && waiting.decision === 'rejected') return 'Dropped, waiting';
   return { accepted: 'Accepted', rejected: 'Rejected', reviewed: 'Kept' }[waiting.decision] + ', waiting';
+}
+
+/** A decision the page holds for a person: queued, it can still be taken back; sending, its write has started. */
+export function pendingLine(decision: Decision, of: 'proposal' | 'source', sending: boolean): string {
+  const word =
+    of === 'source' && decision === 'reject' ? 'Dropped' : { accept: 'Accepted', reject: 'Rejected', reviewed: 'Kept' }[decision];
+  return `${word}, ${sending ? 'sending…' : 'queued'}`;
 }
 
 /**
@@ -77,6 +84,12 @@ export const sourceActions = (
 
 /** Jig 0.40.0 cannot drop the link of an approved stub: its `reject` takes only a proposal (fapost-lab/jig#392). */
 export const NO_DROP = 'Dropping the link has no Jig command yet (fapost-lab/jig#392).';
+
+/** A knowledge read newer than the one shown, by Jig's revision, which only grows; one not ready is never newer. */
+export const newer = (read: Knowledge | 'not-connected', shown: Knowledge | 'not-connected' | undefined): boolean =>
+  typeof read === 'object' &&
+  read.state === 'ready' &&
+  !(typeof shown === 'object' && shown.state === 'ready' && shown.revision >= read.revision);
 
 /** The knowledge view's line when there is nothing to show as a list: nothing waits, or why Jig cannot list it. */
 export function noKnowledge(answer: Knowledge): string | undefined {
@@ -167,12 +180,19 @@ export function shownText(proposal: Proposal, read: DocumentText | 'reading' | '
 }
 
 /**
- * The line for a decision Jig refused, other than a stale revision: `agent.git: none` sends the person to Settings; a
- * document no longer open to it, or one Jig 0.40.0 did not find on its branch, is said so; otherwise Jig's own reasons —
- * Jig 0.41.0 says itself why a document is not where the decision is judged —, paths already cut out by the server, or
- * the code.
+ * The line for decisions Jig refused, which gives them all back: a stale revision as the knowledge having changed; else
+ * `agent.git: none` sends the person to Settings; a document no longer open to it, or one Jig 0.40.0 did not find on its
+ * branch, is said so; otherwise Jig's own reasons — Jig 0.41.0 says itself why a document is not where the decision is
+ * judged —, paths already cut out by the server, or the code. `doc` is the document the refusal names, `null` for none.
  */
-export function knowledgeRefusal(code: string, reasons: string[], doc: string): string {
+export function knowledgeRefusal(code: string, reasons: string[], doc: string | null): string {
+  if (code === 'stale-revision')
+    return 'The knowledge changed since it was shown: your decisions are back, decide them on it as it is now.';
+  const line = why(code, reasons, doc ?? 'them');
+  return `${/[.!?]$/.test(line) ? line : `${line}.`} Nothing was written: your decisions are back for you to decide.`;
+}
+
+function why(code: string, reasons: string[], doc: string): string {
   if (code === 'git-not-allowed') return NO_COMMITS;
   if (code === 'not-found') return `${doc} no longer waits for that decision: the knowledge is shown as it is now.`;
   if (code === 'not-on-branch' && reasons.length === 0) {

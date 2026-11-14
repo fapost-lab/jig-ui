@@ -6,7 +6,7 @@
     type Board,
     call,
     client,
-    type Decision,
+    type DocumentDecision,
     type DocumentText,
     type Edited,
     type Finished,
@@ -39,9 +39,10 @@
   import { Toggle } from '@/components/ui/toggle';
   import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
   import { conflict } from '@/lib/conflict';
+  import { useDecisions } from '@/lib/decisions';
   import { movable } from '@/lib/epics';
   import { settleFinished } from '@/lib/finished';
-  import { knowledgeRefusal, noKnowledge } from '@/lib/knowledge';
+  import { knowledgeRefusal, newer, noKnowledge } from '@/lib/knowledge';
   import { lastWins } from '@/lib/last-wins';
   import { closeRefusal, fileItemRefusal, refusal, roadmapRefusal } from '@/lib/refusal';
   import { filtered, fromQuery, reorders, sift, type Sift, toQuery } from '@/lib/sift';
@@ -458,30 +459,29 @@
   const knowledge = ref<Knowledge | 'not-connected'>();
   const diffs = ref<Partial<Record<string, SourceDiff | 'reading' | 'not-found'>>>({});
   const texts = ref<Partial<Record<string, DocumentText | 'reading' | 'not-found'>>>({});
-  const loadKnowledge = lastWins(
-    async () => {
-      const res = await call(() => client.api.projects[':id'].knowledge.$get({ param }));
-      return res && (res.status === 404 ? ('not-connected' as const) : (await res.json()).knowledge);
-    },
-    (read) => {
-      knowledge.value = read;
-      // A diff stays open while its file is still listed as changed, and is read again with the list.
-      const changed = new Set(
-        typeof read === 'object' && read.state === 'ready' ? read.sources.filter((s) => s.state === 'changed').map((s) => s.id) : [],
-      );
+  function showKnowledge(read: Knowledge | 'not-connected'): void {
+    knowledge.value = read;
+    // A diff stays open while its file is still listed as changed, and is read again with the list.
+    const changed = new Set(
+      typeof read === 'object' && read.state === 'ready' ? read.sources.filter((s) => s.state === 'changed').map((s) => s.id) : [],
+    );
 
-      for (const doc of Object.keys(diffs.value)) {
-        if (changed.has(doc)) void readDiff(doc);
-        else delete diffs.value[doc];
-      }
-      // A document's text likewise, while the document is still proposed.
-      const proposed = new Set(typeof read === 'object' && read.state === 'ready' ? read.proposals.map((p) => p.id) : []);
-      for (const doc of Object.keys(texts.value)) {
-        if (proposed.has(doc)) void readText(doc);
-        else delete texts.value[doc];
-      }
-    },
-  );
+    for (const doc of Object.keys(diffs.value)) {
+      if (changed.has(doc)) void readDiff(doc);
+      else delete diffs.value[doc];
+    }
+    // A document's text likewise, while the document is still proposed.
+    const proposed = new Set(typeof read === 'object' && read.state === 'ready' ? read.proposals.map((p) => p.id) : []);
+    for (const doc of Object.keys(texts.value)) {
+      if (proposed.has(doc)) void readText(doc);
+      else delete texts.value[doc];
+    }
+  }
+
+  const loadKnowledge = lastWins(async () => {
+    const res = await call(() => client.api.projects[':id'].knowledge.$get({ param }));
+    return res && (res.status === 404 ? ('not-connected' as const) : (await res.json()).knowledge);
+  }, showKnowledge);
 
   const noneKnown = computed(() => (typeof knowledge.value === 'object' ? noKnowledge(knowledge.value) : undefined));
 
@@ -535,41 +535,41 @@
     else delete texts.value[doc];
   }
 
-  /** The document whose decision is on its way to Jig. */
-  const deciding = ref<string>();
-
   /**
-   * Sends one decision with the revision of the knowledge it was made on, then reads the knowledge again whatever came of
-   * it; Jig's note, or why it refused, goes to the notice.
+   * Sends decisions as one write with the revision of the knowledge shown — the read after the previous write —, then
+   * reads the knowledge again whatever came of it; Jig's note, or why it refused, goes to the notice. Answers whether
+   * Jig wrote them: a project no longer ready writes nothing, and the knowledge read again shows its state.
    */
-  async function decide(doc: string, decision: Decision): Promise<void> {
+  async function send(decisions: DocumentDecision[]): Promise<boolean> {
     const shown = knowledge.value;
-    if (typeof shown !== 'object' || shown.state !== 'ready' || deciding.value !== undefined) return;
-    deciding.value = doc;
+    if (typeof shown !== 'object' || shown.state !== 'ready') return false;
     notice.value = undefined;
     const res = await call(() =>
-      client.api.projects[':id'].knowledge.decide.$post({ param, json: { doc, decision, revision: shown.revision } }),
+      client.api.projects[':id'].knowledge.decide.$post({ param, json: { decisions, revision: shown.revision } }),
     );
 
     const body = res && (await res.json());
-    await loadKnowledge();
-    deciding.value = undefined;
-    if (!body) return;
-    if (!('error' in body)) {
-      // A project no longer ready is not written: the knowledge read again shows its state.
-      if ('note' in body && body.note) notice.value = { text: body.note, changed: [] };
-      return;
+    const read = await loadKnowledge();
+    // A read the change signal started after this one lands later, if at all: until then the knowledge shown is this one,
+    // so what was sent shows as waiting and the next write goes on a revision after this one's.
+    if (read !== undefined && newer(read, knowledge.value)) showKnowledge(read);
+    if (!body) return false;
+    if ('written' in body) {
+      if (body.note) notice.value = { text: body.note, changed: [] };
+      return true;
     }
+    if (!('error' in body)) return false;
     const { code } = body.error;
     const reasons = 'reasons' in body.error && Array.isArray(body.error.reasons) ? body.error.reasons.map(String) : [];
-    notice.value = {
-      text:
-        code === 'stale-revision'
-          ? 'The knowledge changed since it was shown: here it is as it is now.'
-          : knowledgeRefusal(code, reasons, doc),
-      changed: [],
-    };
+    const doc = 'doc' in body.error && typeof body.error.doc === 'string' ? body.error.doc : null;
+    notice.value = { text: knowledgeRefusal(code, reasons, doc), changed: [] };
+    return false;
   }
+
+  const decisions = useDecisions(
+    send,
+    () => typeof knowledge.value === 'object' && knowledge.value.state === 'ready' && knowledge.value.canDecideMany,
+  );
 
   watch(view, (shown) => shown === 'knowledge' && void loadKnowledge());
 
@@ -722,9 +722,10 @@
         :knowledge="knowledge"
         :diffs="diffs"
         :texts="texts"
-        :busy="deciding"
-        :disabled="deciding !== undefined"
-        @decide="decide"
+        :queued="decisions.queued.value"
+        :sending="decisions.sending.value"
+        @decide="decisions.decide"
+        @take-back="decisions.takeBack"
         @toggle="toggleDiff"
         @toggle-text="toggleText"
       />

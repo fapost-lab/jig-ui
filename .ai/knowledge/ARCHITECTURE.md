@@ -47,7 +47,8 @@ one line that brings its own (the install flow). Jig works exactly as before wit
   edits `jig spec item add|move|file` (from Jig 0.40.0, adr-20261106-editing-a-roadmap-from-the-page; `file --new` from
   Jig 0.41.0, adr-20261110-filing-an-items-task-in-one-write-from-jig-0-41), the
   knowledge waiting for a decision `jig knowledge proposed`, `jig knowledge sources` and its `--diff`, and the decisions
-  `jig knowledge accept|reject|reviewed` (from Jig 0.40.0, feature-knowledge), a proposed document's text
+  `jig knowledge accept|reject|reviewed` (from Jig 0.40.0, feature-knowledge) and several in one write `jig knowledge
+  decide` (from Jig 0.44.0, adr-20261114-knowledge-decisions-are-queued-on-the-page), a proposed document's text
   `jig knowledge read` (from Jig 0.41.0, adr-20261109-knowledge-text-and-drop-from-jig-0-41), `jig refresh` (from Jig
   0.45.0, adr-20261113-refresh-brings-the-clone-up-from-the-card), and
   `jig upgrade`, its dry run and its run (from Jig 0.34.0), and `jig self-update` (its text line), each JSON answer checked by a zod schema (adr-20261018-jig-answers-checked-by-zod-schemas) and tested against

@@ -69,6 +69,11 @@
     knowledgeDiffs,
     knowledgeLater,
     knowledgeTexts,
+    noDecisions,
+    queuedDrop,
+    queuedKeep,
+    sendingAccept,
+    sendingDrop,
     behindAttention,
     behindProject,
     refreshRuns,
@@ -518,9 +523,9 @@
 
     <CanvasSection
       title="KnowledgeView"
-      note="proposals — a document, a stub, a stub whose file is gone, one accepted and waiting in a pull request; changed sources — a diff read with bytes dropped, one being read, no approved text, a file gone, one kept whose diff Jig could not read; then a decision on its way, and decisions waiting pushed with no pull request"
+      note="proposals — a document, a stub, a stub whose file is gone, one accepted and waiting in a pull request; changed sources — a diff read with bytes dropped, one being read, no approved text, a file gone, one kept whose diff Jig could not read; then an Accept being sent and a Keep queued behind it, and decisions waiting pushed with no pull request"
     >
-      <KnowledgeView :knowledge="knowledge" :diffs="knowledgeDiffs" :texts="{}" />
+      <KnowledgeView :knowledge="knowledge" :diffs="knowledgeDiffs" :texts="{}" :queued="noDecisions" :sending="noDecisions" />
       <KnowledgeView
         :knowledge="{
           ...knowledge,
@@ -530,22 +535,22 @@
         }"
         :diffs="{}"
         :texts="{}"
-        busy="feature-checkout"
-        disabled
+        :queued="queuedKeep"
+        :sending="sendingAccept"
       />
     </CanvasSection>
 
     <CanvasSection
       title="KnowledgeView, Jig 0.41.0"
-      note="proposals — a feature's text, a stub's with its Markdown file (bytes dropped) and with a file that is not Markdown, one not pushed being read, one after the decisions were cut whose name lost bytes and whose text Jig could not read, one no longer proposed when its text was read; changed sources — Keep and Drop, Drop on a file gone, one dropped and waiting, one changed only here; then a drop on its way"
+      note="proposals — a feature's text, a stub's with its Markdown file (bytes dropped) and with a file that is not Markdown, one not pushed being read, one after the decisions were cut whose name lost bytes and whose text Jig could not read, one no longer proposed when its text was read; changed sources — Keep and Drop, Drop on a file gone, one dropped and waiting, one changed only here; then a Drop queued and a Drop being sent"
     >
-      <KnowledgeView :knowledge="knowledgeLater" :diffs="{}" :texts="knowledgeTexts" />
+      <KnowledgeView :knowledge="knowledgeLater" :diffs="{}" :texts="knowledgeTexts" :queued="noDecisions" :sending="noDecisions" />
       <KnowledgeView
-        :knowledge="{ ...knowledgeLater, proposals: [], sources: knowledgeLater.sources.slice(2, 3) }"
+        :knowledge="{ ...knowledgeLater, proposals: [], sources: knowledgeLater.sources.slice(1, 3) }"
         :diffs="{}"
         :texts="{}"
-        busy="convention-deploy"
-        disabled
+        :queued="queuedDrop"
+        :sending="sendingDrop"
       />
     </CanvasSection>
 

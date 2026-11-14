@@ -1081,7 +1081,8 @@ describe('/api/projects/:id/knowledge', () => {
     const sent: unknown[][] = [];
     const source: ProjectSource = {
       ...localSource(join(webRoot, 'knowledge-config')),
-      knowledge: (id) => Promise.resolve(id === 'x' ? { state: 'ready', ...read, canRead: true, canDrop: true } : undefined),
+      knowledge: (id) =>
+        Promise.resolve(id === 'x' ? { state: 'ready', ...read, canRead: true, canDrop: true, canDecideMany: true } : undefined),
       knowledgeDiff: (id, doc) =>
         Promise.resolve(
           id === 'x'
@@ -1104,7 +1105,7 @@ describe('/api/projects/:id/knowledge', () => {
   it("reads the knowledge as Jig gave it, the project's own paths included, and a changed file's diff", async () => {
     const { app } = faked(undefined);
     expect(await (await app.request('/api/projects/x/knowledge', { headers })).json()).toEqual({
-      knowledge: { state: 'ready', ...read, canRead: true, canDrop: true },
+      knowledge: { state: 'ready', ...read, canRead: true, canDrop: true, canDecideMany: true },
     });
     expect((await app.request('/api/projects/y/knowledge', { headers })).status).toBe(404);
     expect(await (await app.request('/api/projects/x/knowledge/convention-rules/diff', { headers })).json()).toEqual({
@@ -1130,30 +1131,42 @@ describe('/api/projects/:id/knowledge', () => {
     expect((await app.request('/api/projects/x/knowledge/feature-checkout/text', { headers: { host: HOST } })).status).toBe(401);
   });
 
-  it("hands a decision to the source as the page sent it, and answers Jig's note", async () => {
+  const one = (doc: unknown, decision: unknown) => ({ decisions: [{ doc, decision }], revision: 5 });
+
+  it("hands the decisions to the source as the page sent them, in its order, and answers Jig's note", async () => {
     const { app, sent } = faked({ state: 'written', note: 'agent.git is commit: pushing knowledge/decisions is yours' });
-    for (const decision of ['accept', 'reject', 'reviewed']) {
-      const res = await decide(app, { doc: 'feature-checkout', decision, revision: 5 });
-      expect([res.status, await res.json()]).toEqual([
-        200,
-        { written: true, note: 'agent.git is commit: pushing knowledge/decisions is yours' },
-      ]);
-    }
-    expect(sent).toEqual([
-      ['x', 'feature-checkout', 'accept', 5],
-      ['x', 'feature-checkout', 'reject', 5],
-      ['x', 'feature-checkout', 'reviewed', 5],
+    const decisions = [
+      { doc: 'feature-checkout', decision: 'accept' },
+      { doc: 'feature-search', decision: 'reject' },
+      { doc: 'convention-rules', decision: 'reviewed' },
+    ];
+    const res = await decide(app, { decisions, revision: 5 });
+    expect([res.status, await res.json()]).toEqual([
+      200,
+      { written: true, note: 'agent.git is commit: pushing knowledge/decisions is yours' },
     ]);
+    expect(sent).toEqual([['x', decisions, 5]]);
   });
 
   it.each([
-    [{ decision: 'accept', revision: 5 }],
-    [{ doc: '', decision: 'accept', revision: 5 }],
-    [{ doc: 7, decision: 'accept', revision: 5 }],
-    [{ doc: 'a', decision: 'drop', revision: 5 }],
-    [{ doc: 'a', decision: 'keep', revision: 5 }],
-    [{ doc: 'a', decision: 'accept' }],
-    [{ doc: 'a', decision: 'accept', revision: -1 }],
+    [{ revision: 5 }],
+    [{ decisions: [], revision: 5 }],
+    [{ decisions: { doc: 'a', decision: 'accept' }, revision: 5 }],
+    [one('', 'accept')],
+    [one(7, 'accept')],
+    [one('a', 'drop')],
+    [one('a', 'keep')],
+    [{ decisions: [{ doc: 'a', decision: 'accept' }] }],
+    [{ decisions: [{ doc: 'a', decision: 'accept' }], revision: -1 }],
+    [
+      {
+        decisions: [
+          { doc: 'a', decision: 'accept' },
+          { doc: 'a', decision: 'reject' },
+        ],
+        revision: 5,
+      },
+    ],
   ])('refuses %o as usage, the source not asked', async (body) => {
     const { app, sent } = faked({ state: 'written' });
     const res = await decide(app, body);
@@ -1162,39 +1175,47 @@ describe('/api/projects/:id/knowledge', () => {
   });
 
   it.each([
-    ['a stale read', { state: 'refused', code: 'stale-revision' }, 409, 'stale-revision'],
-    ['a document not open to the decision', { state: 'refused', code: 'not-found' }, 404, 'not-found'],
+    ['a stale read', { state: 'refused', code: 'stale-revision', doc: null }, 409, 'stale-revision'],
+    ['a document not open to the decision', { state: 'refused', code: 'not-found', doc: 'a' }, 404, 'not-found'],
     ['one not on the branch', { state: 'refused', code: 'not-on-branch' }, 422, 'not-on-branch'],
     ['one not on the base', { state: 'refused', code: 'not-on-base' }, 422, 'not-on-base'],
     ['an earlier write still waiting', { state: 'refused', code: 'write-still-waits' }, 422, 'write-still-waits'],
     ['agent.git none', { state: 'refused', code: 'git-not-allowed' }, 422, 'git-not-allowed'],
     ['a project not connected', undefined, 404, 'not-connected'],
   ] as const)('answers %s', async (_, outcome, status, code) => {
-    const res = await decide(faked(outcome).app, { doc: 'a', decision: 'accept', revision: 5 });
+    const res = await decide(faked(outcome).app, one('a', 'accept'));
     expect([res.status, ((await res.json()) as { error: { code: string } }).error.code]).toEqual([status, code]);
   });
 
-  it("carries Jig's reasons, as the source cut their paths", async () => {
+  it("carries Jig's reasons, as the source cut their paths, and the document the refusal names", async () => {
     const outcome: Written = {
       state: 'refused',
-      code: 'branch-checked-out',
-      reasons: ['knowledge/decisions is checked out in … and Jig never moves a checkout'],
+      code: 'not-proposed',
+      reasons: ['not a proposed document: b (status: accepted)'],
+      doc: 'b',
     };
-    const res = await decide(faked(outcome).app, { doc: 'a', decision: 'reject', revision: 5 });
+    const res = await decide(faked(outcome).app, {
+      decisions: [
+        { doc: 'a', decision: 'accept' },
+        { doc: 'b', decision: 'reject' },
+      ],
+      revision: 5,
+    });
     expect([res.status, await res.json()]).toEqual([
       422,
       {
         error: {
-          code: 'branch-checked-out',
-          message: 'Jig refused the change.',
-          reasons: ['knowledge/decisions is checked out in … and Jig never moves a checkout'],
+          code: 'not-proposed',
+          message: 'Jig did not decide them.',
+          reasons: ['not a proposed document: b (status: accepted)'],
+          doc: 'b',
         },
       },
     ]);
   });
 
   it('is refused without the token', async () => {
-    expect((await decide(faked({ state: 'written' }).app, { doc: 'a', decision: 'accept', revision: 5 }, {})).status).toBe(401);
+    expect((await decide(faked({ state: 'written' }).app, one('a', 'accept'), {})).status).toBe(401);
   });
 });
 

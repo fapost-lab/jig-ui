@@ -11,7 +11,7 @@ paths:
   - web/components/KnowledgeView.vue
   - web/lib/knowledge.ts
 summary: Knowledge waiting for a decision is decided on the project's Knowledge view with jig knowledge accept|reject|reviewed and the knowledge's revision, checked against a fresh read (not-on-branch for Jig's not-found); no Drop and no document text until Jig gives them; its paths relative to the project and a source's diff reach the page (amends the RULES path invariant)
-reviewed_at: 2026-11-06
+reviewed_at: 2026-11-14
 ---
 # Knowledge is decided from the page with Jig's commands, and its paths reach the page
 
@@ -70,7 +70,8 @@ proposal in the checkout but not on `origin/<base>` is listed, yet a decision on
 - **A dialog from the workspace card, as Settings** — the roadmap item says "on a project's page",
   and a diff wants room. The card's attention items link to the view instead.
 - **Several ids as one decision** — accepting in bulk what nobody looked at is what `jig-accept`
-  warns against; Jig takes several ids, and the API can later.
+  warns against; Jig takes several ids, and the API can later. *Amended by adr-20261114-knowledge-decisions-are-queued-on-the-page:* several
+  presses, each on one document, share a write; there is still no Accept all.
 - **Waiting for jig#391** — the maintainer chose to build now and add the text later.
 - **Cutting paths with `withoutPaths`** — the paths are the documents' names; a diff is file
   content, and cutting it breaks it (adr-20261030-a-task-document-is-shown-as-written).

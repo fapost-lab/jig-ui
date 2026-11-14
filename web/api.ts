@@ -41,8 +41,10 @@ export type LinkedSource = ReadyKnowledge['sources'][number];
 export type SourceDiff = Ok<KnowledgeApi[':doc']['diff']['$get']>['diff'];
 /** A proposed document's text and the file a stub links (Jig 0.41.0), or why the project's Jig cannot give them. */
 export type DocumentText = Ok<KnowledgeApi[':doc']['text']['$get']>['text'];
+/** Documents and how each was decided, as the route takes them: each document once. */
+export type DocumentDecision = NonNullable<InferRequestType<KnowledgeApi['decide']['$post']>['json']['decisions']>[number];
 /** A decision as the route takes it: Jig's command, `reviewed` keeping a changed file. */
-export type Decision = NonNullable<InferRequestType<KnowledgeApi['decide']['$post']>['json']['decision']>;
+export type Decision = DocumentDecision['decision'];
 /** The answer to a knowledge decision. */
 export type Decided = Awaited<ReturnType<KnowledgeApi['decide']['$post']>>;
 type Queue = Api['projects'][':id']['queue'];

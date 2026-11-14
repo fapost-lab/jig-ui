@@ -393,8 +393,10 @@
     if (error !== undefined) {
       const reasons = 'reasons' in error && Array.isArray(error.reasons) ? error.reasons.map(String) : [];
       closing.value[id] = { task, state: 'refused', message: closeRefusal(error.code, reasons, task) };
-    } else delete closing.value[id];
+    }
+    // A close that went through stays running until the read without the task has landed, as the board's does.
     await load();
+    if (error === undefined) delete closing.value[id];
   }
 
   /** Opens the card's upgrade panel with Jig's dry run of the upgrade. */

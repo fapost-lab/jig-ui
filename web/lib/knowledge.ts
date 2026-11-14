@@ -183,13 +183,19 @@ export function shownText(proposal: Proposal, read: DocumentText | 'reading' | '
  * The line for decisions Jig refused, which gives them all back: a stale revision as the knowledge having changed; else
  * `agent.git: none` sends the person to Settings; a document no longer open to it, or one Jig 0.40.0 did not find on its
  * branch, is said so; otherwise Jig's own reasons — Jig 0.41.0 says itself why a document is not where the decision is
- * judged —, paths already cut out by the server, or the code. `doc` is the document the refusal names, `null` for none.
+ * judged —, paths already cut out by the server, or the code. `doc` is the document the refusal names, `null` for none;
+ * `back` how many decisions are given back, the refused write's and those queued behind it. Jig wrote none of them,
+ * whatever an earlier write of the same run did.
  */
-export function knowledgeRefusal(code: string, reasons: string[], doc: string | null): string {
+export function knowledgeRefusal(code: string, reasons: string[], doc: string | null, back: number): string {
+  const one = back === 1;
   if (code === 'stale-revision')
-    return 'The knowledge changed since it was shown: your decisions are back, decide them on it as it is now.';
+    return `The knowledge changed since it was shown: ${one ? 'your decision is' : `your ${back} decisions are`} back, decide ${one ? 'it' : 'them'} on it as it is now.`;
   const line = why(code, reasons, doc ?? 'them');
-  return `${/[.!?]$/.test(line) ? line : `${line}.`} Nothing was written: your decisions are back for you to decide.`;
+  const given = one
+    ? 'Jig did not write your decision: it is back for you to decide.'
+    : `Jig wrote none of the ${back} decisions: they are back for you to decide.`;
+  return `${/[.!?]$/.test(line) ? line : `${line}.`} ${given}`;
 }
 
 function why(code: string, reasons: string[], doc: string): string {
